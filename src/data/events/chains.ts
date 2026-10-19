@@ -167,7 +167,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   },
   {
     id: 'eloped_chase', title: '대공가의 추격대', once: true, weight: 6,
-    cond: { flags: ['eloped'] },
+    cond: { flags: ['eloped'], hasRel: ['spouse'] },
     text: '대공가의 기사들이 국경까지 쫓아왔다. {spouse}의 손이 떨린다.',
     choices: [
       { label: '숲으로 숨는다', check: { stat: 'luck', dc: 38 },

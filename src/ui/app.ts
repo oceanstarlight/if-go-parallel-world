@@ -1,3 +1,5 @@
+import { Music } from '../audio/music';
+import { moodFor } from '../audio/compose';
 import type { Focus, LifeState, MetaSave, RelKey } from '../types';
 import { HOUSES, houseById } from '../data/houses';
 import { CHEATS, cheatById } from '../data/cheats';
@@ -8,7 +10,7 @@ import { SHOP, itemCost } from '../data/shop';
 import { goalById } from '../data/goals';
 import { FOCUS_DESC, FOCUS_NAMES, MOOD_HINT, MOOD_NAMES, REL_NAMES, STAT_KEYS, STAT_NAMES, affectionWord } from '../data/stats';
 import {
-  STRESS_HIGH, advanceYear, applyOracle, canAdvance, choiceLocked, choose, createLife, currentEvent, focusMul,
+  MAX_INJURY, MONTHS, STRESS_HIGH, advanceMonth, applyOracle, canAdvance, genderOf, choiceLocked, choose, createLife, currentEvent, focusMul,
   successChance, traitsOf, visibleChoices, rollHouse, rollCheat,
 } from '../engine/life';
 import { RARITY_NAME } from '../data/traits';
@@ -27,7 +29,8 @@ import type { MarketCat } from '../data/market';
 import { branchPaths } from '../data/branches';
 import { battleOdds, isCombat } from '../engine/combat';
 import { beginDive, canEnterDungeon, descend, endDiveOnDeath, retreat } from '../engine/dungeon';
-import { buy as marketBuy, drink, drinkBest, equip, innRest, repairItems, sell, sellAllLoot } from '../engine/economy';
+import { buy as marketBuy, drink, drinkBest, equip, fmtGold, innRest, payLabel, repairItems, sell, sellAllLoot } from '../engine/economy';
+import { rec } from '../engine/record';
 import { bossEnemy } from '../gfx/mapping';
 import { biomeOf } from '../data/items';
 import { ENEMY_HP as BOSS_HP } from '../gfx/mapping';
@@ -69,8 +72,12 @@ interface App {
   oracle: Oracle | null;
   /** 방침을 고르지 않고 한 해를 넘기려 했다 (방침 카드를 강조) */
   focusNudge: boolean;
+  /** 시간 흐름: 일시 정지 · 한 해의 길이(초) */
+  paused: boolean;
+  pace: Pace;
   townTab: 'shop' | 'bag';
   townCat: MarketCat;
+  music: Music;
 }
 
 const esc = (v: string | number) =>
@@ -92,8 +99,11 @@ export async function mount(root: HTMLElement) {
     dismissedEvent: null,
     oracle: null,
     focusNudge: false,
+    paused: false,
+    pace: loadPace(),
     townTab: 'shop',
     townCat: 'weapon',
+    music: new Music(),
   };
   if (app.life) repairItems(app.life);
   // 사망 상태로 저장된 삶이 있으면 (정산 직전 새로고침) 바로 정산
@@ -102,6 +112,7 @@ export async function mount(root: HTMLElement) {
   const render = () => {
     root.innerHTML = view(app);
     syncGfx(app, root); // 캔버스가 붙어 높이가 정해진 뒤에 스크롤
+    app.music.setMood(moodFor(app.screen));
     const log = root.querySelector('.chronicle');
     if (log) log.scrollTop = log.scrollHeight;
     bindSwipe(root, (act, i) => run(act, String(i)));
@@ -140,7 +151,7 @@ export async function mount(root: HTMLElement) {
     const ev2 = currentEvent(app.life);
     if (ev.code === 'Space') {
       ev.preventDefault();
-      run('advance');
+      run('pause');
     } else if (/^Digit[1-9]$/.test(ev.code)) {
       const i = Number(ev.code.slice(5)) - 1;
       if (ev2) run('choose', String(i));
@@ -149,7 +160,57 @@ export async function mount(root: HTMLElement) {
       run('choose', ev.code === 'ArrowLeft' ? '0' : '1');
     }
   });
+  // ── 시간: 한 해 = pace 초. 한 달씩 저절로 흐르고, 선택이 필요한 사건이 뜨면 멈춘다 ──
+  let last = performance.now();
+  let acc = 0;
+  window.setInterval(() => {
+    const now = performance.now();
+    const dt = Math.min(500, now - last);
+    last = now;
+    const s = app.life;
+    if (!s || !timeFlows(app)) return;
+    const monthMs = (app.pace * 1000) / MONTHS;
+    acc += dt;
+    if (acc >= monthMs) {
+      acc = 0;
+      advanceMonth(s);
+      afterStep(app);
+      render();
+      popPay(root, s);
+    }
+    const bar = root.querySelector<HTMLElement>('.year-bar > i');
+    if (bar) bar.style.width = `${(((s.month ?? 0) + acc / monthMs) / MONTHS) * 100}%`;
+  }, 100);
   render();
+}
+
+type Pace = 10 | 15 | 25;
+const PACE_KEY = 'igpw-pace-v1';
+const PACES: { v: Pace; name: string }[] = [{ v: 25, name: '느리게' }, { v: 15, name: '보통' }, { v: 10, name: '빠르게' }];
+
+function loadPace(): Pace {
+  try {
+    const v = Number(localStorage.getItem(PACE_KEY));
+    return v === 10 || v === 25 ? v : 15;
+  } catch {
+    return 15;
+  }
+}
+
+/** 지금 시간이 흐르는가: 인생 화면에서, 사건·전투·죽음·일시 정지가 없을 때 */
+const timeFlows = (app: App) =>
+  app.screen === 'life' && !!app.life && canAdvance(app.life) && !app.paused && app.battleLogFrom === null && !document.hidden;
+
+/** 이번 달 들어온 돈을 골드 옆에 잠깐 띄운다 */
+function popPay(root: HTMLElement, s: LifeState) {
+  const pay = s.lastPay ?? 0;
+  const gold = root.querySelector('.econ .gold');
+  if (!pay || !gold) return;
+  const el = document.createElement('span');
+  el.className = 'pay-pop';
+  el.textContent = `+${fmtGold(pay)} ${payLabel(s)}`;
+  gold.appendChild(el);
+  window.setTimeout(() => el.remove(), 1400);
 }
 
 function settle(app: App) {
@@ -165,6 +226,9 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
   app.notice = '';
   app.focusNudge = false;
   switch (action) {
+    case 'music':
+      app.music.toggle();
+      break;
     case 'go':
       if (arg === 'life' && !app.life) break;
       app.screen = arg as Screen;
@@ -209,31 +273,26 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
       break;
     }
     case 'focus': {
-      // 방침을 고르면 그 방침으로 바로 한 해를 보낸다 (고정 중이면 바꾸기만 한다)
       const s = app.life;
       if (!s) break;
+      // 방침은 언제든 바꿀 수 있다. 시간은 저절로 흐른다
       s.focus = arg as Focus;
-      if (!s.focusLocked && canAdvance(s)) advanceYear(s);
       app.tab = 'none';
       afterStep(app);
       break;
     }
-    case 'lock':
-      if (app.life) app.life.focusLocked = !app.life.focusLocked;
-      afterStep(app);
+    case 'pause':
+      app.paused = !app.paused;
       break;
-    case 'advance': {
-      const s = app.life;
-      if (!s || !canAdvance(s)) break;
-      if (needsFocus(s)) {
-        // 매년 방침을 직접 고른다: 방침 시트를 띄운다
-        app.tab = 'action';
-        app.focusNudge = true;
-        break;
+    case 'pace': {
+      const v = Number(arg);
+      if (v === 10 || v === 15 || v === 25) {
+        app.pace = v;
+        app.paused = false;
+        try {
+          localStorage.setItem(PACE_KEY, String(v));
+        } catch { /* 무시 */ }
       }
-      advanceYear(s);
-      if (app.tab === 'action') app.tab = 'none';
-      afterStep(app);
       break;
     }
     case 'choose': {
@@ -388,9 +447,6 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
   }
 }
 
-/** 한 해를 보내기 전에 방침을 물어야 하는가 (세 살부터, 고정하지 않았을 때) */
-const needsFocus = (s: LifeState) => s.age >= 2 && !s.focusLocked;
-
 /** 문답을 마치고 태어난다 */
 function birth(app: App) {
   // 성별은 매 생 무작위. 이름을 비워 두면 그 성별의 이름 목록에서 짓는다
@@ -436,7 +492,10 @@ function view(app: App): string {
   return `
     <header class="topbar">
       <button class="brand" data-act="go" data-arg="title">환생록</button>
-      <div class="stones" title="환생석">${icon('diamond-gem')} ${app.meta.soulStones}</div>
+      <div class="top-right">
+        <button class="music-btn ${app.music.on ? 'on' : ''}" data-act="music" title="배경 음악 ${app.music.on ? '끄기' : '켜기'}" aria-label="배경 음악">${icon(app.music.on ? 'volume-2' : 'volume-x')}</button>
+        <div class="stones" title="환생석">${icon('diamond-gem')} ${app.meta.soulStones}</div>
+      </div>
     </header>
     <main class="screen view-${app.screen}">${body}</main>
     ${underbar(app)}
@@ -482,8 +541,7 @@ function underbar(app: App): string {
     let center: string;
     if (s.death) center = `<button class="ub-main danger" data-act="see-grave"><span>묘비로</span></button>`;
     else if (ev) center = `<button class="ub-main pulse" data-act="tab" data-arg="action"><span>선택!</span></button>`;
-    else if (needsFocus(s)) center = `<button class="ub-main" data-act="advance"><span>한 해</span><small>방침?</small></button>`;
-    else center = `<button class="ub-main" data-act="advance"><span>한 해</span><small>▶</small></button>`;
+    else center = `<button class="ub-main ${app.paused ? 'paused' : ''}" data-act="pause"><span>${app.paused ? '▶' : 'Ⅱ'}</span><small>${app.paused ? '재생' : `${(s.month ?? 0) + 1}월`}</small></button>`;
     const busy = !!(ev || s.death);
     return `
       <nav class="underbar">
@@ -684,7 +742,7 @@ function viewLife(app: App): string {
   const chronicle = groups.map((g) => `
     <div class="year">
       <div class="year-age">${g.age}세</div>
-      <div class="year-body">${g.items.map((l) => `<p class="tone-${l.tone}">${esc(l.text)}</p>`).join('')}</div>
+      <div class="year-body">${g.items.map((l, i) => `<p class="tone-${l.tone}">${l.m && l.m !== g.items[i - 1]?.m ? `<i class="mon">${l.m}월</i>` : ''}${esc(l.text)}</p>`).join('')}</div>
     </div>`).join('');
 
   const stats = STAT_KEYS.map((k) => `
@@ -698,6 +756,7 @@ function viewLife(app: App): string {
   const relBlock = `<ul class="rels">${rels || '<li class="muted small">아직 아무도 없다. 인연을 만들어 보자!</li>'}</ul>`;
   const badges = [
     s.extraLives ? `불굴 ×${s.extraLives}` : '',
+    s.injuries ? `중상 ${s.injuries}/${MAX_INJURY}` : '',
     s.fated ? '운명' : '',
   ].filter(Boolean).join(' · ');
 
@@ -722,7 +781,7 @@ function viewLife(app: App): string {
     panel = `
       <div class="event-card ${swipe ? 'swipeable' : ''}" ${swipe ? `data-swipe="choose" data-left="${esc(fill(choices[0].label, s))}" data-right="${esc(fill(choices[1].label, s))}"` : ''}>
         ${swipe ? '<div class="swipe-label"></div>' : ''}
-        <p class="eyebrow">${s.age}세의 사건</p>
+        <p class="eyebrow">${s.age}세 ${Math.max(1, s.month ?? 0)}월의 사건 · 시간이 멈췄다</p>
         <h3>${esc(fill(ev.title, s))}</h3>
         <p class="event-text">${esc(fill(ev.text, s))}</p>
         ${swipe ? '<p class="swipe-guide"><b class="l">← 왼쪽</b> · 카드를 밀어서 선택 · <b class="r">오른쪽 →</b></p>' : ''}
@@ -747,17 +806,15 @@ function viewLife(app: App): string {
   } else {
     const young = s.age < 2;
     panel = `
-      <div class="focus-card ${app.focusNudge ? 'nudge' : ''}">
-        <p class="eyebrow">올해의 방침</p>
-        ${young ? '' : s.focusLocked
-          ? '<p class="muted small focus-hint">방침이 고정되어 있다. 누르면 방침만 바뀐다.</p>'
-          : '<p class="muted small focus-hint">방침을 누르면 그 방침으로 한 해가 지나간다. <kbd>1</kbd>~<kbd>5</kbd></p>'}
+      <div class="focus-card">
+        <p class="eyebrow">방침</p>
+        ${young ? '' : '<p class="muted small focus-hint">시간은 저절로 흐른다. 방침은 언제든 바꿀 수 있다. <kbd>1</kbd>~<kbd>5</kbd> · 정지 <kbd>Space</kbd></p>'}
         <div class="focus-grid">
           ${FOCI.map((f) => {
             const mul = f === 'rest' ? 1 : focusMul(s, f);
             const tag = Math.abs(mul - 1) < 0.05 ? '' : `<em class="${mul > 1 ? 'up' : 'down'}">×${mul.toFixed(1)}</em>`;
             return `
-            <button class="focus focus-${f} ${s.focus === f && (s.focusLocked || young) ? 'selected' : ''} ${s.focus === f && !s.focusLocked && !young ? 'last' : ''}" data-act="focus" data-arg="${f}" ${young ? 'disabled' : ''}>
+            <button class="focus focus-${f} ${s.focus === f ? 'selected' : ''}" data-act="focus" data-arg="${f}" ${young ? 'disabled' : ''}>
               <strong>${FOCUS_NAMES[f]} ${tag}</strong>
               <span>${FOCUS_DESC[f]}</span>
             </button>`;
@@ -765,8 +822,7 @@ function viewLife(app: App): string {
         </div>
         ${!young && (s.stress ?? 0) >= STRESS_HIGH && s.focus !== 'rest' ? '<p class="warn small">스트레스가 높아 성장이 떨어지고 있다. 한 해 쉬어 가자!</p>' : ''}
         ${young ? '<p class="muted small">아직 너무 어리다. 세 살이 되면 방침을 정할 수 있다.</p>' : ''}
-        ${young ? '' : `<label class="focus-lock"><input type="checkbox" data-act="lock" ${s.focusLocked ? 'checked' : ''} /> 이 방침으로 계속 (매년 묻지 않기)</label>`}
-        ${young || s.focusLocked ? '<button class="btn primary wide advance" data-act="advance">한 해를 보낸다 <kbd>Space</kbd></button>' : ''}
+        ${(s.recover ?? 0) > 0 ? `<p class="warn small">${icon('heart')} 요양 중 (${s.recover}달 남음) — 성장과 수입이 절반이다.</p>` : ''}
       </div>`;
   }
 
@@ -776,7 +832,7 @@ function viewLife(app: App): string {
         <div class="portrait-host" data-gfx="portrait"></div>
         <div class="sheet-main">
           <div class="sheet-head">
-            <h2>${esc(s.name)}</h2>
+            <h2>${esc(s.name)} <span class="sex sex-${genderOf(s)}" title="${genderOf(s) === 'f' ? '여성' : '남성'}">${genderOf(s) === 'f' ? '♀' : '♂'}</span></h2>
             <p class="age">${s.age}세 · ${esc(job ? jobTitle(s.jobId, s.jobRank) : s.age < 18 ? '미성년' : '무직')}</p>
             <p class="muted small">${esc(houseById(s.houseId).name)} · ${esc(cheat.name)}${badges ? ` · ${badges}` : ''}</p>
           </div>
@@ -798,6 +854,7 @@ function viewLife(app: App): string {
     </aside>
     <section class="center">
       <div class="scene-host" data-gfx="scene" data-maxh="${Math.floor(window.innerHeight * 0.45)}"></div>
+      ${s.death ? '' : timeBar(app, s, !!ev)}
       <div class="chronicle">${chronicle}</div>
     </section>
     <section class="action ${tab === 'action' ? 'open' : ''}">
@@ -829,6 +886,44 @@ function viewLife(app: App): string {
       </div>
     </section>
   `;
+}
+
+/** 시간 막대: 올해 진행도, 일시 정지, 속도 */
+function timeBar(app: App, s: LifeState, held: boolean): string {
+  const month = s.month ?? 0;
+  return `
+    <div class="timebar ${held ? 'held' : app.paused ? 'paused' : ''}">
+      <button class="tb-play" data-act="pause" ${held ? 'disabled' : ''} aria-label="${app.paused ? '재생' : '일시 정지'}">${app.paused || held ? '▶' : 'Ⅱ'}</button>
+      <span class="tb-month">${s.age}세 ${Math.max(1, month)}월</span>
+      <div class="year-bar"><i style="width:${(month / MONTHS) * 100}%"></i></div>
+      <span class="tb-state">${held ? '사건!' : app.paused ? '정지' : ''}</span>
+      <div class="tb-pace">${PACES.map((p) => `<button class="chip ${app.pace === p.v ? 'on' : ''}" data-act="pace" data-arg="${p.v}" title="한 해 ${p.v}초">${p.name}</button>`).join('')}</div>
+    </div>`;
+}
+
+/** 사망 화면의 생애 기록 */
+function lifeRecord(s: LifeState): string {
+  const r = rec(s);
+  const top = (m: Record<string, number>, n: number) =>
+    Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => `${esc(k)} ×${v}`).join(', ');
+  const slain = Object.values(r.slain).reduce((a, b) => a + b, 0);
+  const bosses = Object.values(r.bosses).reduce((a, b) => a + b, 0);
+  const row = (label: string, value: string, sub = '') =>
+    `<li><span>${label}</span><b>${value}</b>${sub ? `<small class="muted">${sub}</small>` : ''}</li>`;
+  return `
+    <ul class="life-record">
+      ${row('겪은 사건', `${r.events}건`)}
+      ${row('죽을 뻔한 일', `${r.nearDeaths.length}번`, r.nearDeaths.map((c) => esc(deathById(c).name)).join(', '))}
+      ${row('사건 전투', r.battles ? `${r.battles}전 ${r.wins}승 ${r.battles - r.wins}패` : '없음', top(r.foes, 4))}
+      ${row('던전 원정', r.dives ? `${r.dives}번 · 최고 ${r.maxFloor}층` : '안 갔다')}
+      ${slain ? row('쓰러뜨린 마물', `${slain}마리`, top(r.slain, 4)) : ''}
+      ${bosses ? row('격파한 보스', `${bosses}번`, top(r.bosses, 4)) : ''}
+      ${r.loot ? row('주운 전리품', `${r.loot}개`) : ''}
+      ${row('번 돈', fmtGold(r.earned))}
+      ${row('쓴 돈', fmtGold(r.spent))}
+      ${row('남긴 재산', fmtGold(s.gold ?? 0))}
+      ${row('거쳐 간 직업', r.jobs.length ? r.jobs.map((j) => esc(jobById(j)?.name ?? j)).join(' → ') : s.jobId ? esc(jobById(s.jobId)?.name ?? '') : '무직')}
+    </ul>`;
 }
 
 function viewDeath(app: App): string {
@@ -866,6 +961,8 @@ function viewDeath(app: App): string {
           <div><p class="eyebrow">환생의 여신</p>${st.goddess.map((l) => `<p>"${esc(l)}"</p>`).join('')}</div>
         </div>
         ${st.firstDeath ? '<p class="new-death">새로운 죽음이 도감에 기록되었다!</p>' : ''}
+        <h3>생애 기록</h3>
+        ${lifeRecord(s)}
         <h3>환생석 정산</h3>
         <ul>${st.lines.map((l) => `<li><span>${esc(l.label)}</span><span>+${l.value}</span></li>`).join('')}</ul>
         <p class="settle-total">합계 <strong>◆ ${st.total}</strong></p>

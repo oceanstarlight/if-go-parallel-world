@@ -4,6 +4,7 @@ import { combatPower, floorPower, winChance } from './combat';
 import { fmtGold, maxHp } from './economy';
 import { applyEffect, gainStat, kill, type Rng } from './life';
 import { bagCap } from './economy';
+import { bump, earn, rec } from './record';
 
 /**
  * 던전: 시간이 흐르지 않는 별도 모드. 100계층, 5층씩 내려간다.
@@ -26,6 +27,7 @@ export function beginDive(s: LifeState, start: number) {
   const floor = allowed.includes(start) ? start : 0;
   s.hp = Math.min(s.hp ?? maxHp(s), maxHp(s));
   s.dive = { floor, loot: [], log: [], gold: 0, last: null };
+  rec(s).dives++;
   note(s, floor ? `${floor}층의 귀환 포탈로 내려왔다. 서늘한 공기가 감돈다.` : '던전 입구에 섰다. 횃불이 일렁인다.', 'milestone');
 }
 
@@ -85,6 +87,7 @@ export function descend(s: LifeState, rng: Rng = Math.random): DescendResult {
   if (!d || s.death || d.floor >= DUNGEON_DEPTH) return 'fled';
   const cp = combatPower(s);
   for (let f = d.floor + 1; f <= d.floor + 4; f++) {
+    rec(s).maxFloor = Math.max(rec(s).maxFloor, f);
     const b = biomeOf(f);
     const r = rng();
     if (r < 0.55) {
@@ -95,6 +98,7 @@ export function descend(s: LifeState, rng: Rng = Math.random): DescendResult {
         const it = rng() < 0.75 ? materialDrop(rng, f) : null;
         if (it) d.loot.push(it);
         const res = hurt(s, ep * 0.12 * (1.2 - p), f);
+        bump(rec(s).slain, mon);
         note(s, `${f}층 · ${mon} 처치!${it ? ` 「${it.name}」 획득.` : ''}`, 'good');
         if (res !== 'ok') return finish(s, res);
       } else {
@@ -136,6 +140,8 @@ export function descend(s: LifeState, rng: Rng = Math.random): DescendResult {
     const res = hurt(s, ep * 0.22 * (1.1 - p), bf);
     d.floor = bf;
     s.dgBest = Math.max(s.dgBest ?? 0, bf);
+    bump(rec(s).bosses, boss);
+    rec(s).maxFloor = Math.max(rec(s).maxFloor, bf);
     note(s, `${bf}층 보스 「${boss}」 격파! 귀환 포탈이 열렸다. (HP ${s.hp})`, 'milestone');
     if (res !== 'ok') return finish(s, res);
     if (bf >= DUNGEON_DEPTH) return conquer(s);
@@ -178,6 +184,8 @@ export function retreat(s: LifeState): string {
   const overGold = over.reduce((a, it) => a + Math.round(it.value * 0.5), 0);
   s.bag = [...(s.bag ?? []), ...keep];
   s.gold = (s.gold ?? 0) + d.gold + overGold;
+  earn(s, d.gold + overGold);
+  rec(s).loot += d.loot.length;
   const deepest = d.floor;
   // 모험가 길드 랭크는 도달 계층으로 오른다
   if (s.jobId === 'adventurer') {

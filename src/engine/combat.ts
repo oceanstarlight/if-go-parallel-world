@@ -12,6 +12,12 @@ export const BATTLE_ENEMY: Record<string, EnemyKind> = {
   fugitive_bounty: 'bandit', avenger_duel: 'hero',
 };
 
+/** 적 이름 (생애 기록용) */
+export const ENEMY_NAME: Record<string, string> = {
+  bully: '골목대장', rival: '라이벌', bandit: '산적', shadow: '그림자 마물', dragon: '드래곤', wolf: '마수',
+  soldier: '적국 병사', wyvern: '와이번', traitor: '배신자', stalker: '스토커', hero: '용사', demon_lord: '마왕',
+};
+
 /** 이 선택지가 전투인가 (전투 사건의 체력·마력 판정) */
 export function isCombat(eventId: string | null | undefined, c: Choice): boolean {
   const stat = c.check?.stat;
