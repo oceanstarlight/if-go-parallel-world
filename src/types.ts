@@ -1,7 +1,9 @@
 export type StatKey = 'vit' | 'mana' | 'int' | 'cha' | 'fame' | 'luck';
 export type Stats = Record<StatKey, number>;
 
-export type Focus = 'train' | 'study' | 'social' | 'explore';
+export type Focus = 'train' | 'study' | 'social' | 'explore' | 'rest';
+/** 기분: 방침별 성장 배율과 초상화 표정에 반영된다 */
+export type MoodKey = 'calm' | 'joy' | 'gloom' | 'anger' | 'fear';
 export type RelKey = 'friend' | 'rival' | 'mentor' | 'spouse';
 
 export interface Relation {
@@ -42,6 +44,40 @@ export interface LifeState {
   lastEventId?: string | null;
   extraLives: number;
   death: Death | null;
+  /** 이번 생의 목표 id (예전 저장에는 없을 수 있다) */
+  goals?: string[];
+  /** 남은 판정 되돌리기 횟수 */
+  rerolls?: number;
+  /** 이번 생에 만난 고정 캐릭터 */
+  npcMet?: string[];
+  /** 지난 생들에서 고정 캐릭터를 만난 횟수 (생성 시 메타에서 복사) */
+  npcPast?: Record<string, number>;
+  /** 몇 번째 삶인지 (1부터) */
+  lifeNo?: number;
+  /** 운명에 맡겨 태어났는가 */
+  fated?: boolean;
+  /** 타고난 특성 id (0~2개) */
+  traits?: string[];
+  /** 스트레스 0~100. 높으면 성장이 떨어지고 과로로 쓰러진다 */
+  stress?: number;
+  /** 기분 */
+  mood?: MoodKey;
+  /** 의지력 0~100. 숙명을 거스르는 선택에 쓴다 */
+  will?: number;
+  /** 직전 해의 방침 (같은 방침을 반복하면 스트레스가 더 쌓인다) */
+  prevFocus?: Focus;
+  /** 전설이 된 전생들 (생성 시 메타에서 복사) */
+  legends?: Legend[];
+}
+
+/** 다음 생에 전해지는 전생의 이야기 */
+export interface Legend {
+  name: string;
+  deed: string;
+  kind: 'hero' | 'villain' | 'ghost' | 'sage';
+  houseId: string;
+  age: number;
+  lifeNo: number;
 }
 
 /** 사건/선택지가 나타나기 위한 조건. 명시된 항목은 모두 만족해야 한다. */
@@ -68,6 +104,8 @@ export interface Cond {
   minJobRank?: number;
   maxJobRank?: number;
   test?: (s: LifeState) => boolean;
+  traits?: string[];
+  notTraits?: string[];
 }
 
 export interface Effect {
@@ -85,8 +123,15 @@ export interface Effect {
   job?: string;
   jobRank?: number;
   death?: string;
+  /** 고정 캐릭터를 만났다고 기록 */
+  meet?: string;
   /** 이 효과로 체력이 0이 되었을 때의 사인 (기본: illness) */
   zeroCause?: string;
+  mood?: MoodKey;
+  stress?: number;
+  will?: number;
+  /** 불굴 목숨 증감 */
+  extraLives?: number;
 }
 
 export interface Outcome {
@@ -111,6 +156,8 @@ export interface Resolution {
 export interface Choice extends Resolution {
   label: string;
   cond?: Cond;
+  /** 의지력 비용. 모자라면 선택지가 잠긴다 */
+  will?: number;
 }
 
 export type Text = string | ((s: LifeState) => string);
@@ -141,6 +188,10 @@ export interface House {
   flags?: string[];
   /** 매년 성장 보너스 */
   growth?: Partial<Stats>;
+  /** 운명 모드에서 이 출신으로 태어날 상대 확률 (인구 비중) */
+  weight: number;
+  /** 노화 속도 배율 (엘프는 느리다) */
+  agingMul?: number;
 }
 
 export interface Cheat {
@@ -155,6 +206,14 @@ export interface Cheat {
   relMul?: number;
   extraLives?: number;
   showAffection?: boolean;
+  /** 선택지 성공률을 보여준다 */
+  showChance?: boolean;
+  /** 실패한 판정을 다시 굴릴 수 있는 횟수 (한 생에) */
+  rerolls?: number;
+  /** 노화 속도 배율 */
+  agingMul?: number;
+  /** 운명 모드에서 뽑힐 상대 확률 */
+  weight: number;
 }
 
 export interface Job {
@@ -183,6 +242,10 @@ export interface MetaSave {
   codex: Record<string, number>;
   lives: PastLife[];
   totalLives: number;
+  /** 고정 캐릭터를 만난 생의 수 */
+  npcMet?: Record<string, number>;
+  /** 전설이 된 전생들 (최근 순) */
+  legends?: Legend[];
 }
 
 export interface PastLife {
@@ -192,4 +255,29 @@ export interface PastLife {
   title: string;
   causeId: string;
   stones: number;
+  goalsDone?: number;
+  /** 전설로 남은 업적 */
+  deed?: string;
+}
+
+/** 타고난 특성 (Rogue Legacy 의 유전 특성) */
+export interface Trait {
+  id: string;
+  name: string;
+  desc: string;
+  /** 1 흔함 · 2 드묾 · 3 희귀 */
+  rarity: 1 | 2 | 3;
+  stats?: Partial<Stats>;
+  checkBonus?: Partial<Stats>;
+  growthMul?: Partial<Stats>;
+  /** 방침별 성장 배율 */
+  focusMul?: Partial<Record<Focus, number>>;
+  stressMul?: number;
+  will?: number;
+  agingMul?: number;
+  extraLives?: number;
+  /** 사건 발생률 배율 */
+  eventRate?: number;
+  /** 함께 가질 수 없는 특성 */
+  conflicts?: string[];
 }

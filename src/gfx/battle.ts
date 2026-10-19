@@ -127,6 +127,24 @@ export class BattleDirector {
     const w = new Painter(1, 1);
     w.px(0, 0, '#ffffff');
     this.white = this.own(host.texOf(w));
+    const st = new Painter(3, 3);
+    st.px(1, 0, '#ffffff'); st.px(0, 1, '#ffffff'); st.px(1, 1, '#ffffff'); st.px(2, 1, '#ffffff'); st.px(1, 2, '#ffffff');
+    this.star = this.own(host.texOf(st));
+  }
+
+  private star: Texture;
+
+  /** 쓰러짐: 화면이 하얗게 번지며 부드럽게 (애니풍) */
+  private soften() {
+    const flash = new Graphics().rect(0, 0, SCENE_W, SCENE_H).fill({ color: 0xffffff });
+    flash.alpha = 0;
+    this.host.layer.addChild(flash);
+    this.tw(gsap.timeline()
+      .to(flash, { alpha: 0.75, duration: 0.18, ease: 'power2.out' })
+      .to(flash, { alpha: 0, duration: 0.6, ease: 'power1.in' }));
+    const { x, y } = this.player.mid;
+    this.burst(x, y, 30, [0xffffff, 0xfff4a0, 0xa8f0ff, 0xffc8f0], 0.9, -0.03);
+    this.glitch(0.12);
   }
 
   private own(t: Texture) {
@@ -180,10 +198,10 @@ export class BattleDirector {
 
   private burst(x: number, y: number, n: number, colors: number[], speed = 1.6, gravity = 0.12) {
     for (let i = 0; i < n; i++) {
-      const s = new Sprite(this.white);
+      const s = new Sprite(i % 3 === 0 ? this.star : this.white);
       s.tint = colors[i % colors.length];
       s.position.set(Math.round(x), Math.round(y));
-      if (i % 4 === 0) s.scale.set(2);
+      if (i % 5 === 1) s.scale.set(2);
       this.host.layer.addChild(s);
       const a = Math.random() * Math.PI * 2;
       const v = speed * (0.4 + Math.random());
@@ -263,7 +281,7 @@ export class BattleDirector {
     const back = -from.facing * (crit ? 6 : 3);
     this.tw(gsap.fromTo(target.root, { x: target.root.x + back }, { x: target.root.x, duration: 0.3, ease: 'power2.out', snap: { x: 1 } }));
     // 파티클, 베기, 숫자, 흔들림
-    const colors = magic ? [0x9adcff, 0xffffff, 0x5a8ae0] : [0xfff4dc, 0xf0c060, 0xc83a2a];
+    const colors = magic ? [0x9af0ff, 0xffffff, 0xc8a0ff, 0xffb0e8] : [0xffffff, 0xffe070, 0xff8aa8, 0x8ad8ff];
     this.burst(x, y, crit ? 22 : 12, colors, crit ? 2.4 : 1.6);
     if (!magic) this.slash(x, y, from.facing < 0, crit ? '#ffe680' : '#fff4dc');
     this.number(x, y - target.h * 0.35, dmg, crit);
@@ -329,7 +347,7 @@ export class BattleDirector {
       const maxHp = o.enemyHp ?? 100;
       if (o.glow) this.player.root.filters = [new GlowFilter({ distance: 4, outerStrength: 0.9, color: o.glow, quality: 0.2 })];
 
-      this.dim.rect(0, 0, SCENE_W, SCENE_H).fill({ color: 0x000000, alpha: 0.35 });
+      this.dim.rect(0, 0, SCENE_W, SCENE_H).fill({ color: 0x1a1a5a, alpha: 0.12 });
       const shadow = new Graphics();
       host.layer.addChild(this.dim, shadow, this.enemy.root, this.player.root, this.hpBar);
       this.player.root.position.set(-30, gy);
@@ -367,7 +385,7 @@ export class BattleDirector {
           e.breathing = false;
           e.setPose('hurt');
           const { x, y } = e.mid;
-          this.burst(x, y, 26, [0x8a8480, 0x5e5a58, 0xc8c0b0], 1.1, -0.02);
+          this.burst(x, y, 26, [0xffffff, 0xfff4a0, 0xffc8f0, 0xa8f0ff], 1.1, -0.02);
           this.tw(gsap.to(e.root, { alpha: 0, y: gy + 6, duration: 0.55, ease: 'steps(6)' }));
         });
       } else {
@@ -378,7 +396,7 @@ export class BattleDirector {
           p.setPose('hurt');
           if (o.died) {
             this.tw(gsap.to(p.root, { rotation: -Math.PI / 2, alpha: 0.7, duration: 0.45, ease: 'bounce.out' }));
-            this.glitch(0.45);
+            this.soften();
           } else {
             this.tw(gsap.to(p.root, { y: gy + 3, duration: 0.2, ease: 'power2.out' }));
           }

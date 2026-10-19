@@ -1,5 +1,5 @@
 import type { Choice, LifeState } from '../types';
-import type { SceneKind } from './scenes';
+import { DEFAULT_TIME, type ParticleKind, type SceneKind, type TimeOfDay } from './scenes';
 import type { EnemyKind } from './sprites';
 
 /** 사건 → 장면. 'home' 은 가문의 고향 장면으로 바뀐다 */
@@ -21,10 +21,18 @@ const EVENT_SCENE: Record<string, SceneKind | 'home'> = {
   m_career18: 'road', e_knight_war: 'battlefield', e_merchant_deal: 'port', e_adv_betrayal: 'forest',
   e_adv_quest: 'road', e_priest_heretic: 'temple', e_priest_plague: 'graveyard', e_farmer_harvest: 'village',
   e_demon_raid: 'burning', e_demon_lord_hero: 'throne', e_hero_final: 'throne',
+  npc_lulu: 'forest', npc_lulu_regular: 'forest', npc_grim: 'graveyard', npc_momo: 'road',
+  d_farm: 'village', d_merchant: 'port', d_noble: 'castle', d_demon: 'demon_castle', d_hero: 'room',
+  d_elf: 'forest', d_dwarf: 'dungeon', d_beastkin: 'forest', d_eastern: 'temple', d_mermaid: 'port',
+  d_sky: 'castle', d_witch: 'forest', d_slime: 'forest',
+  x_blow_spouse: 'road', x_blow_friend: 'road', x_blow_mentor: 'road',
+  lg_statue: 'village', lg_bard: 'tavern', lg_book: 'library', lg_villain: 'village', lg_ghost: 'graveyard',
 };
 
 const HOME: Record<string, SceneKind> = {
   farm: 'village', merchant: 'port', noble: 'castle', demon: 'demon_castle', hero: 'village',
+  elf: 'forest', dwarf: 'dungeon', beastkin: 'road', eastern: 'temple', mermaid: 'port',
+  sky: 'castle', witch: 'forest', slime: 'forest',
 };
 
 const JOB_SCENE: Record<string, SceneKind> = {
@@ -68,18 +76,18 @@ export function battleFor(eventId: string, choice: Choice): { enemy: EnemyKind; 
 }
 
 /** 사인별 묘지 연출 */
-export function graveWeather(causeId: string): 'embers' | 'snow' | 'ash' | 'rain' | 'fireflies' | 'dust' {
+export function graveWeather(causeId: string): ParticleKind {
   switch (causeId) {
-    case 'heresy': case 'dragon': case 'mana_overload': case 'experiment': case 'pact': case 'demon_lord_slain':
+    case 'heresy': case 'dragon': case 'pact': case 'demon_lord_slain':
       return 'embers';
+    case 'mana_overload': case 'experiment': case 'hero_sacrifice': case 'old_age':
+      return 'sparkles';
     case 'famine': case 'plague': case 'illness':
       return 'snow';
     case 'war': case 'demon_purge': case 'assassination':
-      return 'ash';
+      return 'leaves';
     case 'yandere': case 'betrayal_party': case 'hero_framed': case 'duel': case 'carriage': case 'bandits': case 'dungeon':
       return 'rain';
-    case 'hero_sacrifice':
-      return 'dust';
     default:
       return 'fireflies';
   }
@@ -90,3 +98,18 @@ export const ENEMY_HP: Record<EnemyKind, number> = {
   bully: 30, bandit: 120, soldier: 150, rival: 160, stalker: 140, traitor: 130, wolf: 110,
   shadow: 260, wyvern: 380, hero: 720, demon_lord: 880, dragon: 999,
 };
+
+/** 밤에 일어나는 사건 */
+const NIGHT_EVENTS = new Set(['m_awaken3', 'c_fever', 'a_yandere', 'a_dark_pact', 'a_pact_due', 'a_illness', 'e_adv_betrayal', 'a_inquisition', 'd_demon', 'd_witch', 'd_hero', 'x_blow_spouse', 'x_blow_friend', 'x_blow_mentor']);
+/** 노을 무렵의 사건 */
+const DUSK_EVENTS = new Set(['npc_grim', 'a_spouse_death', 'a_mentor_death', 'a_reflection', 'a_friend_confess', 'a_rival_reconcile', 'e_hero_final', 'e_demon_lord_hero', 'lg_ghost', 'd_mermaid']);
+
+/** 시간대: 사건 > 나이(노년은 노을) > 장면 기본값 */
+export function timeFor(s: LifeState, kind: SceneKind): TimeOfDay {
+  const evId = s.pendingEventId ?? s.lastEventId;
+  if (evId && NIGHT_EVENTS.has(evId)) return 'night';
+  if (evId && DUSK_EVENTS.has(evId)) return 'dusk';
+  const base = DEFAULT_TIME[kind];
+  if (base === 'day' && s.age >= 55) return 'dusk';
+  return base;
+}

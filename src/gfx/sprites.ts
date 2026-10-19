@@ -3,7 +3,7 @@ import { lookOf, type PortraitSpec, type Ramp } from './portrait';
 
 /** 전투 스프라이트. 모두 오른쪽을 바라보도록 그린다 (적은 좌우 반전해서 쓴다). */
 
-const OUTLINE = '#120c10';
+const OUTLINE = '#2a1838';
 
 export type Weapon = 'sword' | 'holysword' | 'staff' | 'axe' | 'spear' | 'knife' | 'fist' | 'pitchfork';
 
@@ -165,7 +165,7 @@ export function drawHumanoid(o: HumanoidOpts, pose: Pose = 'idle'): Painter {
   p.rect(handX - 1, handY - 1, S(3), S(3), o.skin[1]);
   drawWeapon(p, o.weapon, handX, handY, k, P.angle);
 
-  p.outline(OUTLINE);
+  p.outlineTinted(0.6);
   return p;
 }
 
@@ -275,35 +275,35 @@ const HAIR_DARK: Ramp = ['#56506a', '#302a3e', '#1a1624'];
 export function enemySprite(kind: EnemyKind): SpriteSet {
   switch (kind) {
     case 'bandit':
-      return humanoidSet({ skin: SKIN_MID, hair: HAIR_DARK, eye: '#2a1a1a', body: '#5a4430', bodyShadow: '#3a2a1e', trim: '#2a1e14', legs: '#3a3028', weapon: 'axe', hood: '#4a3a2a' });
+      return humanoidSet({ skin: SKIN_MID, hair: HAIR_DARK, eye: '#2a1a1a', body: '#c8884a', bodyShadow: '#9a6038', trim: '#6a3a22', legs: '#7a5a4a', weapon: 'axe', hood: '#a86a3a' });
     case 'soldier':
-      return humanoidSet({ skin: SKIN_MID, hair: HAIR_DARK, eye: '#2a1a1a', body: '#6a2a2a', bodyShadow: '#4a1a1a', trim: '#9aa0aa', legs: '#3a3a44', weapon: 'spear', helmet: '#8a929e' });
+      return humanoidSet({ skin: SKIN_MID, hair: HAIR_DARK, eye: '#2a1a1a', body: '#e85a5a', bodyShadow: '#b03a4a', trim: '#e0e8f8', legs: '#5a6a9a', weapon: 'spear', helmet: '#c8d4ec' });
     case 'rival':
-      return humanoidSet({ skin: SKIN_MID, hair: ['#e0e0f0', '#9a9ab8', '#5e5e7a'], eye: '#6a3aa0', body: '#2a2a3e', bodyShadow: '#1a1a28', trim: '#a8303a', legs: '#1e1e2a', weapon: 'sword', cape: '#3a1a2a' });
+      return humanoidSet({ skin: SKIN_MID, hair: ['#e0e0f0', '#9a9ab8', '#5e5e7a'], eye: '#6a3aa0', body: '#4a4ab8', bodyShadow: '#30308a', trim: '#ff5a7a', legs: '#2a2a6a', weapon: 'sword', cape: '#8a3ab8' });
     case 'bully':
-      return humanoidSet({ skin: SKIN_MID, hair: ['#e0b860', '#b08a3a', '#7a5a22'], eye: '#3a3a6a', body: '#3a5a9a', bodyShadow: '#2a3e6a', trim: '#e0c060', legs: '#4a3a2a', weapon: 'fist', size: 0.8 });
+      return humanoidSet({ skin: SKIN_MID, hair: ['#e0b860', '#b08a3a', '#7a5a22'], eye: '#3a3a6a', body: '#ff8a3a', bodyShadow: '#d0602a', trim: '#ffe070', legs: '#5a6ab8', weapon: 'fist', size: 0.8 });
     case 'stalker':
-      return humanoidSet({ skin: ['#f4dcd0', '#dcbcb0', '#a88a84'], hair: ['#4a3a5a', '#2a1e36', '#140e1e'], eye: '#c8304a', body: '#2a1e2e', bodyShadow: '#18101c', trim: '#6a2a3a', legs: '#1e1622', weapon: 'knife' });
+      return humanoidSet({ skin: ['#f4dcd0', '#dcbcb0', '#a88a84'], hair: ['#4a3a5a', '#2a1e36', '#140e1e'], eye: '#c8304a', body: '#ff8ab8', bodyShadow: '#d05a90', trim: '#ffffff', legs: '#7a4a8a', weapon: 'knife' });
     case 'hero':
-      return humanoidSet({ skin: SKIN_MID, hair: ['#f4d878', '#c8a040', '#8a6626'], eye: '#3e8ae0', body: '#b8c4d4', bodyShadow: '#76829a', trim: '#e0b850', legs: '#4a5a7a', weapon: 'holysword', cape: '#2e5aa8' });
+      return humanoidSet({ skin: SKIN_MID, hair: ['#f4d878', '#c8a040', '#8a6626'], eye: '#3e8ae0', body: '#e4ecff', bodyShadow: '#a4b4e0', trim: '#ffc83a', legs: '#4a6ad0', weapon: 'holysword', cape: '#3a8aff' });
     case 'demon_lord':
-      return humanoidSet({ skin: ['#e0d4e4', '#b8a6c4', '#7e6a90'], hair: HAIR_DARK, eye: '#ff3040', body: '#1e1a26', bodyShadow: '#100c16', trim: '#b8283a', legs: '#140e1a', weapon: 'sword', horns: true, crown: true, cape: '#6a0c18', size: 1.3 });
+      return humanoidSet({ skin: ['#e0d4e4', '#b8a6c4', '#7e6a90'], hair: HAIR_DARK, eye: '#ff3040', body: '#5a2a98', bodyShadow: '#3a1a6a', trim: '#ff3a7a', legs: '#2a1a4a', weapon: 'sword', horns: true, crown: true, cape: '#c82a5a', size: 1.3 });
     case 'traitor':
-      return humanoidSet({ skin: SKIN_MID, hair: ['#b07c44', '#7a4e2a', '#4a2e1a'], eye: '#3a3a2a', body: '#4e5a3a', bodyShadow: '#323a24', trim: '#7a5232', legs: '#3a3428', weapon: 'knife', hood: '#3e4a2e' });
+      return humanoidSet({ skin: SKIN_MID, hair: ['#b07c44', '#7a4e2a', '#4a2e1a'], eye: '#3a3a2a', body: '#5ab878', bodyShadow: '#3a8858', trim: '#d08a50', legs: '#6a5a4a', weapon: 'knife', hood: '#4a9a68' });
     case 'wolf':
       return singleSet(drawWolf());
     case 'shadow':
       return singleSet(drawShadow());
     case 'dragon':
-      return singleSet(drawDragon('#5a1a1e', '#8a2a24', '#e0602a', 1));
+      return singleSet(drawDragon('#e84a4a', '#ff8a6a', '#ffd070', 1));
     case 'wyvern':
-      return singleSet(drawDragon('#2a4a2e', '#4a6a3a', '#c8d040', 0.6));
+      return singleSet(drawDragon('#3ab878', '#7ae0a0', '#fff070', 0.6));
   }
 }
 
 function drawWolf(): Painter {
   const p = new Painter(48, 32);
-  const fur = '#5a5a66', dark = '#3a3a44', light = '#8a8a96';
+  const fur = '#a8b0d8', dark = '#7a82b0', light = '#e0e8ff';
   p.poly([[2, 14], [10, 10], [12, 13], [6, 17]], fur); // 꼬리
   p.ellipse(22, 18, 13, 7, fur);
   p.ellipseWhere(22, 18, 13, 7, dark, (_x, y) => y > 21);
@@ -315,22 +315,22 @@ function drawWolf(): Painter {
   p.poly([[37, 9], [40, 3], [41, 10]], fur);
   p.px(40, 12, '#ff4030');
   p.line(42, 17, 46, 17, '#f0f0f0');
-  p.outline(OUTLINE);
+  p.outlineTinted(0.6);
   return p;
 }
 
 function drawShadow(): Painter {
   const p = new Painter(44, 44);
-  p.ellipse(22, 22, 16, 18, '#1a1426');
-  for (let i = 0; i < 6; i++) p.poly([[8 + i * 6, 34], [10 + i * 6, 43], [13 + i * 6, 34]], '#1a1426');
-  p.ellipse(22, 18, 10, 10, '#2a2038');
+  p.ellipse(22, 22, 16, 18, '#6a4ab8');
+  for (let i = 0; i < 6; i++) p.poly([[8 + i * 6, 34], [10 + i * 6, 43], [13 + i * 6, 34]], '#6a4ab8');
+  p.ellipse(22, 18, 10, 10, '#8a6ad8');
   p.ellipse(26, 18, 3, 2, '#ff3040');
   p.ellipse(16, 18, 3, 2, '#ff3040');
   p.px(26, 17, '#ffd0d0');
   p.px(16, 17, '#ffd0d0');
   p.rect(14, 27, 14, 2, '#0a0610');
   for (let i = 0; i < 5; i++) p.px(15 + i * 3, 26, '#e0e0e0');
-  p.outline('#4a2a6a');
+  p.outlineTinted(0.5);
   return p;
 }
 
@@ -364,7 +364,7 @@ function drawDragon(body: string, light: string, belly: string, k: number): Pain
   p.line(S(52), S(40), S(58), S(4), shadow);
   p.line(S(56), S(40), S(76), S(6), shadow);
   p.line(S(58), S(44), S(84), S(28), shadow);
-  p.outline(OUTLINE);
+  p.outlineTinted(0.6);
   return p;
 }
 
