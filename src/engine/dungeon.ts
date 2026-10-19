@@ -184,9 +184,11 @@ export function retreat(s: LifeState): string {
     const rank = deepest >= 80 ? 5 : deepest >= 50 ? 4 : deepest >= 30 ? 3 : deepest >= 10 ? 2 : 1;
     if (rank > s.jobRank) s.jobRank = rank;
   }
-  if (deepest >= 20 && !s.flags.includes(`depth_${Math.floor(deepest / 20) * 20}`)) {
-    s.flags.push(`depth_${Math.floor(deepest / 20) * 20}`);
-    applyEffect(s, { stats: { fame: Math.floor(deepest / 20) * 2 } }, Math.random);
+  // 20층 단위 도달 기록: 한 번에 여러 지대를 넘어도 빠짐없이 남긴다 (길드 초청 등 후속 사건이 읽는다)
+  for (let d20 = 20; d20 <= deepest; d20 += 20) {
+    if (s.flags.includes(`depth_${d20}`)) continue;
+    s.flags.push(`depth_${d20}`);
+    applyEffect(s, { stats: { fame: d20 / 10 } }, Math.random);
   }
   const summary = `던전 원정: ${deepest}층까지 도달. 전리품 ${d.loot.length}개, ${fmtGold(d.gold + overGold)} 획득${over.length ? ` (가방이 넘쳐 ${over.length}개는 헐값에 처분)` : ''}.`;
   s.log.push({ age: s.age, text: summary, tone: d.gold || d.loot.length ? 'good' : 'normal' });

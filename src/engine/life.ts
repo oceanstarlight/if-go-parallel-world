@@ -53,9 +53,18 @@ export function weightedPick<T extends { weight: number }>(items: T[], rng: Rng)
   return items[items.length - 1];
 }
 
-/** 운명 모드: 출신과 권능을 인구 비중대로 뽑는다 */
-export function rollFate(rng: Rng = Math.random): { houseId: string; cheatId: string } {
-  return { houseId: weightedPick(HOUSES, rng).id, cheatId: weightedPick(CHEATS, rng).id };
+/** 출신은 언제나 운명이 정한다: 해금한 출신 중 인구 비중대로 (목록이 없으면 전체) */
+export function rollHouse(rng: Rng = Math.random, unlocked?: string[]): string {
+  const pool = unlocked ? HOUSES.filter((h) => unlocked.includes(h.id)) : HOUSES;
+  return weightedPick(pool.length ? pool : HOUSES, rng).id;
+}
+
+/** 운명에 맡긴 권능: 전체 권능 중 무작위 (해금 여부와 무관) */
+export const rollCheat = (rng: Rng = Math.random) => weightedPick(CHEATS, rng).id;
+
+/** 출신과 권능을 모두 운명에 맡긴다 (동시대 환생자 시뮬레이션용) */
+export function rollFate(rng: Rng = Math.random, unlocked?: string[]): { houseId: string; cheatId: string } {
+  return { houseId: rollHouse(rng, unlocked), cheatId: rollCheat(rng) };
 }
 
 function pickGoals(s: LifeState, rng: Rng): string[] {
@@ -125,7 +134,6 @@ export function createLife(opt: NewLifeOptions, rng: Rng = Math.random): LifeSta
     lastEventId: null,
     extraLives: (cheat.extraLives ?? 0) + traits.reduce((a, t) => a + (t.extraLives ?? 0), 0),
     death: null,
-    rerolls: cheat.rerolls ?? 0,
     npcMet: [],
     npcPast: { ...(opt.npcPast ?? {}) },
     lifeNo: opt.lifeNo ?? 1,
@@ -380,13 +388,7 @@ export function choiceChance(s: LifeState, eventId: string | null | undefined, c
 function resolve(s: LifeState, r: Resolution, rng: Rng, eventId?: string): { outcome: Outcome; passed: boolean | null } {
   if (!r.check) return { outcome: r.success, passed: null };
   const chance = choiceChance(s, eventId, r);
-  let passed = rng() * 100 < chance;
-  if (!passed && (s.rerolls ?? 0) > 0) {
-    // 세이브 & 로드: 실패를 한 번 되돌린다
-    s.rerolls = (s.rerolls ?? 0) - 1;
-    log(s, `⟲ 세이브 포인트에서 다시 시작! (남은 횟수 ${s.rerolls})`, 'milestone');
-    passed = rng() * 100 < chance;
-  }
+  const passed = rng() * 100 < chance;
   return { outcome: passed ? r.success : r.fail ?? r.success, passed };
 }
 

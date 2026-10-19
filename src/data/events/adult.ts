@@ -292,14 +292,18 @@ export const ADULT: GameEvent[] = [
     text: '용사 일행이 당신의 소문을 듣고 찾아왔다! "함께 마왕을 무찌르지 않겠어?"',
     choices: [
       { label: '합류한다', success: { text: '용사 파티에 들어갔다! 반짝반짝한 동료들. …이 반짝임에 그늘이 있다는 건 아직 몰랐다.', effect: { flags: ['hero_party'], stats: { fame: 10 } }, tone: 'good' } },
-      { label: '사양한다', success: { text: '"저는 조연이 편해서요." 용사는 아쉬운 기색 없이 돌아섰다.' } },
+      { label: '사양한다', success: { text: '"저는 조연이 편해서요." 용사는 아쉬운 기색 없이 돌아섰다.', effect: { flags: ['hp_declined'] } } },
     ],
   },
   {
     id: 'a_hero_framed', title: '누명', once: true, weight: 4,
-    cond: { minAge: 19, maxAge: 50, flags: ['hero_party'] },
-    text: '공주님이 독에 쓰러졌다. 그리고 용사가, 증거라며 당신의 단검을 들어 올렸다. 이건… 그 유명한 파티 추방물?!',
+    cond: { minAge: 19, maxAge: 50, flags: ['hero_party', 'hp_camp'], notFlags: ['hp_trust'] },
+    text: '공주님이 독에 쓰러졌다. 그리고 세실이, 증거라며 당신의 단검을 들어 올렸다. 아르센의 눈이 흔들린다. 이건… 그 유명한 파티 추방물?!',
     choices: [
+      {
+        label: '모닥불에서 주운 편지를 내민다', cond: { flags: ['hp_suspect'] },
+        success: { text: '타다 남은 편지의 문장이 모두의 눈앞에 드러났다. 세실의 얼굴이 하얗게 질렸다. 진범은 성녀였다!', effect: { flags: ['hp_cleared'], unflags: ['hero_party'], stats: { fame: 15 }, karma: 5 }, tone: 'milestone' },
+      },
       {
         label: '결백을 주장한다', check: { stat: 'cha', dc: 46 },
         success: { text: '진범은 파티의 성녀였다! 누명은 벗었지만, 다들 어색하게 눈을 피했다.', effect: { stats: { fame: 5 }, karma: 5, unflags: ['hero_party'] } },

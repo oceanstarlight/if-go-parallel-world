@@ -11,7 +11,7 @@ const defy = (label: string, will: number, text: string, effect: Choice['success
   ({ label, will, success: { text, effect: { ...effect, flags: [...(effect?.flags ?? []), 'defied_fate'] }, tone: 'milestone' } });
 
 const destiny = (id: string, house: string, title: string, text: string, choices: Choice[], minAge = 14, maxAge = 26): GameEvent =>
-  ({ id, title, once: true, weight: 3, cond: { minAge, maxAge, houses: [house] }, text, choices });
+  ({ id, title, once: true, weight: 3, cond: { minAge, maxAge, houses: [house], ...(house === 'demon' ? { flags: ['demon_joined'] } : {}) }, text, choices });
 
 export const DESTINY_EVENTS: GameEvent[] = [
   destiny('d_farm', 'farm', '물려받는 밭',
@@ -38,12 +38,6 @@ export const DESTINY_EVENTS: GameEvent[] = [
       defy('몰래 마을에 경고를 보낸다', 40, '한밤중, 마을 우물에 쪽지를 떨어뜨렸다. "도망쳐." 다음 날 마을은 텅 비어 있었다. 들키면 끝장이다…',
         { karma: 15, mood: 'fear' }),
     ]),
-  destiny('d_hero', 'hero', '성검의 부름',
-    '열여섯 생일 밤, 지하실의 성검이 스스로 빛을 뿜었다. "용사여, 깨어나라…" 머릿속에 목소리가 울린다.', [
-      conform('성검을 뽑는다', '쑥! 성검이 손에 감겼다. 운명이 움직이기 시작했다. 이게 바로 주인공 각성 이벤트!', { stats: { vit: 5, fame: 5 } }),
-      defy('"용사 같은 거 안 해!" 하고 지하실 문을 잠근다', 45, '성검이 서운하게 깜빡였다. 그 대신 평범하고 느긋한 하루하루가 시작됐다. 의외로 행복하다!',
-        { stats: { luck: 8, cha: 3 }, stress: -20, flags: ['refused_sword'] }),
-    ], 15, 18),
   destiny('d_elf', 'elf', '숲의 맹세',
     '세계수 아래 장로들이 모였다. "백 년 동안 숲을 떠나지 않겠다고 맹세하거라." 나뭇잎 사이로 인간 세상의 연기가 보인다.', [
       conform('세계수에 맹세한다', '세계수가 은빛 잎을 떨어뜨렸다. 숲의 마력이 몸에 스며든다.', { stats: { mana: 6 }, will: 10 }),

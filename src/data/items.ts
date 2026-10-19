@@ -83,14 +83,23 @@ export const bossLoot = (floor: number): [string, number] => [`${bossOf(floor)}�
 const RARITY_MUL: Record<Rarity, number> = { common: 1, rare: 1.3, epic: 1.7, legend: 2.3 };
 export const RARITY_NAME: Record<Rarity, string> = { common: '일반', rare: '희귀', epic: '영웅', legend: '전설' };
 
-let uidSeq = 1;
+/**
+ * 물건 고유 번호. 예전에는 무작위 값을 더해서 같은 번호가 나올 수 있었고,
+ * 그러면 다른 물건을 집어 「장착할 수 없다」가 뜨는 버그가 있었다. 이제는 단조 증가만 한다.
+ */
+let uidSeq = 0;
+let uidBase = 0;
+export function nextUid(): number {
+  if (!uidBase) uidBase = (Date.now() % 1e9) * 1000;
+  return uidBase + uidSeq++;
+}
 /** 원형으로 물건을 만든다. 희귀도가 높으면 성능과 가치가 오른다 */
-export function makeItem(def: ItemDef, rarity: Rarity = 'common', rng: () => number = Math.random): Item {
+export function makeItem(def: ItemDef, rarity: Rarity = 'common', _rng?: () => number): Item {
   const mul = RARITY_MUL[rarity];
   const names = def.kind === 'loot' ? ['', '빛나는 ', '진귀한 ', '전설의 '] : ['', '빛나는 ', '영웅의 ', '전설의 '];
   const prefix = names[['common', 'rare', 'epic', 'legend'].indexOf(rarity)];
   return {
-    uid: Date.now() % 1e9 * 1000 + (uidSeq++ % 1000) + Math.floor(rng() * 7),
+    uid: nextUid(),
     base: def.base,
     name: prefix + def.name,
     kind: def.kind,

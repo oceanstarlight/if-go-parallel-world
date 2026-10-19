@@ -55,7 +55,8 @@ describe('v0.6 스트레스 · 휴식 · 의지력', () => {
   });
 
   it('의지력이 모자라면 숙명을 거스르는 선택지가 잠긴다', () => {
-    expect(DESTINY_EVENTS.map((e) => e.cond.houses![0]).sort()).toEqual(HOUSES.map((h) => h.id).sort());
+    // 용사 혈통의 숙명은 「성검의 부름」(m_hero16) 이 맡는다
+    expect(DESTINY_EVENTS.map((e) => e.cond.houses![0]).sort()).toEqual(HOUSES.map((h) => h.id).filter((h) => h !== 'hero').sort());
     const s = createLife({ ...base, traits: [] }, seededRng(4));
     s.age = 16;
     s.pendingEventId = 'd_farm';

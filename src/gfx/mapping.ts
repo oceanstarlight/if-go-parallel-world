@@ -23,13 +23,23 @@ const EVENT_SCENE: Record<string, SceneKind | 'home'> = {
   e_adv_quest: 'road', e_priest_heretic: 'temple', e_priest_plague: 'graveyard', e_farmer_harvest: 'village',
   e_demon_raid: 'burning', e_demon_lord_hero: 'throne', e_hero_final: 'throne',
   npc_lulu: 'forest', npc_lulu_regular: 'forest', npc_grim: 'graveyard', npc_momo: 'road',
-  d_farm: 'village', d_merchant: 'port', d_noble: 'castle', d_demon: 'demon_castle', d_hero: 'room',
+  d_farm: 'village', d_merchant: 'port', d_noble: 'castle', d_demon: 'demon_castle',
   d_elf: 'forest', d_dwarf: 'dungeon', d_beastkin: 'forest', d_eastern: 'temple', d_mermaid: 'port',
   d_sky: 'castle', d_witch: 'forest', d_slime: 'forest',
   x_blow_spouse: 'road', x_blow_friend: 'road', x_blow_mentor: 'road',
   b_invest: 'port', b_debt_collector: 'village', b_debt_doom: 'village', b_heist: 'castle', b_jail: 'dungeon',
   b_thief_recruit: 'tavern', b_court_exam: 'library', b_court_intrigue: 'castle', b_farm_land: 'village',
   b_career_change: 'village', b_rich_scam: 'tavern',
+  hp_first_quest: 'forest', hp_campfire: 'forest', hp_dungeon_raid: 'dungeon', hp_final_march: 'demon_castle',
+  hp_victory_feast: 'castle', hp_cleared_reward: 'castle', hp_hunted: 'village', hp_second_call: 'tavern',
+  sword_crisis: 'burning', sword_new_bearer: 'home', sword_bearer_return: 'castle',
+  betroth_meeting: 'castle', cold_marriage_end: 'castle', eloped_chase: 'forest',
+  bankrupt_bottom: 'village', bankrupt_comeback: 'port', fugitive_bounty: 'tavern', fugitive_choice: 'road',
+  new_identity_past: 'village', slime_town: 'village', slime_love: 'village', relic_glow: 'room', relic_dungeon: 'dungeon',
+  royal_manhunt: 'castle', royal_princess: 'castle', princess_ransom: 'castle', blow_repay: 'temple',
+  hero_slain_avenger: 'graveyard', avenger_duel: 'battlefield', own_housewarming: 'home', own_horse_race: 'road',
+  own_cat_gift: 'home', own_castle_siege: 'battlefield', guild_instructor: 'tavern', abyss_voice: 'dungeon',
+  abyss_mark_throne: 'demon_castle', peace_after_demon_lord: 'castle',
     lg_statue: 'village', lg_bard: 'tavern', lg_book: 'library', lg_villain: 'village', lg_ghost: 'graveyard',
 };
 
@@ -99,7 +109,7 @@ export const ENEMY_HP: Record<EnemyKind, number> = {
 };
 
 /** 밤에 일어나는 사건 */
-const NIGHT_EVENTS = new Set(['m_awaken3', 'c_fever', 'a_yandere', 'a_dark_pact', 'a_pact_due', 'a_illness', 'e_adv_betrayal', 'a_inquisition', 'd_demon', 'd_witch', 'd_hero', 'x_blow_spouse', 'x_blow_friend', 'x_blow_mentor', 'b_heist', 'b_court_intrigue']);
+const NIGHT_EVENTS = new Set(['m_awaken3', 'c_fever', 'a_yandere', 'a_dark_pact', 'a_pact_due', 'a_illness', 'e_adv_betrayal', 'a_inquisition', 'd_demon', 'd_witch', 'x_blow_spouse', 'x_blow_friend', 'x_blow_mentor', 'b_heist', 'b_court_intrigue']);
 /** 노을 무렵의 사건 */
 const DUSK_EVENTS = new Set(['npc_grim', 'a_spouse_death', 'a_mentor_death', 'a_reflection', 'a_friend_confess', 'a_rival_reconcile', 'e_hero_final', 'e_demon_lord_hero', 'lg_ghost', 'd_mermaid']);
 

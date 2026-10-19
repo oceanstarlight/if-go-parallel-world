@@ -1,6 +1,6 @@
 import type { Item, LifeState } from '../types';
 import { jobById } from '../data/jobs';
-import { gearByBase, makeItem, sellPrice } from '../data/items';
+import { gearByBase, makeItem, nextUid, sellPrice } from '../data/items';
 import { OWNED_CALM, marketById, marketPrice, owns } from '../data/market';
 import { applyEffect, type Rng } from './life';
 
@@ -153,4 +153,18 @@ export function innRest(s: LifeState): Result {
 /** 시작 장비 (출신에 관계없이 천 옷 한 벌) */
 export function starterKit(): { armor: Item } {
   return { armor: makeItem(gearByBase('a1')!) };
+}
+
+/** 저장된 삶을 불러올 때: 겹치는 물건 번호를 새로 매긴다 (예전 버전 저장 데이터 복구) */
+export function repairItems(s: LifeState) {
+  const seen = new Set<number>();
+  const fix = (it: Item | null | undefined) => {
+    if (!it) return;
+    if (seen.has(it.uid)) it.uid = nextUid();
+    seen.add(it.uid);
+  };
+  fix(s.equip?.weapon);
+  fix(s.equip?.armor);
+  for (const it of s.bag ?? []) fix(it);
+  for (const it of s.dive?.loot ?? []) fix(it);
 }

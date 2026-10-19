@@ -8,8 +8,8 @@ import { SHOP, itemCost } from '../data/shop';
 import { goalById } from '../data/goals';
 import { FOCUS_DESC, FOCUS_NAMES, MOOD_HINT, MOOD_NAMES, REL_NAMES, STAT_KEYS, STAT_NAMES, affectionWord } from '../data/stats';
 import {
-  STRESS_HIGH, advanceYear, applyOracle, canAdvance, choiceLocked, choose, createLife, currentEvent, focusMul, rollFate,
-  successChance, traitsOf, visibleChoices,
+  STRESS_HIGH, advanceYear, applyOracle, canAdvance, choiceLocked, choose, createLife, currentEvent, focusMul,
+  successChance, traitsOf, visibleChoices, rollHouse, rollCheat,
 } from '../engine/life';
 import { RARITY_NAME } from '../data/traits';
 import { type OracleAnswer, oracleById, pickOracle } from '../data/oracle';
@@ -27,7 +27,7 @@ import type { MarketCat } from '../data/market';
 import { branchPaths } from '../data/branches';
 import { battleOdds, isCombat } from '../engine/combat';
 import { beginDive, canEnterDungeon, descend, endDiveOnDeath, retreat } from '../engine/dungeon';
-import { buy as marketBuy, drink, drinkBest, equip, innRest, sell, sellAllLoot } from '../engine/economy';
+import { buy as marketBuy, drink, drinkBest, equip, innRest, repairItems, sell, sellAllLoot } from '../engine/economy';
 import { bossEnemy } from '../gfx/mapping';
 import { biomeOf } from '../data/items';
 import { ENEMY_HP as BOSS_HP } from '../gfx/mapping';
@@ -56,7 +56,7 @@ interface App {
   screen: Screen;
   meta: MetaSave;
   life: LifeState | null;
-  setup: { name: string; houseId: string; cheatId: string; fated: boolean };
+  setup: { name: string; cheatId: string; fated: boolean };
   settlement: Settlement | null;
   notice: string;
   gfx: GfxStage | null;
@@ -82,7 +82,7 @@ export async function mount(root: HTMLElement) {
     screen: 'title',
     meta: loadMeta(),
     life: loadRun(),
-    setup: { name: pick(PLAYER_NAMES, Math.random), houseId: 'farm', cheatId: 'growth', fated: true },
+    setup: { name: pick(PLAYER_NAMES, Math.random), cheatId: 'growth', fated: true },
     settlement: null,
     notice: '',
     gfx: await GfxStage.create(),
@@ -94,6 +94,7 @@ export async function mount(root: HTMLElement) {
     townTab: 'shop',
     townCat: 'weapon',
   };
+  if (app.life) repairItems(app.life);
   // 사망 상태로 저장된 삶이 있으면 (정산 직전 새로고침) 바로 정산
   if (app.life?.death) settle(app);
 
@@ -168,7 +169,6 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
       app.screen = arg as Screen;
       app.tab = 'none';
       if (arg === 'setup') {
-        if (!isUnlocked(app.meta, app.setup.houseId)) app.setup.houseId = 'farm';
         if (!isUnlocked(app.meta, app.setup.cheatId)) app.setup.cheatId = 'growth';
       }
       break;
@@ -184,9 +184,6 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
       break;
     case 'fate':
       app.setup.fated = arg === 'on';
-      break;
-    case 'house':
-      if (arg && isUnlocked(app.meta, arg)) app.setup.houseId = arg;
       break;
     case 'cheat':
       if (arg && isUnlocked(app.meta, arg)) app.setup.cheatId = arg;
@@ -346,13 +343,13 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
 
     // ───── 마을 (상점 · 가방 · 여관) ─────
     case 'town':
+    case 'town-tab':
+      // 상점·가방은 각각의 버튼으로 바로 간다 (어디서 누르든 해당 탭만 켜진다)
       if (app.life && !app.life.dive && !app.life.death) {
         app.screen = 'town';
+        app.townTab = arg === 'bag' ? 'bag' : 'shop';
         app.tab = 'none';
       }
-      break;
-    case 'town-tab':
-      app.townTab = arg as 'shop' | 'bag';
       break;
     case 'town-cat':
       app.townCat = arg as MarketCat;
@@ -400,7 +397,11 @@ const needsFocus = (s: LifeState) => s.age >= 2 && !s.focusLocked;
 function birth(app: App) {
   const name = app.setup.name.trim().slice(0, 12) || pick(PLAYER_NAMES, Math.random);
   const fated = app.setup.fated;
-  const origin = fated ? rollFate() : { houseId: app.setup.houseId, cheatId: app.setup.cheatId };
+  // 출신은 해금한 것 중 운명이 정하고, 권능은 직접 고르거나 운명에 맡긴다
+  const origin = {
+    houseId: rollHouse(Math.random, app.meta.unlocked),
+    cheatId: fated ? rollCheat() : app.setup.cheatId,
+  };
   app.life = createLife({
     ...origin,
     name,
@@ -452,13 +453,25 @@ function underbar(app: App): string {
     if (s.death) center = `<button class="ub-main danger" data-act="see-grave"><span>묘비로</span></button>`;
     else if (app.screen === 'dungeon' && s.dive && s.dive.floor < 100) center = `<button class="ub-main pulse" data-act="descend"><span>하강</span><small>5층</small></button>`;
     const inDive = !!s.dive;
+    const inShop = app.screen === 'town' && app.townTab === 'shop';
+    const inBag = app.screen === 'town' && app.townTab === 'bag';
+    if (inDive) {
+      return `
+      <nav class="underbar">
+        ${item('drink', '', 'potion', '회복약')}
+        ${item('dungeon', '', 'sword', '던전', true)}
+        ${center}
+        ${item('retreat', '', 'door-closed', '귀환')}
+        ${item('town', 'bag', 'backpack', '가방', false, 'disabled')}
+      </nav>`;
+    }
     return `
       <nav class="underbar">
-        ${inDive ? item('drink', '', 'potion', '회복약') : item('go', 'life', 'user', '인생')}
-        ${item('dungeon', '', 'sword', '던전', app.screen === 'dungeon')}
+        ${app.screen === 'town' ? item('inn', '', 'bed', '여관') : item('dungeon', '', 'sword', '던전', app.screen === 'dungeon')}
+        ${app.screen === 'town' ? item('dungeon', '', 'sword', '던전') : item('drink', '', 'potion', '회복약')}
         ${center}
-        ${inDive ? item('retreat', '', 'door-closed', '귀환') : item('town', '', 'store', '마을', app.screen === 'town')}
-        ${inDive ? item('go', 'life', 'user', '인생', false, 'disabled') : item('town-tab', 'bag', 'backpack', '가방', app.screen === 'town' && app.townTab === 'bag')}
+        ${item('town', 'shop', 'store', '상점', inShop)}
+        ${item('town', 'bag', 'backpack', '가방', inBag)}
       </nav>`;
   }
   if (app.screen === 'life' && app.life) {
@@ -476,7 +489,7 @@ function underbar(app: App): string {
         ${item('dungeon', '', 'sword', '던전', false, busy || s.age < 12 ? 'disabled' : '')}
         ${item('tab', 'action', ev ? 'warning-diamond' : 'target', ev ? '사건' : '방침', tab === 'action')}
         ${center}
-        ${item('town', '', 'store', '마을', false, busy ? 'disabled' : '')}
+        ${item('town', 'shop', 'store', '상점', false, busy ? 'disabled' : '')}
         ${item('tab', 'menu', 'menu', '정보', tab === 'menu')}
       </nav>`;
   }
@@ -523,13 +536,12 @@ function viewTitle(app: App): string {
 
 function viewSetup(app: App): string {
   const { setup, meta } = app;
-  const card = (kind: 'house' | 'cheat', id: string, name: string, desc: string) => {
+  const cheatCard = (id: string, name: string, desc: string) => {
     const unlocked = isUnlocked(meta, id);
-    const selected = (kind === 'house' ? setup.houseId : setup.cheatId) === id;
     const cost = SHOP.find((i) => i.id === id);
     return `
-      <button class="pick ${selected ? 'selected' : ''} ${unlocked ? '' : 'locked'}"
-        data-act="${kind}" data-arg="${id}" ${unlocked ? '' : 'disabled'}>
+      <button class="pick ${setup.cheatId === id ? 'selected' : ''} ${unlocked ? '' : 'locked'}"
+        data-act="cheat" data-arg="${id}" ${unlocked ? '' : 'disabled'}>
         <strong>${esc(name)}</strong>
         <span>${esc(desc)}</span>
         ${unlocked ? '' : `<em>${icon('lock')} 윤회의 제단 · ${cost ? itemCost(cost, 0) : '?'}</em>`}
@@ -537,9 +549,10 @@ function viewSetup(app: App): string {
   };
   const echo = meta.upgrades.echo ?? 0;
   const fortune = meta.upgrades.fortune ?? 0;
-  // 운명 모드: 출신별 탄생 확률을 보여준다 (80억분의 1 처럼)
-  const total = HOUSES.reduce((a, h) => a + h.weight, 0);
-  const odds = [...HOUSES].sort((a, b) => b.weight - a.weight).map((h) =>
+  // 출신은 언제나 운명: 해금한 출신 중에서 인구 비중대로 태어난다
+  const born = HOUSES.filter((h) => isUnlocked(meta, h.id));
+  const total = born.reduce((a, h) => a + h.weight, 0);
+  const odds = [...born].sort((a, b) => b.weight - a.weight).map((h) =>
     `<li><span>${esc(h.name)}</span><b>${((h.weight / total) * 100).toFixed(1)}%</b></li>`).join('');
   return `
     <h2 class="screen-title">환생 설정</h2>
@@ -548,27 +561,26 @@ function viewSetup(app: App): string {
       <input id="name-input" maxlength="12" value="${esc(setup.name)}" autocomplete="off" />
       <button class="btn small" data-act="reroll-name">무작위</button>
     </div>
+    <h3>태어날 곳 <span class="muted small">— 운명이 정한다</span></h3>
+    <div class="fate-card">
+      <p>어느 나라, 어떤 핏줄로 태어날지는 고를 수 없다. 해금한 출신 ${born.length}/${HOUSES.length}종 중에서 인구만큼의 확률로 정해진다.
+      윤회의 제단에서 출신을 해금하면 더 다양한 곳에 태어날 수 있다.</p>
+      <ul class="odds">${odds}</ul>
+    </div>
+    <h3>여신의 권능</h3>
     <div class="fate-toggle">
       <button class="fate-opt ${setup.fated ? 'selected' : ''}" data-act="fate" data-arg="on">
-        <strong>${icon('sparkles')} 운명에 맡기기</strong><span>출신 ${HOUSES.length}종 · 권능 ${CHEATS.length}종 중 무작위 · 환생석 +20%</span>
+        <strong>${icon('sparkles')} 운명에 맡기기</strong><span>권능 ${CHEATS.length}종 전체 중 무작위 · 환생석 +20%</span>
       </button>
       <button class="fate-opt ${setup.fated ? '' : 'selected'}" data-act="fate" data-arg="off">
-        <strong>${icon('target')} 직접 고르기</strong><span>해금한 출신과 권능만 고를 수 있다</span>
+        <strong>${icon('target')} 직접 고르기</strong><span>해금한 권능 중에서 고른다</span>
       </button>
     </div>
-    ${setup.fated ? `
-      <div class="fate-card">
-        <p>어느 나라에서, 어떤 모습으로 태어날지는 아무도 모른다. 세계의 인구만큼 확률이 정해져 있다.</p>
-        <ul class="odds">${odds}</ul>
-      </div>` : `
-      <h3>태어날 곳</h3>
-      <div class="pick-grid">${HOUSES.map((h) => card('house', h.id, h.name, h.desc)).join('')}</div>
-      <h3>환생 권능</h3>
-      <div class="pick-grid">${CHEATS.map((c) => card('cheat', c.id, c.name, c.desc)).join('')}</div>`}
+    ${setup.fated ? '' : `<div class="pick-grid">${CHEATS.map((c) => cheatCard(c.id, c.name, c.desc)).join('')}</div>`}
     ${echo || fortune ? `<p class="muted">전생의 잔향: 시작 능력치 +${echo * 2}${fortune ? ` · 행운 +${fortune * 5}` : ''}</p>` : ''}
     <div class="setup-actions">
       <button class="btn" data-act="go" data-arg="title">돌아간다</button>
-      <button class="btn primary" data-act="begin">${setup.fated ? `${icon('sparkles')} 운명의 주사위를 굴린다` : '환생한다'}</button>
+      <button class="btn primary" data-act="begin">${icon('sparkles')} 환생한다</button>
     </div>
   `;
 }
@@ -685,7 +697,6 @@ function viewLife(app: App): string {
   const relBlock = `<ul class="rels">${rels || '<li class="muted small">아직 아무도 없다. 인연을 만들어 보자!</li>'}</ul>`;
   const badges = [
     s.extraLives ? `불굴 ×${s.extraLives}` : '',
-    s.rerolls ? `세이브 ⟲${s.rerolls}` : '',
     s.fated ? '운명' : '',
   ].filter(Boolean).join(' · ');
 
@@ -903,10 +914,10 @@ function viewAltar(app: App): string {
     `<h3>${title}</h3><ul class="altar">${SHOP.filter((i) => i.kind === kind).map((i) => row(i.id)).join('')}</ul>`;
   return `
     <h2 class="screen-title">윤회의 제단</h2>
-    <p class="muted">운명 모드에서는 무엇이든 태어날 수 있다. 해금하면 「직접 고르기」에서 원하는 출신과 권능을 고를 수 있다.</p>
-    ${section('출신 (직접 고르기 해금)', 'house')}
+    <p class="muted">환생석으로 다음 생을 준비하자. 권능을 해금하면 직접 고를 수 있고, 출신을 해금하면 그곳에서도 태어날 수 있게 된다.</p>
+    ${section('잔향 (영구 강화)', 'upgrade')}
     ${section('권능 (직접 고르기 해금)', 'cheat')}
-    ${section('잔향', 'upgrade')}
+    ${section('출신 (태어날 수 있는 곳 추가)', 'house')}
     <div class="setup-actions">
       <button class="btn" data-act="go" data-arg="title">돌아간다</button>
       <button class="btn primary" data-act="go" data-arg="setup">새로운 삶</button>
@@ -937,11 +948,10 @@ function viewLives(app: App): string {
     ${lives.length === 0 ? '<p class="muted">아직 끝난 삶이 없다. 첫 번째 이세계 인생을 시작해 보자!</p>' : `
     <ul class="life-list">${lives.map((l) => `
       <li>
-        <strong>${esc(l.name)}</strong>
+        <div class="l-top"><strong>${esc(l.name)}</strong><em>${icon('diamond-gem')} ${l.stones}</em></div>
         <span class="muted small">${esc(houseById(l.houseId).name)} · ${esc(l.title)}</span>
         <span class="small">향년 ${l.age}세 · <b class="tone-death">${esc(deathById(l.causeId).name)}</b>${l.goalsDone !== undefined ? ` · 목표 ${l.goalsDone}/3` : ''}</span>
         ${l.deed ? `<span class="small deed">${icon('crown')} ${esc(l.deed)} 전설</span>` : ''}
-        <em>◆ ${l.stones}</em>
       </li>`).join('')}
     </ul>`}
     <div class="setup-actions"><button class="btn" data-act="go" data-arg="title">돌아간다</button></div>

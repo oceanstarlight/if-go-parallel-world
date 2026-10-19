@@ -1,6 +1,9 @@
 import type { Focus, LifeState } from '../types';
 import { NPC_NAMES, PLAYER_NAMES } from '../data/names';
 import { STRESS_HIGH, advanceYear, choiceLocked, choose, createLife, currentEvent, rollFate, visibleChoices, type Rng } from './life';
+import { beginDive, canEnterDungeon, descend, endDiveOnDeath, preview, retreat, startFloors } from './dungeon';
+import { buy, equip, maxHp, sellAllLoot } from './economy';
+import { MARKET, marketPrice, owns } from '../data/market';
 
 /** 재현 가능한 난수 (mulberry32) */
 export function seededRng(seed: number): Rng {
@@ -46,6 +49,9 @@ export function autoStep(s: LifeState, rng: Rng) {
     choose(s, pool[Math.floor(rng() * pool.length)][1], rng);
     return;
   }
+  if (s.age >= 14 && rng() < 0.3) autoDive(s, rng);
+  if (s.death) return;
+  if (s.age >= 10 && rng() < 0.4) autoTown(s, rng);
   if ((s.stress ?? 0) >= STRESS_HIGH && rng() < 0.7) s.focus = 'rest';
   else if (s.focus === 'rest' || rng() < 0.15) s.focus = FOCI[Math.floor(rng() * 4)];
   advanceYear(s, rng);
@@ -61,4 +67,33 @@ export function contemporaries(seed: number, exclude: string): LifeState[] {
     out.push(simulateLife(Math.floor(rng() * 2 ** 31), { name }));
   }
   return out;
+}
+
+/** 자동 플레이의 마을 볼일: 전리품 팔기 → 좋은 장비 끼기 → 가끔 하나 사기 */
+function autoTown(s: LifeState, rng: Rng) {
+  sellAllLoot(s);
+  for (const it of [...(s.bag ?? [])]) {
+    if (it.kind !== 'weapon' && it.kind !== 'armor') continue;
+    if (it.power > (s.equip?.[it.kind]?.power ?? 0)) equip(s, it.uid);
+  }
+  const affordable = MARKET.filter((m) => marketPrice(s, m) <= (s.gold ?? 0) * 0.6 && !(m.type === 'owned' && owns(s, m.id)) && (!m.minAge || s.age >= m.minAge));
+  if (affordable.length && rng() < 0.6) {
+    const m = affordable[Math.floor(rng() * affordable.length)];
+    buy(s, m.id);
+    const it = s.bag?.[s.bag.length - 1];
+    if (it && (it.kind === 'weapon' || it.kind === 'armor') && it.power > (s.equip?.[it.kind]?.power ?? 0)) equip(s, it.uid);
+  }
+}
+
+/** 자동 플레이의 던전 원정: 승률 60% 이상, HP 60% 이상일 때만 내려간다 */
+function autoDive(s: LifeState, rng: Rng) {
+  if (!canEnterDungeon(s)) return;
+  const floors = startFloors(s);
+  beginDive(s, floors[floors.length - 1]);
+  for (let k = 0; k < 20 && s.dive; k++) {
+    if (preview(s).p < 60 || (s.hp ?? 0) < maxHp(s) * 0.6 || s.dive.floor >= 100) break;
+    if (descend(s, rng) !== 'cleared') break;
+  }
+  if (s.death) endDiveOnDeath(s);
+  else retreat(s);
 }

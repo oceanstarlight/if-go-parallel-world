@@ -8,6 +8,8 @@ export const BATTLE_ENEMY: Record<string, EnemyKind> = {
   a_rival_deathmatch: 'rival', a_bandits: 'bandit', a_dungeon: 'shadow', a_dragon: 'dragon',
   a_monster_hunt: 'wolf', e_knight_war: 'soldier', a_war: 'soldier', e_adv_quest: 'wyvern',
   e_adv_betrayal: 'traitor', a_yandere: 'stalker', e_demon_lord_hero: 'hero', e_hero_final: 'demon_lord',
+  hp_first_quest: 'shadow', hp_dungeon_raid: 'shadow', hp_final_march: 'demon_lord', hp_hunted: 'hero',
+  fugitive_bounty: 'bandit', avenger_duel: 'hero',
 };
 
 /** 이 선택지가 전투인가 (전투 사건의 체력·마력 판정) */
