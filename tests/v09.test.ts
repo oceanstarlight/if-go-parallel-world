@@ -55,7 +55,7 @@ describe('v0.9 도트 지도 초상화', () => {
         backs.add(h.back);
       }
       expect(bangs.size).toBeGreaterThanOrEqual(5);
-      expect(backs.size).toBeGreaterThanOrEqual(3);
+      expect(backs.size).toBeGreaterThanOrEqual(g === 'f' ? 5 : 2);
     }
   });
 

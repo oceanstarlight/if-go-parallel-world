@@ -237,3 +237,16 @@ export function seeded(seed: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+const softCache = new Map<string, string>();
+/** 배경 색 보정: 채도를 낮추고 너무 밝거나 어두운 끝을 눌러 차분하게 만든다 */
+export function soften(c: string): string {
+  let out = softCache.get(c);
+  if (out) return out;
+  const [r, g, b] = hexToRgb(c);
+  const l = r * 0.299 + g * 0.587 + b * 0.114;
+  const f = (v: number) => 14 + (l + (v - l) * 0.68) * 0.86;
+  out = rgbToHex(f(r), f(g), f(b));
+  softCache.set(c, out);
+  return out;
+}

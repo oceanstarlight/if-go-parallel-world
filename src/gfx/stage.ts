@@ -1,6 +1,6 @@
 import titleUrl from '../assets/title.png';
 import { Application, Container, Graphics, Sprite, Texture, TextureStyle, TilingSprite } from 'pixi.js';
-import { Painter, bayer, hashStr } from './painter';
+import { Painter, bayer, hashStr, soften } from './painter';
 import { drawPortrait, specKey, type PortraitSpec } from './portrait';
 import { SCENE_H, SCENE_W, cloudPainter, drawScene, type Fx, type SceneKind, type TimeOfDay } from './scenes';
 import { BattleDirector, type BattleOptions } from './battle';
@@ -12,6 +12,8 @@ export type { BattleOptions };
 TextureStyle.defaultOptions.scaleMode = 'nearest';
 
 const hex = (c: string) => parseInt(c.slice(1), 16);
+/** 배경과 같은 톤으로 차분하게 */
+const softHex = (n: number) => hex(soften(`#${n.toString(16).padStart(6, '0')}`));
 
 function texOf(p: Painter): Texture {
   return Texture.from(p.toCanvas());
@@ -315,7 +317,7 @@ export class GfxStage {
     } else if (f.kind === 'glow') {
       for (const [x, y, rad, color] of f.pts) {
         const g = new Graphics();
-        const c = hex(color);
+        const c = hex(soften(color));
         g.circle(x, y, rad).fill({ color: c, alpha: 0.07 });
         g.circle(x, y, rad * 0.6).fill({ color: c, alpha: 0.08 });
         g.circle(x, y, rad * 0.3).fill({ color: c, alpha: 0.1 });
@@ -333,7 +335,7 @@ export class GfxStage {
         const fy = 1 - Math.abs(y / f.h - 0.5) * 2;
         for (let x = 0; x < SCENE_W; x++) {
           const n = (Math.sin(x / 13 + y / 5) + Math.sin(x / 31 - y / 3)) * 0.25 + 0.5;
-          if (bayer(x, y) < n * fy * 0.55) p.px(x, y, f.color);
+          if (bayer(x, y) < n * fy * 0.55) p.px(x, y, soften(f.color));
         }
       }
       const ts = new TilingSprite({ texture: this.own(texOf(p)), width: SCENE_W, height: f.h });
@@ -343,7 +345,9 @@ export class GfxStage {
       this.updaters.push((dt) => { ts.tilePosition.x += dt * 0.004; });
     } else if (f.kind === 'clouds') {
       f.items.forEach(([x, y, w], i) => {
-        const s = new Sprite(this.own(texOf(cloudPainter(w, seed + i, f.tint))));
+        const cp = cloudPainter(w, seed + i, f.tint);
+        cp.map(soften);
+        const s = new Sprite(this.own(texOf(cp)));
         s.position.set(Math.round(x), Math.round(y));
         s.alpha = 0.92;
         this.fxLayer.addChild(s);
@@ -358,8 +362,9 @@ export class GfxStage {
     } else if (f.kind === 'birds') {
       // 작은 V 자 새가 날갯짓하며 가로지른다
       const up = new Painter(5, 2), down = new Painter(5, 2);
-      up.px(0, 0, f.color); up.px(1, 1, f.color); up.px(2, 1, f.color); up.px(3, 1, f.color); up.px(4, 0, f.color);
-      down.px(0, 1, f.color); down.px(1, 0, f.color); down.px(2, 1, f.color); down.px(3, 0, f.color); down.px(4, 1, f.color);
+      const bc = soften(f.color);
+      up.px(0, 0, bc); up.px(1, 1, bc); up.px(2, 1, bc); up.px(3, 1, bc); up.px(4, 0, bc);
+      down.px(0, 1, bc); down.px(1, 0, bc); down.px(2, 1, bc); down.px(3, 0, bc); down.px(4, 1, bc);
       const tu = this.own(texOf(up)), td = this.own(texOf(down));
       for (let i = 0; i < f.count; i++) {
         const s = new Sprite(tu);
@@ -377,7 +382,7 @@ export class GfxStage {
       const colors = PARTICLE_COLOR[f.type];
       for (let i = 0; i < f.count; i++) {
         const s = new Sprite(shapeTex(f.type));
-        s.tint = colors[i % colors.length];
+        s.tint = softHex(colors[i % colors.length]);
         if (f.type === 'rain') s.height = 3;
         const [ax, ay, aw, ah] = f.area;
         s.position.set(ax + rnd() * aw, ay + rnd() * ah);

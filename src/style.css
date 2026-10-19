@@ -111,8 +111,7 @@ h4 { font-size: 13px; color: var(--muted); margin: 20px 0 6px; letter-spacing: 0
 /* ───── 환생 설정 ───── */
 .setup-name { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
 .setup-name label { color: var(--gold); }
-.gender-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
-.gender-row > span:first-child { color: var(--gold); margin-right: 4px; }
+.gender-note { margin: 8px 0 0; }
 .setup-name input {
   background: var(--panel);
   border: 1px solid var(--line-2);

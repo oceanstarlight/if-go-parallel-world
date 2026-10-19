@@ -3,7 +3,7 @@ import { HOUSES, houseById } from '../data/houses';
 import { CHEATS, cheatById } from '../data/cheats';
 import { jobById, jobTitle } from '../data/jobs';
 import { DEATHS, deathById } from '../data/deaths';
-import { type Gender, genderOfName, namesOf, pick } from '../data/names';
+import { type Gender, namesOf, pick } from '../data/names';
 import { SHOP, itemCost } from '../data/shop';
 import { goalById } from '../data/goals';
 import { FOCUS_DESC, FOCUS_NAMES, MOOD_HINT, MOOD_NAMES, REL_NAMES, STAT_KEYS, STAT_NAMES, affectionWord } from '../data/stats';
@@ -56,7 +56,8 @@ interface App {
   screen: Screen;
   meta: MetaSave;
   life: LifeState | null;
-  setup: { name: string; gender: Gender; cheatId: string; fated: boolean };
+  /** name 이 비어 있으면 태어날 때 성별에 맞는 이름을 무작위로 짓는다 */
+  setup: { name: string; cheatId: string; fated: boolean };
   settlement: Settlement | null;
   notice: string;
   gfx: GfxStage | null;
@@ -82,10 +83,7 @@ export async function mount(root: HTMLElement) {
     screen: 'title',
     meta: loadMeta(),
     life: loadRun(),
-    setup: (() => {
-      const gender: Gender = Math.random() < 0.5 ? 'm' : 'f';
-      return { name: pick(namesOf(gender), Math.random), gender, cheatId: 'growth', fated: true };
-    })(),
+    setup: { name: '', cheatId: 'growth', fated: true },
     settlement: null,
     notice: '',
     gfx: await GfxStage.create(),
@@ -190,17 +188,6 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
       break;
     case 'cheat':
       if (arg && isUnlocked(app.meta, arg)) app.setup.cheatId = arg;
-      break;
-    case 'gender': {
-      const g = arg === 'f' ? 'f' : 'm';
-      // 기본 이름 목록에서 고른 이름이면 성별에 맞는 이름으로 바꿔 준다 (직접 입력한 이름은 그대로)
-      const listed = genderOfName(app.setup.name) !== g && namesOf(app.setup.gender).includes(app.setup.name);
-      app.setup.gender = g;
-      if (listed) app.setup.name = pick(namesOf(g), Math.random);
-      break;
-    }
-    case 'reroll-name':
-      app.setup.name = pick(namesOf(app.setup.gender), Math.random);
       break;
     case 'begin':
       // 태어나기 전에 여신의 문답 3개
@@ -406,7 +393,9 @@ const needsFocus = (s: LifeState) => s.age >= 2 && !s.focusLocked;
 
 /** 문답을 마치고 태어난다 */
 function birth(app: App) {
-  const name = app.setup.name.trim().slice(0, 12) || pick(namesOf(app.setup.gender), Math.random);
+  // 성별은 매 생 무작위. 이름을 비워 두면 그 성별의 이름 목록에서 짓는다
+  const gender: Gender = Math.random() < 0.5 ? 'm' : 'f';
+  const name = app.setup.name.trim().slice(0, 12) || pick(namesOf(gender), Math.random);
   const fated = app.setup.fated;
   // 출신은 해금한 것 중 운명이 정하고, 권능은 직접 고르거나 운명에 맡긴다
   const origin = {
@@ -416,7 +405,7 @@ function birth(app: App) {
   app.life = createLife({
     ...origin,
     name,
-    gender: app.setup.gender,
+    gender,
     upgrades: app.meta.upgrades,
     npcPast: app.meta.npcMet ?? {},
     lifeNo: app.meta.totalLives + 1,
@@ -570,15 +559,9 @@ function viewSetup(app: App): string {
     <h2 class="screen-title">환생 설정</h2>
     <div class="setup-name">
       <label for="name-input">이름</label>
-      <input id="name-input" maxlength="12" value="${esc(setup.name)}" autocomplete="off" />
-      <button class="btn small" data-act="reroll-name">무작위</button>
+      <input id="name-input" maxlength="12" value="${esc(setup.name)}" placeholder="비우면 운명이 짓는다" autocomplete="off" />
     </div>
-    <div class="gender-row">
-      <span>성별</span>
-      <button class="chip ${setup.gender === 'f' ? 'on' : ''}" data-act="gender" data-arg="f">여성</button>
-      <button class="chip ${setup.gender === 'm' ? 'on' : ''}" data-act="gender" data-arg="m">남성</button>
-      <span class="muted small">연인은 이성으로 태어난다</span>
-    </div>
+    <p class="gender-note muted small">성별은 태어날 때 운명이 정한다 (여·남 반반). 연인은 이성으로 만난다.</p>
     <h3>태어날 곳 <span class="muted small">— 운명이 정한다</span></h3>
     <div class="fate-card">
       <p>어느 나라, 어떤 핏줄로 태어날지는 고를 수 없다. 해금한 출신 ${born.length}/${HOUSES.length}종 중에서 인구만큼의 확률로 정해진다.
