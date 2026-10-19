@@ -134,6 +134,12 @@ export interface LifeState {
   injuries?: number;
   /** 요양 남은 달 수 */
   recover?: number;
+  /** 던전에서 한 번 쓰러진 적이 있다 (다음에 쓰러지면 진짜 죽음) */
+  dgFallen?: boolean;
+  /** 이 나이부터 던전에 다시 들어갈 수 있다 */
+  dgBanUntil?: number;
+  /** 던전의 악몽: 남은 달 동안 스트레스가 100으로 묶인다 */
+  trauma?: number;
   /** 방금 입은 중상 (사건 결과 문장 뒤에 알린다) */
   pendingInjury?: string | null;
   record?: LifeRecord;
@@ -169,6 +175,8 @@ export interface Dive {
   gold: number;
   /** 방금 끝난 구간 결과 */
   last?: 'cleared' | 'fled' | null;
+  /** 쓰러져서 모든 것을 잃었다 (지상으로 돌아갈 일만 남았다) */
+  fallen?: boolean;
 }
 
 /** 다음 생에 전해지는 전생의 이야기 */

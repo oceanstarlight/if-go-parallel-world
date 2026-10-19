@@ -13,7 +13,13 @@ import { bump, earn, rec } from './record';
 export const DUNGEON_DEPTH = 100;
 export const DUNGEON_MIN_AGE = 12;
 
-export const canEnterDungeon = (s: LifeState) => !s.death && !s.pendingEventId && s.age >= DUNGEON_MIN_AGE;
+/** 던전에서 처음 쓰러진 뒤 다시 들어가기까지 (년) */
+export const DUNGEON_BAN_YEARS = 10;
+/** 처음 쓰러진 뒤 악몽에 시달리는 기간 (달) */
+export const TRAUMA_MONTHS = 36;
+
+export const canEnterDungeon = (s: LifeState) =>
+  !s.death && !s.pendingEventId && s.age >= DUNGEON_MIN_AGE && s.age >= (s.dgBanUntil ?? 0);
 
 /** 시작할 수 있는 계층 (입구 + 클리어한 5층 단위 지점) */
 export function startFloors(s: LifeState): number[] {
@@ -65,11 +71,20 @@ function materialDrop(rng: Rng, floor: number): Item {
   return makeLoot(name, Math.round(value * depth), rarityRoll(rng, floor, false), rng);
 }
 
-/** HP 를 깎는다. 0 이 되면 죽음 (불굴이면 버티고 강제 귀환) */
-function hurt(s: LifeState, dmg: number, floor: number): 'ok' | 'dead' | 'saved' {
+/**
+ * HP 를 깎는다. 0 이 되면:
+ *  - 불굴의 육체가 있으면 버티고 강제 귀환
+ *  - 처음이면 살아남지만 장비·소지품·돈을 모두 잃고, 3년 악몽 + 10년 출입 금지
+ *  - 두 번째면 진짜 죽음
+ */
+function hurt(s: LifeState, dmg: number, floor: number): 'ok' | 'dead' | 'saved' | 'fallen' {
   s.hp = Math.max(0, (s.hp ?? 0) - Math.max(1, Math.round(dmg)));
   if (s.hp > 0) return 'ok';
   const cause = floor > 50 ? 'abyss' : 'dungeon';
+  if (!s.dgFallen && s.extraLives <= 0) {
+    fall(s, floor);
+    return 'fallen';
+  }
   if (kill(s, cause)) {
     note(s, `${floor}층에서 쓰러졌다… 다시는 지상의 햇빛을 보지 못했다.`, 'death');
     return 'dead';
@@ -79,12 +94,41 @@ function hurt(s: LifeState, dmg: number, floor: number): 'ok' | 'dead' | 'saved'
   return 'saved';
 }
 
-export type DescendResult = 'cleared' | 'fled' | 'dead' | 'conquered';
+let fallNotes: [string, Tone][] = [];
+
+/** 처음 쓰러짐: 모든 것을 잃고 지상으로 실려 나간다 */
+function fall(s: LifeState, floor: number) {
+  const d = s.dive!;
+  const lostItems = (s.bag ?? []).length + d.loot.length + (s.equip?.weapon ? 1 : 0) + (s.equip?.armor ? 1 : 0);
+  const lostGold = Math.max(0, s.gold ?? 0) + d.gold;
+  s.dgFallen = true;
+  s.dgBanUntil = s.age + DUNGEON_BAN_YEARS;
+  s.trauma = TRAUMA_MONTHS;
+  s.stress = 100;
+  s.mood = 'fear';
+  s.bag = [];
+  s.equip = { weapon: null, armor: null };
+  if ((s.gold ?? 0) > 0) s.gold = 0;
+  d.loot = [];
+  d.gold = 0;
+  d.fallen = true;
+  d.last = 'fled';
+  s.hp = Math.max(1, Math.round(maxHp(s) * 0.1));
+  rec(s).nearDeaths.push(floor > 50 ? 'abyss' : 'dungeon');
+  // 원정 기록은 그 층의 마지막 일(함정·패배)을 적은 뒤에 남긴다 (finish)
+  fallNotes = [
+    [`${floor}층에서 쓰러졌다… 정신을 차려 보니 지상의 진료소였다. 누군가 끌고 나와 준 모양이다.`, 'death'],
+    [`장비·소지품 ${lostItems}개와 ${fmtGold(lostGold)}를 모두 잃었다. 3년간 악몽에 시달리고, ${s.dgBanUntil}세까지 던전에 들어갈 수 없다. 다음에 또 쓰러지면… 정말 끝이다.`, 'bad'],
+  ];
+  s.log.push({ age: s.age, m: Math.max(1, s.month ?? 0), text: `던전 ${floor}층에서 쓰러졌다! 목숨은 건졌지만 장비·소지품과 ${fmtGold(lostGold)}를 모두 잃었다. 3년간 악몽에 시달린다. (${s.dgBanUntil}세까지 던전 출입 불가 · 다음엔 진짜 죽음)`, tone: 'bad' });
+}
+
+export type DescendResult = 'cleared' | 'fled' | 'dead' | 'conquered' | 'fallen';
 
 /** 5층을 내려간다 */
 export function descend(s: LifeState, rng: Rng = Math.random): DescendResult {
   const d = s.dive;
-  if (!d || s.death || d.floor >= DUNGEON_DEPTH) return 'fled';
+  if (!d || s.death || d.fallen || d.floor >= DUNGEON_DEPTH) return 'fled';
   const cp = combatPower(s);
   for (let f = d.floor + 1; f <= d.floor + 4; f++) {
     rec(s).maxFloor = Math.max(rec(s).maxFloor, f);
@@ -149,15 +193,17 @@ export function descend(s: LifeState, rng: Rng = Math.random): DescendResult {
     return 'cleared';
   }
   const res = hurt(s, ep * 0.6, bf);
-  if (res === 'dead') return finish(s, res);
+  if (res === 'dead' || res === 'fallen') return finish(s, res);
   note(s, `${bf}층 보스 「${boss}」에게 패배… 도망쳐 나왔다.`, 'bad');
   d.last = 'fled';
   return 'fled';
 }
 
-function finish(s: LifeState, res: 'dead' | 'saved'): DescendResult {
+function finish(s: LifeState, res: 'dead' | 'saved' | 'fallen'): DescendResult {
   if (s.dive) s.dive.last = 'fled';
-  return res === 'dead' ? 'dead' : 'fled';
+  for (const [t, tone] of fallNotes) note(s, t, tone);
+  fallNotes = [];
+  return res === 'dead' ? 'dead' : res === 'fallen' ? 'fallen' : 'fled';
 }
 
 /** 100층 마왕 토벌 */
@@ -178,6 +224,10 @@ function conquer(s: LifeState): DescendResult {
 export function retreat(s: LifeState): string {
   const d = s.dive;
   if (!d) return '';
+  if (d.fallen) {
+    s.dive = null;
+    return '빈손으로 지상에 돌아왔다…';
+  }
   const room = bagCap(s) - (s.bag ?? []).length;
   const keep = d.loot.slice(0, Math.max(0, room));
   const over = d.loot.slice(keep.length);

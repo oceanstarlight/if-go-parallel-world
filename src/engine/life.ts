@@ -546,7 +546,8 @@ function startYear(s: LifeState, rng: Rng) {
   grow(s, rng);
   updateMind(s, rng);
   s.hp = maxHp(s);
-  if (overwork(s, rng) && s.death) return;
+  // 던전의 악몽 중에는 스트레스가 묶여 있을 뿐, 과로로 쓰러지지는 않는다
+  if (!(s.trauma ?? 0) && overwork(s, rng) && s.death) return;
   if (rng() < naturalDeathChance(s)) kill(s, 'old_age');
 }
 
@@ -567,6 +568,14 @@ export function advanceMonth(s: LifeState, rng: Rng = Math.random) {
   }
   const money = monthlyEconomy(s, month, rng);
   if (money) log(s, money, 'normal');
+  if ((s.trauma ?? 0) > 0) {
+    s.trauma = (s.trauma ?? 0) - 1;
+    s.stress = 100;
+    if (s.trauma === 0) {
+      s.stress = 60;
+      log(s, '던전의 악몽이 마침내 걷혔다. 오랜만에 푹 잤다.', 'good');
+    }
+  }
   if ((s.recover ?? 0) > 0) {
     s.recover = (s.recover ?? 0) - 1;
     if (s.recover === 0) log(s, '긴 요양이 끝났다. 다시 걸을 수 있다!', 'good');

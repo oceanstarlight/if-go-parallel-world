@@ -364,8 +364,8 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
       const res = descend(s);
       if (res === 'dead') endDiveOnDeath(s);
       afterStep(app);
-      // 보스전 연출
-      if (app.gfx) {
+      // 보스전 연출 (보스 앞까지 못 가고 쓰러졌으면 생략)
+      if (app.gfx && res !== 'fallen') {
         const kind = bossEnemy(bossFloor);
         const magic = s.stats.mana > s.stats.vit;
         app.battleLogFrom = s.log.length;
@@ -377,7 +377,7 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
             glow: magic ? 0x7ad0ff : undefined,
             enemyHp: BOSS_HP[kind],
             win: res === 'cleared' || res === 'conquered',
-            died: res === 'dead',
+            died: res === 'dead', // 처음 쓰러짐(fallen)은 죽지 않는다
             groundY: app.gfx.groundY,
           })
           .then(() => {
@@ -511,7 +511,7 @@ function underbar(app: App): string {
     const s = app.life;
     let center = `<button class="ub-main" data-act="go" data-arg="life"><span>인생</span></button>`;
     if (s.death) center = `<button class="ub-main danger" data-act="see-grave"><span>묘비로</span></button>`;
-    else if (app.screen === 'dungeon' && s.dive && s.dive.floor < 100) center = `<button class="ub-main pulse" data-act="descend"><span>하강</span><small>5층</small></button>`;
+    else if (app.screen === 'dungeon' && s.dive && !s.dive.fallen && s.dive.floor < 100) center = `<button class="ub-main pulse" data-act="descend"><span>하강</span><small>5층</small></button>`;
     const inDive = !!s.dive;
     const inShop = app.screen === 'town' && app.townTab === 'shop';
     const inBag = app.screen === 'town' && app.townTab === 'bag';
@@ -822,6 +822,7 @@ function viewLife(app: App): string {
         </div>
         ${!young && (s.stress ?? 0) >= STRESS_HIGH && s.focus !== 'rest' ? '<p class="warn small">스트레스가 높아 성장이 떨어지고 있다. 한 해 쉬어 가자!</p>' : ''}
         ${young ? '<p class="muted small">아직 너무 어리다. 세 살이 되면 방침을 정할 수 있다.</p>' : ''}
+        ${(s.trauma ?? 0) > 0 ? `<p class="warn small">${icon('skull')} 던전의 악몽 (${s.trauma}달 남음) — 스트레스가 100에 묶여 있다.</p>` : ''}
         ${(s.recover ?? 0) > 0 ? `<p class="warn small">${icon('heart')} 요양 중 (${s.recover}달 남음) — 성장과 수입이 절반이다.</p>` : ''}
       </div>`;
   }
