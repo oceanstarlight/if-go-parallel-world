@@ -78,6 +78,10 @@ kbd {
   color: var(--gold);
 }
 .stones { color: var(--gold); font-weight: 600; }
+.top-right { display: flex; align-items: center; gap: 14px; }
+.music-btn { background: none; border: 0; padding: 4px; color: var(--muted); display: flex; cursor: pointer; }
+.music-btn.on { color: var(--accent); }
+.music-btn .ic { width: 22px; height: 22px; }
 
 .screen { flex: 1; width: 100%; max-width: 1100px; margin: 0 auto; padding: 28px 24px 48px; }
 .screen-title { font-size: 24px; margin: 0 0 8px; color: var(--gold); }
