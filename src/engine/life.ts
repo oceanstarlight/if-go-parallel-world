@@ -10,7 +10,7 @@ import { HOUSES, houseById } from '../data/houses';
 import { GOALS } from '../data/goals';
 import { CHEATS, cheatById } from '../data/cheats';
 import { jobById } from '../data/jobs';
-import { NPC_NAMES, pick } from '../data/names';
+import { type Gender, genderOfName, namesOf, opposite, pick } from '../data/names';
 import { STAT_KEYS } from '../data/stats';
 import { ALL_EVENTS, eventById } from '../data/events';
 import { BIRTH_TEXT, QUIET_YEAR } from '../data/flavor';
@@ -40,6 +40,8 @@ export interface NewLifeOptions {
   legends?: Legend[];
   /** 특성을 직접 지정 (테스트용). 없으면 무작위 */
   traits?: string[];
+  /** 성별. 없으면 이름으로 짐작한다 */
+  gender?: Gender;
 }
 
 /** 가중치에 따라 하나를 뽑는다 */
@@ -53,9 +55,18 @@ export function weightedPick<T extends { weight: number }>(items: T[], rng: Rng)
   return items[items.length - 1];
 }
 
-/** 운명 모드: 출신과 권능을 인구 비중대로 뽑는다 */
-export function rollFate(rng: Rng = Math.random): { houseId: string; cheatId: string } {
-  return { houseId: weightedPick(HOUSES, rng).id, cheatId: weightedPick(CHEATS, rng).id };
+/** 출신은 언제나 운명이 정한다: 해금한 출신 중 인구 비중대로 (목록이 없으면 전체) */
+export function rollHouse(rng: Rng = Math.random, unlocked?: string[]): string {
+  const pool = unlocked ? HOUSES.filter((h) => unlocked.includes(h.id)) : HOUSES;
+  return weightedPick(pool.length ? pool : HOUSES, rng).id;
+}
+
+/** 운명에 맡긴 권능: 전체 권능 중 무작위 (해금 여부와 무관) */
+export const rollCheat = (rng: Rng = Math.random) => weightedPick(CHEATS, rng).id;
+
+/** 출신과 권능을 모두 운명에 맡긴다 (동시대 환생자 시뮬레이션용) */
+export function rollFate(rng: Rng = Math.random, unlocked?: string[]): { houseId: string; cheatId: string } {
+  return { houseId: rollHouse(rng, unlocked), cheatId: rollCheat(rng) };
 }
 
 function pickGoals(s: LifeState, rng: Rng): string[] {
@@ -109,6 +120,7 @@ export function createLife(opt: NewLifeOptions, rng: Rng = Math.random): LifeSta
 
   const s: LifeState = {
     name: opt.name,
+    gender: opt.gender ?? genderOfName(opt.name),
     age: 0,
     houseId: house.id,
     cheatId: cheat.id,
@@ -125,7 +137,6 @@ export function createLife(opt: NewLifeOptions, rng: Rng = Math.random): LifeSta
     lastEventId: null,
     extraLives: (cheat.extraLives ?? 0) + traits.reduce((a, t) => a + (t.extraLives ?? 0), 0),
     death: null,
-    rerolls: cheat.rerolls ?? 0,
     npcMet: [],
     npcPast: { ...(opt.npcPast ?? {}) },
     lifeNo: opt.lifeNo ?? 1,
@@ -324,9 +335,10 @@ export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
   if (e.karma) s.karma = clamp(s.karma + e.karma, -100, 100);
   if (e.addRel && !s.rels[e.addRel]) {
     const used = new Set(Object.values(s.rels).map((r) => r!.name));
-    const name = pick(NPC_NAMES.filter((n) => !used.has(n)), rng);
+    const gender = relGender(s, e.addRel, rng);
+    const name = pick(namesOf(gender).filter((n) => n !== s.name && !used.has(n)), rng);
     const base: Record<RelKey, number> = { friend: 40, rival: 25, mentor: 50, spouse: 65 };
-    s.rels[e.addRel] = { name, affection: base[e.addRel] };
+    s.rels[e.addRel] = { name, affection: base[e.addRel], gender };
   }
   if (e.promoteToSpouse && s.rels[e.promoteToSpouse]) {
     const r = s.rels[e.promoteToSpouse]!;
@@ -377,16 +389,24 @@ export function choiceChance(s: LifeState, eventId: string | null | undefined, c
   return isCombat(eventId, c as Choice) ? battleOdds(s, c as Choice).p : successChance(s, c.check);
 }
 
+/** 내 성별 (예전 저장 데이터는 이름으로 짐작) */
+export const genderOf = (s: LifeState): Gender => s.gender ?? genderOfName(s.name);
+
+/**
+ * 인연의 성별: 반려와 소꿉친구(연인 후보)는 이성, 숙적은 동성, 스승은 무작위.
+ * 소꿉친구가 반려가 되는 사건이 있어서 둘을 같은 규칙으로 맞춘다.
+ */
+function relGender(s: LifeState, key: RelKey, rng: Rng): Gender {
+  const me = genderOf(s);
+  if (key === 'spouse' || key === 'friend') return opposite(me);
+  if (key === 'rival') return me;
+  return rng() < 0.5 ? 'm' : 'f';
+}
+
 function resolve(s: LifeState, r: Resolution, rng: Rng, eventId?: string): { outcome: Outcome; passed: boolean | null } {
   if (!r.check) return { outcome: r.success, passed: null };
   const chance = choiceChance(s, eventId, r);
-  let passed = rng() * 100 < chance;
-  if (!passed && (s.rerolls ?? 0) > 0) {
-    // 세이브 & 로드: 실패를 한 번 되돌린다
-    s.rerolls = (s.rerolls ?? 0) - 1;
-    log(s, `⟲ 세이브 포인트에서 다시 시작! (남은 횟수 ${s.rerolls})`, 'milestone');
-    passed = rng() * 100 < chance;
-  }
+  const passed = rng() * 100 < chance;
   return { outcome: passed ? r.success : r.fail ?? r.success, passed };
 }
 
@@ -434,7 +454,7 @@ function pickEvent(s: LifeState, rng: Rng): GameEvent | null {
 function startEvent(s: LifeState, ev: GameEvent, rng: Rng) {
   s.seen.push(ev.id);
   s.lastEventId = ev.id;
-  log(s, `「${ev.title}」 ${fill(ev.text, s)}`, ev.milestone ? 'milestone' : 'normal');
+  log(s, `「${fill(ev.title, s)}」 ${fill(ev.text, s)}`, ev.milestone ? 'milestone' : 'normal');
   if (ev.auto) {
     const { outcome, passed } = resolve(s, ev.auto, rng, ev.id);
     applyOutcome(s, outcome, passed, rng);
@@ -506,7 +526,7 @@ export function choose(s: LifeState, index: number, rng: Rng = Math.random): Cho
   if (!choice || choiceLocked(s, choice)) return null;
   s.pendingEventId = null;
   if (choice.will) s.will = clamp((s.will ?? 50) - choice.will, 0, 100);
-  log(s, `▸ ${choice.label}`);
+  log(s, `▸ ${fill(choice.label, s)}`);
   const { outcome, passed } = resolve(s, choice, rng, ev.id);
   applyOutcome(s, outcome, passed, rng);
   return { choice, passed };

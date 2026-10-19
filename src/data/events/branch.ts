@@ -68,7 +68,7 @@ export const BRANCH_EVENTS: GameEvent[] = [
     text: '차가운 돌바닥. 철창 너머로 달빛이 들어온다. 형기가 끝나간다.',
     choices: [
       { label: '손을 씻고 새 삶을 산다', success: { text: '출소하는 날, 하늘이 유난히 파랬다. 이제 정직하게 살자.', effect: { unflags: ['jailed'], job: 'farmer', karma: 10 } } },
-      { label: '다시 뒷골목으로', success: { text: '출소 첫날 밤, 옛 동료들이 마중 나왔다. "기다렸다고, 형님."', effect: { unflags: ['jailed'], karma: -5 } } },
+      { label: '다시 뒷골목으로', success: { text: '출소 첫날 밤, 옛 동료들이 마중 나왔다. "기다렸다고, {sir}."', effect: { unflags: ['jailed'], karma: -5 } } },
       { label: '탈옥한다', check: { stat: 'luck', dc: 45 },
         success: { text: '숟가락 하나로 벽을 뚫었다! 전설에 한 줄이 추가됐다.', effect: { unflags: ['jailed'], stats: { fame: 5 } }, tone: 'good' },
         fail: { text: '탈옥 실패! 형기가 늘어났다.', effect: { stress: 20 } } },

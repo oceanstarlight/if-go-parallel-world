@@ -96,7 +96,9 @@ describe('시뮬레이션', () => {
     const avg = lives.reduce((a, s) => a + s.age, 0) / N;
     const jobs: Record<string, number> = {};
     for (const s of lives) jobs[`${s.jobId}:${s.jobRank}`] = (jobs[`${s.jobId}:${s.jobRank}`] ?? 0) + 1;
-    const unseen = ALL_EVENTS.filter((e) => !seen.has(e.id)).map((e) => e.id);
+    // 일부러 드문 사건 (도달 가능성은 tests/chains.test.ts 에서 직접 확인한다)
+    const RARE = ['b_debt_doom', 'hp_cleared_reward', 'bankrupt_comeback'];
+    const unseen = ALL_EVENTS.filter((e) => !seen.has(e.id) && !RARE.includes(e.id)).map((e) => e.id);
     console.log('평균 수명', avg.toFixed(1));
     console.log('사인 분포', Object.entries(causes).sort((a, b) => b[1] - a[1]));
     console.log('직업:직급', Object.entries(jobs).sort((a, b) => b[1] - a[1]).slice(0, 20));

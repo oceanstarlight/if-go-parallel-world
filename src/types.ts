@@ -9,6 +9,8 @@ export type RelKey = 'friend' | 'rival' | 'mentor' | 'spouse';
 export interface Relation {
   name: string;
   affection: number;
+  /** 'm' | 'f' (예전 저장 데이터에는 없을 수 있다) */
+  gender?: 'm' | 'f';
 }
 
 export type Tone = 'normal' | 'good' | 'bad' | 'milestone' | 'death';
@@ -27,6 +29,8 @@ export interface Death {
 /** 한 번의 삶. 순수 JSON 이어야 한다 (localStorage 저장). */
 export interface LifeState {
   name: string;
+  /** 성별 'm' | 'f' (예전 저장 데이터에는 없을 수 있다 → 이름으로 짐작) */
+  gender?: 'm' | 'f';
   age: number;
   houseId: string;
   cheatId: string;
@@ -46,8 +50,6 @@ export interface LifeState {
   death: Death | null;
   /** 이번 생의 목표 id (예전 저장에는 없을 수 있다) */
   goals?: string[];
-  /** 남은 판정 되돌리기 횟수 */
-  rerolls?: number;
   /** 이번 생에 만난 고정 캐릭터 */
   npcMet?: string[];
   /** 지난 생들에서 고정 캐릭터를 만난 횟수 (생성 시 메타에서 복사) */
@@ -280,8 +282,6 @@ export interface Cheat {
   showAffection?: boolean;
   /** 선택지 성공률을 보여준다 */
   showChance?: boolean;
-  /** 실패한 판정을 다시 굴릴 수 있는 횟수 (한 생에) */
-  rerolls?: number;
   /** 노화 속도 배율 */
   agingMul?: number;
   /** 운명 모드에서 뽑힐 상대 확률 */

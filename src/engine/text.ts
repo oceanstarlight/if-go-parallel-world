@@ -1,6 +1,19 @@
 import type { LifeState, Relation, RelKey, Text } from '../types';
 import { houseById } from '../data/houses';
 import { jobTitle } from '../data/jobs';
+import { genderOfName } from '../data/names';
+
+/**
+ * 성별에 따라 바뀌는 호칭. [남성 주인공일 때, 여성 주인공일 때]
+ * 연인 관련 단어는 상대가 이성이 되도록 짝지었다.
+ */
+const GENDERED: Record<string, [string, string]> = {
+  sir: ['형님', '누님'], // 부하·후배가 부르는 말
+  elder: ['아저씨', '누나'], // 어린아이가 부르는 말
+  royal: ['공주', '왕자'], // 주인공의 연인이 되는 왕족
+  royalChild: ['딸', '아들'], // 국왕이 말하는 그 왕족
+  inlaw: ['사위', '며느리'],
+};
 
 /** [받침 있을 때, 없을 때] */
 const JOSA: Record<string, [string, string]> = {
@@ -38,6 +51,7 @@ export function fill(text: Text, s: LifeState, extraRels?: LifeState['rels']): s
   return raw.replace(/\{(\w+)(?::([가-힣]+))?\}/g, (m, key: string, form?: string) => {
     let word: string | undefined;
     if (key === 'name') word = s.name;
+    else if (GENDERED[key]) word = GENDERED[key][(s.gender ?? genderOfName(s.name)) === 'f' ? 1 : 0];
     else if (key === 'house') word = houseById(s.houseId).name;
     else if (key === 'title') word = jobTitle(s.jobId, s.jobRank);
     else word = rels[key as RelKey]?.name;

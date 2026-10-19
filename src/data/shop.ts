@@ -26,7 +26,6 @@ export const SHOP: ShopItem[] = [
   { id: 'witch', kind: 'house', cost: 45 },
   { id: 'slime', kind: 'house', cost: 80 },
   { id: 'appraisal', kind: 'cheat', cost: 25 },
-  { id: 'rewind', kind: 'cheat', cost: 60 },
   { id: 'goddess', kind: 'cheat', cost: 35 },
   { id: 'swordsaint', kind: 'cheat', cost: 40 },
   { id: 'sage', kind: 'cheat', cost: 40 },

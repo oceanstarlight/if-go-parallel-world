@@ -58,7 +58,7 @@ export const YOUTH: GameEvent[] = [
         success: { text: '검이 깃털처럼 가볍게 뽑혔다! 눈부신 빛과 함께 등에 문장이 떠올랐다. 이제부터 당신은 용사다!', effect: { job: 'hero', flags: ['hero_awakened'], stats: { fame: 15 } }, tone: 'milestone' },
         fail: { text: '…꿈쩍도 안 한다. 성검이 "아직이야"라고 말하는 것 같다.', effect: { flags: ['hero_failed'], stats: { vit: -3 } } },
       },
-      { label: '못 들은 척한다', success: { text: '지하실 문을 잠갔다. 그래도 성검은 밤마다 서운하다는 듯 웅웅거렸다.', effect: { karma: -5, flags: ['hero_refused'] } } },
+      { label: '"용사 같은 거 안 해!" 지하실 문을 잠근다', will: 30, success: { text: '지하실 문을 잠갔다. 성검은 밤마다 서운하다는 듯 웅웅거렸지만, 평범하고 느긋한 하루하루가 시작됐다.', effect: { flags: ['hero_refused', 'defied_fate'], stats: { luck: 6 }, stress: -15 }, tone: 'milestone' } },
     ],
   },
   {

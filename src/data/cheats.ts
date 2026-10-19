@@ -52,13 +52,6 @@ export const CHEATS: Cheat[] = [
     weight: 12,
   },
   {
-    id: 'rewind',
-    name: '세이브 & 로드',
-    desc: '이 인생엔 세이브 포인트가 있다. 실패한 판정을 한 생에 두 번 되돌린다.',
-    rerolls: 2,
-    weight: 4,
-  },
-  {
     id: 'goddess',
     name: '여신의 가호',
     desc: '환생의 여신이 당신을 편애한다. 행운 +25, 행운 성장 1.5배.',
