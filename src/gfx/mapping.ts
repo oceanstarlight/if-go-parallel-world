@@ -21,10 +21,13 @@ const EVENT_SCENE: Record<string, SceneKind | 'home'> = {
   m_career18: 'road', e_knight_war: 'battlefield', e_merchant_deal: 'port', e_adv_betrayal: 'forest',
   e_adv_quest: 'road', e_priest_heretic: 'temple', e_priest_plague: 'graveyard', e_farmer_harvest: 'village',
   e_demon_raid: 'burning', e_demon_lord_hero: 'throne', e_hero_final: 'throne',
+  npc_lulu: 'forest', npc_lulu_regular: 'forest', npc_grim: 'graveyard', npc_momo: 'road',
 };
 
 const HOME: Record<string, SceneKind> = {
   farm: 'village', merchant: 'port', noble: 'castle', demon: 'demon_castle', hero: 'village',
+  elf: 'forest', dwarf: 'dungeon', beastkin: 'road', eastern: 'temple', mermaid: 'port',
+  sky: 'castle', witch: 'forest', slime: 'forest',
 };
 
 const JOB_SCENE: Record<string, SceneKind> = {
@@ -94,7 +97,7 @@ export const ENEMY_HP: Record<EnemyKind, number> = {
 /** 밤에 일어나는 사건 */
 const NIGHT_EVENTS = new Set(['m_awaken3', 'c_fever', 'a_yandere', 'a_dark_pact', 'a_pact_due', 'a_illness', 'e_adv_betrayal', 'a_inquisition']);
 /** 노을 무렵의 사건 */
-const DUSK_EVENTS = new Set(['a_spouse_death', 'a_mentor_death', 'a_reflection', 'a_friend_confess', 'a_rival_reconcile', 'e_hero_final', 'e_demon_lord_hero']);
+const DUSK_EVENTS = new Set(['npc_grim', 'a_spouse_death', 'a_mentor_death', 'a_reflection', 'a_friend_confess', 'a_rival_reconcile', 'e_hero_final', 'e_demon_lord_hero']);
 
 /** 시간대: 사건 > 나이(노년은 노을) > 장면 기본값 */
 export function timeFor(s: LifeState, kind: SceneKind): TimeOfDay {

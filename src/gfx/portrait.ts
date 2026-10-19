@@ -78,6 +78,14 @@ const HOUSE_HAIR: Record<string, string[]> = {
   noble: ['platinum', 'gold', 'lavender', 'pink'],
   demon: ['lavender', 'crimson', 'raven'],
   hero: ['gold', 'sky', 'gold'],
+  elf: ['platinum', 'gold', 'mint'],
+  dwarf: ['auburn', 'chestnut', 'crimson'],
+  beastkin: ['chestnut', 'gold', 'auburn', 'raven'],
+  eastern: ['raven', 'raven', 'pink'],
+  mermaid: ['teal', 'sky', 'pink'],
+  sky: ['sky', 'platinum', 'lavender'],
+  witch: ['raven', 'lavender', 'crimson'],
+  slime: ['sky'],
 };
 
 const EYES: Record<string, string[]> = {
@@ -86,6 +94,14 @@ const EYES: Record<string, string[]> = {
   noble: ['#3a88ff', '#b05aff', '#ff5aa8'],
   demon: ['#ff2a50'],
   hero: ['#2ab0ff'],
+  elf: ['#3ec070', '#2ab0c0'],
+  dwarf: ['#e8a030', '#8a5a3a'],
+  beastkin: ['#ffb020', '#3ec070'],
+  eastern: ['#5a3a8a', '#e83a5a'],
+  mermaid: ['#2ac0e0', '#b05aff'],
+  sky: ['#68c0ff', '#ffd25a'],
+  witch: ['#b05aff', '#3ec070'],
+  slime: ['#2a5aa8'],
 };
 
 const SKINS: Ramp[] = [
@@ -102,6 +118,14 @@ const BG: Record<string, [string, string]> = {
   noble: ['#fff0fa', '#d8a0e0'],
   demon: ['#ffe4f4', '#a85ac8'],
   hero: ['#fffbe0', '#7ab8ff'],
+  elf: ['#f0fff0', '#7ad8a0'],
+  dwarf: ['#fff0e0', '#e8a070'],
+  beastkin: ['#fffbe0', '#e8c870'],
+  eastern: ['#fff0f6', '#ffa8c8'],
+  mermaid: ['#e8fcff', '#58b8e8'],
+  sky: ['#ffffff', '#a8d8ff'],
+  witch: ['#f8f0ff', '#9a7ad0'],
+  slime: ['#f0fbff', '#88d8f0'],
 };
 
 export interface Outfit {
@@ -117,6 +141,14 @@ const HOUSE_OUTFIT: Record<string, Outfit> = {
   noble: { base: '#5a7aff', light: '#98b0ff', shadow: '#3a50c8', trim: '#ffd85a' },
   demon: { base: '#8a4ac8', light: '#b880f0', shadow: '#5e2e98', trim: '#ff5a8a' },
   hero: { base: '#3aa0ff', light: '#88ccff', shadow: '#2a6ad0', trim: '#ffd85a' },
+  elf: { base: '#5ac87a', light: '#9ae8a8', shadow: '#3a9858', trim: '#fff0a0' },
+  dwarf: { base: '#c86a3a', light: '#e8986a', shadow: '#984a2a', trim: '#ffd05a' },
+  beastkin: { base: '#e8a050', light: '#ffc888', shadow: '#b8783a', trim: '#7ac85a' },
+  eastern: { base: '#ff6a8a', light: '#ffa8bc', shadow: '#d0406a', trim: '#ffffff' },
+  mermaid: { base: '#3ac0d8', light: '#88e8f8', shadow: '#2a8aa8', trim: '#ffb8e0' },
+  sky: { base: '#ffffff', light: '#ffffff', shadow: '#c8dcf8', trim: '#68c0ff' },
+  witch: { base: '#4a3a8a', light: '#7a6ac0', shadow: '#2e2260', trim: '#c8a0ff' },
+  slime: { base: '#68c0ff', light: '#a8e0ff', shadow: '#3a88d0', trim: '#ffffff' },
 };
 
 const JOB_OUTFIT: Record<string, Outfit> = {
@@ -221,6 +253,14 @@ export function drawPortrait(spec: PortraitSpec, blink = false, sway = 0): Paint
   const fig = new Painter(64, 64);
   const sw = sway ? 1 : 0;
 
+  if (house === 'slime') {
+    drawSlime(fig, spec, eye, blink, sw);
+    fig.outlineTinted();
+    bg.blit(fig, 0, 0);
+    if (spec.dead) bg.map((c) => mix(grayscale(c), '#f4f4ff', 0.25));
+    return bg;
+  }
+
   // 2-1) 뒷머리
   if (spec.stage !== 'baby') {
     fig.ellipse(g.cx, g.cy - 2, g.rx + 2, g.ry + 1, hair[1]);
@@ -249,8 +289,23 @@ export function drawPortrait(spec: PortraitSpec, blink = false, sway = 0): Paint
   drawCollar(fig, g, spec, outfit, job);
 
   // 2-4) 얼굴: 둥근 볼 + 작은 턱
-  fig.ellipse(g.cx - g.rx, g.eyeY + 2, 1.5, 2.5, skin[1]);
-  fig.ellipse(g.cx + g.rx, g.eyeY + 2, 1.5, 2.5, skin[1]);
+  if (house === 'elf') {
+    // 뾰족한 엘프 귀
+    for (const side of [-1, 1]) {
+      const ex = g.cx + side * g.rx;
+      fig.poly([[ex, g.eyeY - 1], [ex + side * 8, g.eyeY - 6], [ex, g.eyeY + 5]], skin[1]);
+      fig.line(ex + side * 1, g.eyeY + 1, ex + side * 6, g.eyeY - 4, skin[2]);
+    }
+  } else if (house === 'mermaid') {
+    // 지느러미 귀
+    for (const side of [-1, 1]) {
+      const ex = g.cx + side * g.rx;
+      fig.poly([[ex, g.eyeY - 2], [ex + side * 6, g.eyeY - 4], [ex + side * 5, g.eyeY + 1], [ex + side * 6, g.eyeY + 5], [ex, g.eyeY + 4]], '#88e8f8');
+    }
+  } else {
+    fig.ellipse(g.cx - g.rx, g.eyeY + 2, 1.5, 2.5, skin[1]);
+    fig.ellipse(g.cx + g.rx, g.eyeY + 2, 1.5, 2.5, skin[1]);
+  }
   fig.ellipse(g.cx, g.cy - 1, g.rx, g.ry - 2, skin[1]);
   if (spec.stage !== 'baby') {
     const chinY = g.cy + g.ry - 1;
@@ -556,6 +611,19 @@ function drawHeadgear(fig: Painter, g: Geo, spec: PortraitSpec, job: string | nu
       fig.line(bx, top + 2, bx + side * 5 * hs, top - 7 * hs, '#b08ae0');
     }
   }
+  if (spec.houseId === 'beastkin' && spec.stage !== 'baby') {
+    // 동물 귀 (머리 위)
+    const { hair } = lookOf(spec);
+    for (const side of [-1, 1]) {
+      const bx = cx + side * 7;
+      fig.poly([[bx - 4, top + 4], [bx + side * 2, top - 8], [bx + 4, top + 4]], hair[1]);
+      fig.poly([[bx - 2, top + 3], [bx + side * 1.5, top - 4], [bx + 2, top + 3]], '#ffc8d8');
+    }
+  }
+  if (spec.houseId === 'sky' && spec.stage !== 'baby') {
+    // 머리 위 빛의 고리
+    fig.ellipseWhere(cx, top - 4, 9, 2.5, '#fff070', (x, y) => Math.hypot((x - cx) / 9, (y - (top - 4)) / 2.5) > 0.6);
+  }
   if (spec.stage === 'baby' || spec.stage === 'child') return;
 
   switch (job) {
@@ -609,4 +677,36 @@ function drawHeadgear(fig: Painter, g: Geo, spec: PortraitSpec, job: string | nu
         fig.poly([[cx - 2, top + 2], [cx - 5, top + 4], [cx - 2, top + 6]], o.trim);
       }
   }
+}
+
+/** 슬라임: 사람 대신 말랑한 젤리 몸 */
+function drawSlime(fig: Painter, spec: PortraitSpec, eye: string, blink: boolean, sw: number) {
+  const body = '#68c0ff', light = '#b8e8ff', shade = '#3a88d0';
+  const grow = { baby: 0.7, child: 0.82, teen: 0.92, adult: 1, elder: 1 }[spec.stage];
+  const rx = 22 * grow, ry = 17 * grow - sw;
+  const cy = 63 - ry;
+  fig.ellipse(32, cy, rx, ry, body);
+  fig.rect(32 - rx, cy, rx * 2, 63 - cy, body);
+  fig.poly([[32 - 4, cy - ry + 1], [32 + sw, cy - ry - 7 * grow], [32 + 4, cy - ry + 1]], body); // 꼭지
+  fig.ellipseWhere(32, cy, rx, ry, shade, (x, y) => x > 32 + rx * 0.45 || y > cy + ry * 0.55);
+  fig.ellipse(32 - rx * 0.45, cy - ry * 0.35, rx * 0.22, ry * 0.18, light);
+  fig.px(32 - rx * 0.6, cy - ry * 0.55, '#ffffff');
+  const ey = cy - 1;
+  for (const side of [-1, 1]) {
+    const ex = 32 + side * 7 * grow;
+    if (spec.dead || blink) {
+      fig.rect(ex - 2, ey + 2, 4, 1, '#2a3a6a');
+    } else {
+      fig.rect(ex - 1, ey - 2, 3, 6, eye);
+      fig.rect(ex - 1, ey - 2, 2, 2, '#ffffff');
+    }
+  }
+  if (!spec.dead) {
+    fig.rect(32 - 2, ey + 5, 4, 1, '#2a3a6a');
+    if (spec.mood === 'happy') fig.rect(32 - 1, ey + 6, 2, 1, '#ff8aa0');
+    fig.rect(32 - 14 * grow, ey + 4, 3, 1, '#ff9ab8');
+    fig.rect(32 + 11 * grow, ey + 4, 3, 1, '#ff9ab8');
+  }
+  if (spec.stage === 'elder') fig.rect(26, cy - ry - 2, 12, 2, '#ffffff');
+  if (spec.jobId === 'demon_officer' && spec.jobRank >= 5) fig.rect(26, cy - ry - 3, 12, 3, '#ffd85a');
 }

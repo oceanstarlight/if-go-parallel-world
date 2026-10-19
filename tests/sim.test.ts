@@ -22,7 +22,7 @@ const FOCI: Focus[] = ['train', 'study', 'social', 'explore'];
 
 function simulate(seed: number, houseId: string, cheatId: string): LifeState {
   const rng = seeded(seed);
-  const s = createLife({ name: '테스트', houseId, cheatId, upgrades: {} });
+  const s = createLife({ name: '테스트', houseId, cheatId, upgrades: {}, npcPast: seed % 3 === 0 ? { lulu: 3, grim: 2, momo: 2 } : {}, lifeNo: 1 + (seed % 5) }, rng);
   for (let guard = 0; guard < 500 && !s.death; guard++) {
     if (rng() < 0.15) s.focus = FOCI[Math.floor(rng() * 4)];
     const ev = currentEvent(s);
@@ -79,7 +79,7 @@ describe('시뮬레이션', () => {
     for (const s of lives) {
       expect(s.death).not.toBeNull();
       expect(deathIds).toContain(s.death!.causeId);
-      expect(s.age).toBeLessThanOrEqual(100);
+      expect(s.age).toBeLessThanOrEqual(140); // 엘프·불로 체질은 100세를 넘길 수 있다
     }
   });
 

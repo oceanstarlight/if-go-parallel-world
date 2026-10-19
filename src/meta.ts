@@ -1,6 +1,8 @@
 import type { LifeState, MetaSave } from './types';
 import { DEFAULT_UNLOCKED, SHOP, itemCost } from './data/shop';
-import { computeStones, sumStones, type StoneLine } from './engine/score';
+import { computeStones, goalsDone, sumStones, type StoneLine } from './engine/score';
+import { contemporaries } from './engine/sim';
+import { hashStr } from './gfx/painter';
 import { jobTitle } from './data/jobs';
 
 const META_KEY = 'igpw-meta-v1';
@@ -63,12 +65,14 @@ export function buy(m: MetaSave, itemId: string): boolean {
 }
 
 /** 죽은 삶을 정산하고 기록한다 */
-export function settleLife(m: MetaSave, s: LifeState): { lines: StoneLine[]; total: number; firstDeath: boolean } {
+export function settleLife(m: MetaSave, s: LifeState): { lines: StoneLine[]; total: number; firstDeath: boolean; peers: LifeState[] } {
   const causeId = s.death!.causeId;
   const lines = computeStones(s, m);
   const total = sumStones(lines);
   const firstDeath = !m.codex[causeId];
   m.codex[causeId] = (m.codex[causeId] ?? 0) + 1;
+  m.npcMet = m.npcMet ?? {};
+  for (const id of s.npcMet ?? []) m.npcMet[id] = (m.npcMet[id] ?? 0) + 1;
   m.soulStones += total;
   m.totalLives++;
   m.lives.unshift({
@@ -78,9 +82,12 @@ export function settleLife(m: MetaSave, s: LifeState): { lines: StoneLine[]; tot
     title: s.jobId ? jobTitle(s.jobId, s.jobRank) : s.age < 18 ? '어린 영혼' : '자유로운 영혼',
     causeId,
     stones: total,
+    goalsDone: goalsDone(s),
   });
   m.lives = m.lives.slice(0, 30);
   saveMeta(m);
   saveRun(null);
-  return { lines, total, firstDeath };
+  // 같은 해에 환생한 네 사람 (이름과 나이로 시드를 고정해 새로고침해도 같다)
+  const peers = contemporaries(hashStr(`${s.name}|${s.houseId}|${s.age}|${m.totalLives}`), s.name);
+  return { lines, total, firstDeath, peers };
 }

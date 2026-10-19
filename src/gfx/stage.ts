@@ -80,7 +80,10 @@ function shapeTex(type: ParticleType): Texture {
 function fitCanvas(canvas: HTMLCanvasElement, host: HTMLElement, w: number, h: number, maxK = 8) {
   const avail = host.clientWidth || w;
   const availH = host.dataset.maxh ? Number(host.dataset.maxh) : Infinity;
-  const k = Math.max(1, Math.min(maxK, Math.floor(avail / w), Math.floor(availH / h)));
+  // 기기 픽셀 기준 정수 배율: 고해상도 화면(dpr 2~3)에서도 도트 경계가 뭉개지지 않으면서 폭을 꽉 채운다
+  const dpr = window.devicePixelRatio || 1;
+  const dev = Math.max(1, Math.min(maxK * dpr, Math.floor((avail * dpr) / w), Math.floor((availH * dpr) / h)));
+  const k = dev / dpr;
   canvas.style.width = `${w * k}px`;
   canvas.style.height = `${h * k}px`;
 }

@@ -385,3 +385,139 @@ h4 { font-size: 13px; color: var(--muted); margin: 20px 0 6px; letter-spacing: 0
 .portrait-host canvas { border: 3px solid #ffffff; border-radius: 10px; box-shadow: var(--shadow); }
 .title-scene canvas { border-radius: 16px; box-shadow: 0 10px 30px rgba(74, 98, 240, 0.25); }
 .title-scene { box-shadow: none !important; }
+
+/* ───── v0.5: 목표 · 운명 · 동시대 환생자 · 스와이프 ───── */
+.sheet-top { display: flex; flex-direction: column; }
+.goals { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.goals li { display: grid; grid-template-columns: 18px 1fr auto; gap: 6px; color: var(--muted); }
+.goals li em { font-style: normal; color: var(--accent); font-size: 12px; }
+.goals li.done { color: var(--good); }
+.tombstone .goals { margin-top: 16px; text-align: left; }
+
+.fate-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+.fate-opt {
+  display: flex; flex-direction: column; gap: 4px; text-align: left;
+  background: var(--panel); border: 1px solid var(--line-2); border-radius: 10px; padding: 14px 16px;
+}
+.fate-opt span { font-size: 13px; color: var(--muted); }
+.fate-opt.selected { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(74, 98, 240, 0.25), var(--shadow); }
+.fate-opt.selected strong { color: var(--gold); }
+.fate-card { margin-top: 14px; background: var(--panel); border: 1px dashed var(--line-2); border-radius: 10px; padding: 14px 18px; }
+.fate-card p { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+.odds { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 16px; font-size: 13px; }
+.odds li { display: flex; justify-content: space-between; border-bottom: 1px dotted var(--line); }
+.odds b { font-weight: 400; color: var(--gold); font-variant-numeric: tabular-nums; }
+
+.peers { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.settle .peers li { display: flex; justify-content: flex-start; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 8px; background: var(--panel); }
+.peer img { image-rendering: pixelated; border-radius: 6px; flex: none; }
+.peer div { display: flex; flex-direction: column; min-width: 0; }
+.share-row { display: flex; gap: 10px; margin-top: 18px; }
+.share-row .btn { flex: 1; }
+
+.event-card { position: relative; }
+.event-card.swipeable { touch-action: pan-y; user-select: none; transition: transform 0.18s ease-out; }
+.event-card.swipeable.dragging { transition: none; cursor: grabbing; }
+.swipe-label {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%); max-width: 90%; padding: 6px 14px; border-radius: 10px;
+  font-size: 14px; font-weight: 700; color: #fff; background: #5a7aff; opacity: 0; pointer-events: none; z-index: 2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: var(--shadow);
+}
+.swipe-label.right { background: var(--accent); }
+.swipe-guide { display: none; text-align: center; font-size: 12px; color: var(--muted); margin: -8px 0 12px; }
+
+.life-list { list-style: none; margin: 20px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.life-list li {
+  display: grid; grid-template-columns: auto 1fr auto; grid-template-rows: auto auto; column-gap: 12px; align-items: baseline;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; box-shadow: var(--shadow);
+}
+.life-list li strong { grid-row: 1; }
+.life-list li .muted { grid-row: 1; }
+.life-list li > span:not(.muted) { grid-column: 1 / 3; grid-row: 2; }
+.life-list li em { grid-column: 3; grid-row: 1 / 3; align-self: center; font-style: normal; color: var(--accent); }
+
+/* 모바일 전용 요소는 데스크톱에서 숨긴다 */
+.underbar, .m-panel, .sheet-handle { display: none; }
+
+/* ───── 모바일 ───── */
+@media (max-width: 760px) {
+  :root { --ub-h: 64px; }
+  body { padding-bottom: calc(var(--ub-h) + env(safe-area-inset-bottom)); }
+  .topbar { padding: 8px 16px; position: sticky; top: 0; z-index: 30; }
+  .screen { padding: 16px 16px 24px; }
+  .title-card h1 { font-size: 44px; }
+  .menu { width: 100%; }
+  .fate-toggle, .peers { grid-template-columns: 1fr; }
+  .setup-actions { flex-wrap: wrap; }
+  .setup-actions .btn { flex: 1; }
+  .swipe-guide { display: block; }
+
+  /* 하단 고정 바 */
+  .underbar {
+    display: grid; grid-template-columns: repeat(5, 1fr); align-items: end;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    height: calc(var(--ub-h) + env(safe-area-inset-bottom));
+    padding: 0 6px env(safe-area-inset-bottom);
+    background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(10px);
+    border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(60, 80, 160, 0.08);
+  }
+  .ub-item {
+    height: var(--ub-h); background: none; border: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 2px; color: var(--muted); font-size: 11px;
+  }
+  .ub-icon { font-size: 20px; line-height: 1; }
+  .ub-item.on { color: var(--gold); font-weight: 700; }
+  .ub-main {
+    align-self: center; justify-self: center; width: 62px; height: 62px; margin-top: -22px; border-radius: 50%;
+    border: 3px solid #fff; background: linear-gradient(180deg, #7a9aff 0%, #5a62f0 100%); color: #fff;
+    font-weight: 700; font-size: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(74, 98, 240, 0.4);
+  }
+  .ub-main small { font-size: 10px; }
+  .ub-main.danger { background: linear-gradient(180deg, #ff7a90 0%, #e8365a 100%); }
+  .ub-main.pulse { background: linear-gradient(180deg, #ffc65a 0%, #ffad1f 100%); animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { transform: scale(1.08); } }
+
+  /* 인생 화면: 위쪽 가로 바 + 장면 + 연대기 (연대기만 스크롤) */
+  .view-life {
+    display: flex; flex-direction: column; gap: 10px; padding: 10px 12px 12px;
+    height: calc(100dvh - 45px - var(--ub-h) - env(safe-area-inset-bottom));
+  }
+  .view-life .sheet { flex: none; overflow: visible; padding: 10px 12px; }
+  .sheet-top { flex-direction: row; gap: 12px; align-items: center; }
+  .sheet-top .portrait-host { margin: 0; width: 88px; flex: none; }
+  .sheet-main { flex: 1; min-width: 0; }
+  .sheet-head h2 { font-size: 17px; display: inline; }
+  .sheet-head .age { display: inline; margin-left: 6px; font-size: 13px; }
+  .sheet-head p.small { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stats { margin-top: 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+  .stat { grid-template-columns: 28px 1fr 22px; gap: 5px; font-size: 12px; }
+  .sheet-extra { display: none; }
+  .view-life .center { flex: 1; min-height: 0; gap: 10px; }
+  .view-life .chronicle { padding: 12px 14px; max-height: none; }
+  .year { grid-template-columns: 40px 1fr; font-size: 14px; }
+
+  /* 바텀 시트 (행동 · 목표·인연 · 메뉴) */
+  .view-life .action, .m-panel {
+    display: flex; flex-direction: column;
+    position: fixed; left: 0; right: 0; z-index: 40;
+    bottom: calc(var(--ub-h) + env(safe-area-inset-bottom));
+    max-height: 72dvh; overflow-y: auto; padding: 8px 16px 16px;
+    background: var(--panel); border: 0; border-top: 1px solid var(--line-2);
+    border-radius: 18px 18px 0 0; box-shadow: 0 -8px 28px rgba(60, 80, 160, 0.18);
+    transform: translateY(calc(100% + var(--ub-h) + 40px)); transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+    visibility: hidden;
+  }
+  .view-life .action.open, .m-panel.open { transform: none; visibility: visible; }
+  .sheet-handle {
+    display: block; flex: none; align-self: center; width: 44px; height: 18px; margin-bottom: 6px;
+    border: 0; background: none; position: relative;
+  }
+  .sheet-handle::after { content: ''; position: absolute; left: 0; right: 0; top: 7px; height: 4px; border-radius: 2px; background: var(--line-2); }
+  .m-panel h4:first-of-type { margin-top: 4px; }
+  .advance { display: none; }
+  .focus-grid { margin-bottom: 4px; }
+  .death-call { margin: 12px 0; }
+  .toast { bottom: calc(var(--ub-h) + 20px + env(safe-area-inset-bottom)); z-index: 60; }
+  .tombstone h2 { font-size: 28px; }
+}

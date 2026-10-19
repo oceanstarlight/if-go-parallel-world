@@ -1,8 +1,9 @@
 import type {
   Check, Choice, Effect, Focus, GameEvent, LifeState, Outcome, RelKey, Resolution, StatKey,
 } from '../types';
-import { houseById } from '../data/houses';
-import { cheatById } from '../data/cheats';
+import { HOUSES, houseById } from '../data/houses';
+import { GOALS } from '../data/goals';
+import { CHEATS, cheatById } from '../data/cheats';
 import { jobById } from '../data/jobs';
 import { NPC_NAMES, pick } from '../data/names';
 import { STAT_KEYS } from '../data/stats';
@@ -18,6 +19,38 @@ export interface NewLifeOptions {
   houseId: string;
   cheatId: string;
   upgrades: Record<string, number>;
+  /** 지난 생들에서 고정 캐릭터를 만난 횟수 */
+  npcPast?: Record<string, number>;
+  /** 몇 번째 삶인지 (1부터) */
+  lifeNo?: number;
+  /** 운명에 맡겨 태어났는가 */
+  fated?: boolean;
+}
+
+/** 가중치에 따라 하나를 뽑는다 */
+export function weightedPick<T extends { weight: number }>(items: T[], rng: Rng): T {
+  const total = items.reduce((a, b) => a + b.weight, 0);
+  let r = rng() * total;
+  for (const it of items) {
+    r -= it.weight;
+    if (r <= 0) return it;
+  }
+  return items[items.length - 1];
+}
+
+/** 운명 모드: 출신과 권능을 인구 비중대로 뽑는다 */
+export function rollFate(rng: Rng = Math.random): { houseId: string; cheatId: string } {
+  return { houseId: weightedPick(HOUSES, rng).id, cheatId: weightedPick(CHEATS, rng).id };
+}
+
+function pickGoals(s: LifeState, rng: Rng): string[] {
+  const pool = GOALS.filter((g) => !g.canAssign || g.canAssign(s));
+  const out: string[] = [];
+  while (out.length < 3 && out.length < pool.length) {
+    const g = pool[Math.floor(rng() * pool.length)];
+    if (!out.includes(g.id)) out.push(g.id);
+  }
+  return out;
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -26,7 +59,7 @@ const randInt = (rng: Rng, lo: number, hi: number) => lo + Math.floor(rng() * (h
 /** 소수 성장값을 확률적으로 반올림한다 (1.4 → 40% 확률로 2) */
 const stochastic = (v: number, rng: Rng) => Math.floor(v) + (rng() < v - Math.floor(v) ? 1 : 0);
 
-export function createLife(opt: NewLifeOptions): LifeState {
+export function createLife(opt: NewLifeOptions, rng: Rng = Math.random): LifeState {
   const house = houseById(opt.houseId);
   const cheat = cheatById(opt.cheatId);
   const stats = { vit: 10, mana: 10, int: 10, cha: 10, fame: 0, luck: 10 };
@@ -55,7 +88,19 @@ export function createLife(opt: NewLifeOptions): LifeState {
     lastEventId: null,
     extraLives: cheat.extraLives ?? 0,
     death: null,
+    rerolls: cheat.rerolls ?? 0,
+    npcMet: [],
+    npcPast: { ...(opt.npcPast ?? {}) },
+    lifeNo: opt.lifeNo ?? 1,
+    fated: !!opt.fated,
   };
+  s.goals = pickGoals(s, rng);
+  if ((opt.lifeNo ?? 1) > 1) {
+    // 매 생마다 다시 만나는 환생의 여신
+    log(s, `환생의 여신이 하품을 하며 손을 흔들었다. "어머, 벌써 ${opt.lifeNo}번째 인생이네? 이번엔 「${cheat.name}」 권능으로 해줄게~"`, 'milestone');
+  } else {
+    log(s, `환생의 여신이 반짝이는 손가락으로 당신을 콕 찔렀다. "축하해, 이세계 환생이야! 선물로 「${cheat.name}」 권능을 줄게♪"`, 'milestone');
+  }
   log(s, fill(BIRTH_TEXT[house.id] ?? BIRTH_TEXT.farm, s), 'milestone');
   return s;
 }
@@ -109,18 +154,28 @@ function grow(s: LifeState, rng: Rng) {
       if (rng() < 0.6) gainStat(s, k as StatKey, v * (1 + s.jobRank * 0.2), rng);
     }
   }
-  // 노화
-  if (s.age >= 40 && rng() < 0.6) s.stats.vit = Math.max(1, s.stats.vit - 1);
-  if (s.age >= 60) s.stats.vit = Math.max(1, s.stats.vit - 1);
-  if (s.age >= 70 && rng() < 0.5) s.stats.vit = Math.max(1, s.stats.vit - 1);
+  // 노화 (엘프·불로 체질은 느리다)
+  const am = agingMul(s);
+  if (s.age >= 40 && rng() < 0.6 * am) s.stats.vit = Math.max(1, s.stats.vit - 1);
+  if (s.age >= 60 && rng() < am) s.stats.vit = Math.max(1, s.stats.vit - 1);
+  if (s.age >= 70 && rng() < 0.5 * am) s.stats.vit = Math.max(1, s.stats.vit - 1);
 }
 
 /** 자연사 확률 */
+function agingMul(s: LifeState): number {
+  return (houseById(s.houseId).agingMul ?? 1) * (cheatById(s.cheatId).agingMul ?? 1);
+}
+
 export function naturalDeathChance(s: LifeState): number {
-  if (s.age >= 100) return 1;
-  if (s.age < 55) return 0;
-  const t = (s.age - 55) / 40;
-  return clamp((0.004 + t * t * 0.35) * (1.3 - s.stats.vit / 100), 0, 1);
+  const am = agingMul(s);
+  const limit = am < 1 ? 140 : 100;
+  if (s.age >= limit) return 1;
+  // 노화가 느리면 '체감 나이'가 젊다
+  const age = 55 + (s.age - 55) * am;
+  if (age < 55) return 0;
+  const t = (age - 55) / 40;
+  const grim = s.flags.includes('grim_win') ? 0.5 : 1;
+  return clamp((0.004 + t * t * 0.35) * (1.3 - s.stats.vit / 100) * grim, 0, 1);
 }
 
 // ───────────────────────── 죽음 ─────────────────────────
@@ -178,6 +233,10 @@ export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
   for (const k of e.removeRel ?? []) delete s.rels[k];
   for (const f of e.flags ?? []) if (!s.flags.includes(f)) s.flags.push(f);
   if (e.unflags) s.flags = s.flags.filter((f) => !e.unflags!.includes(f));
+  if (e.meet) {
+    s.npcMet = s.npcMet ?? [];
+    if (!s.npcMet.includes(e.meet)) s.npcMet.push(e.meet);
+  }
   if (e.job) {
     s.jobId = e.job;
     s.jobRank = 1;
@@ -189,7 +248,13 @@ export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
 
 function resolve(s: LifeState, r: Resolution, rng: Rng): { outcome: Outcome; passed: boolean | null } {
   if (!r.check) return { outcome: r.success, passed: null };
-  const passed = rng() * 100 < successChance(s, r.check);
+  let passed = rng() * 100 < successChance(s, r.check);
+  if (!passed && (s.rerolls ?? 0) > 0) {
+    // 세이브 & 로드: 실패를 한 번 되돌린다
+    s.rerolls = (s.rerolls ?? 0) - 1;
+    log(s, `⟲ 세이브 포인트에서 다시 시작! (남은 횟수 ${s.rerolls})`, 'milestone');
+    passed = rng() * 100 < successChance(s, r.check);
+  }
   return { outcome: passed ? r.success : r.fail ?? r.success, passed };
 }
 

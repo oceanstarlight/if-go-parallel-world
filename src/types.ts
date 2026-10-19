@@ -42,6 +42,18 @@ export interface LifeState {
   lastEventId?: string | null;
   extraLives: number;
   death: Death | null;
+  /** 이번 생의 목표 id (예전 저장에는 없을 수 있다) */
+  goals?: string[];
+  /** 남은 판정 되돌리기 횟수 */
+  rerolls?: number;
+  /** 이번 생에 만난 고정 캐릭터 */
+  npcMet?: string[];
+  /** 지난 생들에서 고정 캐릭터를 만난 횟수 (생성 시 메타에서 복사) */
+  npcPast?: Record<string, number>;
+  /** 몇 번째 삶인지 (1부터) */
+  lifeNo?: number;
+  /** 운명에 맡겨 태어났는가 */
+  fated?: boolean;
 }
 
 /** 사건/선택지가 나타나기 위한 조건. 명시된 항목은 모두 만족해야 한다. */
@@ -85,6 +97,8 @@ export interface Effect {
   job?: string;
   jobRank?: number;
   death?: string;
+  /** 고정 캐릭터를 만났다고 기록 */
+  meet?: string;
   /** 이 효과로 체력이 0이 되었을 때의 사인 (기본: illness) */
   zeroCause?: string;
 }
@@ -141,6 +155,10 @@ export interface House {
   flags?: string[];
   /** 매년 성장 보너스 */
   growth?: Partial<Stats>;
+  /** 운명 모드에서 이 출신으로 태어날 상대 확률 (인구 비중) */
+  weight: number;
+  /** 노화 속도 배율 (엘프는 느리다) */
+  agingMul?: number;
 }
 
 export interface Cheat {
@@ -155,6 +173,14 @@ export interface Cheat {
   relMul?: number;
   extraLives?: number;
   showAffection?: boolean;
+  /** 선택지 성공률을 보여준다 */
+  showChance?: boolean;
+  /** 실패한 판정을 다시 굴릴 수 있는 횟수 (한 생에) */
+  rerolls?: number;
+  /** 노화 속도 배율 */
+  agingMul?: number;
+  /** 운명 모드에서 뽑힐 상대 확률 */
+  weight: number;
 }
 
 export interface Job {
@@ -183,6 +209,8 @@ export interface MetaSave {
   codex: Record<string, number>;
   lives: PastLife[];
   totalLives: number;
+  /** 고정 캐릭터를 만난 생의 수 */
+  npcMet?: Record<string, number>;
 }
 
 export interface PastLife {
@@ -192,4 +220,5 @@ export interface PastLife {
   title: string;
   causeId: string;
   stones: number;
+  goalsDone?: number;
 }
