@@ -8,12 +8,20 @@ export type SceneKind =
   | 'temple' | 'academy' | 'library' | 'dungeon' | 'road' | 'battlefield' | 'tavern'
   | 'throne' | 'graveyard' | 'grave' | 'burning';
 
+export type TimeOfDay = 'day' | 'dusk' | 'night';
+
+export type ParticleKind = 'embers' | 'snow' | 'rain' | 'fireflies' | 'dust' | 'ash' | 'petals' | 'leaves' | 'sparkles';
+
 /** Pixi 에서 애니메이션으로 덧입힐 효과 */
 export type Fx =
   | { kind: 'twinkle'; pts: [number, number][] }
   | { kind: 'glow'; pts: [number, number, number, string][] } // x, y, 반경, 색 (깜빡이는 빛)
-  | { kind: 'particles'; type: 'embers' | 'snow' | 'rain' | 'fireflies' | 'dust' | 'ash'; count: number; area: [number, number, number, number] }
-  | { kind: 'fog'; y: number; h: number; color: string };
+  | { kind: 'particles'; type: ParticleKind; count: number; area: [number, number, number, number] }
+  | { kind: 'fog'; y: number; h: number; color: string }
+  /** 흘러가는 구름: [x, y, 폭] */
+  | { kind: 'clouds'; items: [number, number, number][]; speed: number; tint: string }
+  /** 날아가는 새 떼 */
+  | { kind: 'birds'; count: number; color: string };
 
 export interface Scene {
   p: Painter;
@@ -22,125 +30,225 @@ export interface Scene {
   groundY: number;
 }
 
-const SKY = {
-  night: ['#06081a', '#0e1430', '#1a2348', '#2a365e'],
-  dusk: ['#16142e', '#3a2448', '#7a3648', '#c8644a', '#eca05a'],
-  day: ['#36609e', '#5284be', '#80acd2', '#bcd4de'],
-  blood: ['#140406', '#320a10', '#5e1616', '#982c1c', '#d45a26'],
-  gold: ['#2e3a6a', '#6e6494', '#c89a7e', '#ecca94'],
-  gray: ['#141418', '#26262e', '#3e3c44', '#5e5a5c'],
+/** 애니 배경 특유의 맑고 진한 하늘 */
+const SKY: Record<TimeOfDay, string[]> = {
+  day: ['#2a7cff', '#4a9cff', '#78bcff', '#a8daff', '#dcf2ff'],
+  dusk: ['#4a3ab8', '#9a5ad0', '#ff7aa8', '#ffa878', '#ffe0a0'],
+  night: ['#141a58', '#222c80', '#34489e', '#5070c0'],
 };
+
+/** 시간대별 색 보정: 밤에는 파랗게, 노을에는 분홍빛으로 */
+function tint(c: string, time: TimeOfDay): string {
+  if (time === 'night') return mix(darken(c, 0.25), '#3a4aa8', 0.35);
+  if (time === 'dusk') return mix(c, '#ff8a9a', 0.18);
+  return c;
+}
 
 type Rnd = () => number;
 
 // ───────────────────────── 공용 그리기 도구 ─────────────────────────
 
-/** 중점 변위로 만든 능선 아래를 칠한다. 반환: x → 능선 y */
-function ridge(p: Painter, rnd: Rnd, baseY: number, amp: number, color: string, rough = 0.55, top?: string): number[] {
-  const n = 256;
-  const ys = new Array(n + 1).fill(0);
-  ys[0] = rnd() * 2 - 1;
-  ys[n] = rnd() * 2 - 1;
-  for (let step = n; step > 1; step /= 2) {
-    const half = step / 2;
-    const scale = Math.pow(rough, Math.log2(n / step));
-    for (let i = half; i < n; i += step) ys[i] = (ys[i - half] + ys[i + half]) / 2 + (rnd() * 2 - 1) * scale;
-  }
+function sky(p: Painter, time: TimeOfDay, h: number) {
+  p.vGradient(0, 0, p.w, h, SKY[time]);
+}
+
+/** 완만하게 굽이치는 언덕 (사인파 합) */
+function hills(p: Painter, rnd: Rnd, baseY: number, amp: number, color: string, light: string): number[] {
+  const f1 = 0.015 + rnd() * 0.02, f2 = 0.04 + rnd() * 0.03, ph1 = rnd() * 6, ph2 = rnd() * 6;
   const out: number[] = [];
   for (let x = 0; x < p.w; x++) {
-    const y = Math.round(baseY + ys[Math.floor((x / p.w) * n)] * amp);
+    const y = Math.round(baseY + Math.sin(x * f1 + ph1) * amp + Math.sin(x * f2 + ph2) * amp * 0.35);
     out.push(y);
     p.rect(x, y, 1, p.h - y, color);
-    if (top) p.px(x, y, top);
+    p.px(x, y, light);
+    if (x % 3 === 0) p.px(x, y + 1, light);
   }
   return out;
+}
+
+/** 멀리 보이는 눈 덮인 산맥 */
+function mountains(p: Painter, rnd: Rnd, baseY: number, color: string, snow: string) {
+  let x = -20;
+  while (x < p.w + 20) {
+    const w = 40 + rnd() * 50, h = 22 + rnd() * 26;
+    const peak = x + w / 2;
+    p.poly([[x, baseY], [peak, baseY - h], [x + w, baseY]], color);
+    p.poly([[peak, baseY - h], [x + w, baseY], [peak + w * 0.15, baseY]], darken(color, 0.12));
+    p.poly([[peak - w * 0.12, baseY - h * 0.72], [peak, baseY - h], [peak + w * 0.12, baseY - h * 0.72], [peak + 3, baseY - h * 0.64], [peak - 3, baseY - h * 0.68]], snow);
+    x += w * 0.65;
+  }
+}
+
+/** 몽실몽실한 적운 */
+export function cloudPainter(w: number, seed = 1, tintColor = '#ffffff'): Painter {
+  const rnd = seeded(seed);
+  const h = Math.round(w * 0.45);
+  const p = new Painter(w, h + 2);
+  const base = tintColor;
+  const shade = mix(base, '#a8c8f0', 0.55);
+  const n = 4 + Math.floor(rnd() * 3);
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    const cx = w * (0.15 + t * 0.7);
+    const r = w * (0.14 + rnd() * 0.12) * (1 - Math.abs(t - 0.5) * 0.6);
+    p.ellipse(cx, h - r * 0.9, r, r * 0.9, base);
+  }
+  p.rect(Math.round(w * 0.1), h - 3, Math.round(w * 0.8), 3, base);
+  // 아랫부분 그림자
+  p.map((c, x, y) => (c === base && y > h * 0.7 && (y > h * 0.82 || (x + y) % 2 === 0) ? shade : c));
+  return p;
+}
+
+function staticClouds(p: Painter, rnd: Rnd, n: number, maxY: number, time: TimeOfDay) {
+  const tintC = time === 'dusk' ? '#ffe4ec' : time === 'night' ? '#8a9ad8' : '#ffffff';
+  for (let i = 0; i < n; i++) {
+    const c = cloudPainter(30 + Math.floor(rnd() * 40), Math.floor(rnd() * 1000), tintC);
+    p.blit(c, Math.floor(rnd() * (p.w - 20)) - 10, Math.floor(rnd() * maxY));
+  }
+}
+
+function driftClouds(rnd: Rnd, n: number, maxY: number, time: TimeOfDay): Fx {
+  const items: [number, number, number][] = [];
+  for (let i = 0; i < n; i++) items.push([rnd() * SCENE_W, 4 + rnd() * maxY, 24 + Math.floor(rnd() * 30)]);
+  return { kind: 'clouds', items, speed: 0.004 + rnd() * 0.004, tint: time === 'dusk' ? '#ffe4ec' : time === 'night' ? '#8a9ad8' : '#ffffff' };
 }
 
 function stars(p: Painter, rnd: Rnd, count: number, maxY: number): [number, number][] {
   const pts: [number, number][] = [];
   for (let i = 0; i < count; i++) {
     const x = Math.floor(rnd() * p.w), y = Math.floor(rnd() * maxY);
-    const bright = rnd() < 0.15;
-    p.px(x, y, bright ? '#fff6dc' : rnd() < 0.5 ? '#8a94c0' : '#c8ccdc');
+    const bright = rnd() < 0.2;
+    p.px(x, y, bright ? '#ffffff' : rnd() < 0.5 ? '#a8c0ff' : '#ffe8ff');
     if (bright) pts.push([x, y]);
   }
   return pts;
 }
 
-function moon(p: Painter, x: number, y: number, r: number, c = '#f0e6c8') {
-  p.ellipse(x, y, r + 2, r + 2, mix(c, '#1a2348', 0.75));
-  p.ellipse(x, y, r, r, c);
-  p.ellipseWhere(x, y, r, r, darken(c, 0.15), (px, py) => px > x + r * 0.3 || (px - x) * 0.6 + (py - y) > r * 0.6);
-  p.ellipse(x - r * 0.35, y - r * 0.2, r * 0.22, r * 0.22, darken(c, 0.1));
-  p.ellipse(x + r * 0.2, y + r * 0.35, r * 0.15, r * 0.15, darken(c, 0.1));
+function moon(p: Painter, x: number, y: number, r: number) {
+  p.ellipse(x, y, r + 3, r + 3, '#6a80d0');
+  p.ellipse(x, y, r + 1, r + 1, '#a8b8f0');
+  p.ellipse(x, y, r, r, '#fffbe8');
+  p.ellipse(x - r * 0.3, y - r * 0.2, r * 0.22, r * 0.22, '#f0ead0');
+  p.ellipse(x + r * 0.25, y + r * 0.3, r * 0.15, r * 0.15, '#f0ead0');
 }
 
-function pine(p: Painter, x: number, baseY: number, h: number, c: string, light?: string) {
+function sun(p: Painter, x: number, y: number, r: number, time: TimeOfDay) {
+  const core = time === 'dusk' ? '#fff0a0' : '#ffffff';
+  const halo = time === 'dusk' ? '#ffc070' : '#d8f0ff';
+  p.ellipseWhere(x, y, r * 2.2, r * 2.2, halo, (px, py) => bayer(px, py) < 0.4);
+  p.ellipse(x, y, r * 1.3, r * 1.3, mix(core, halo, 0.5));
+  p.ellipse(x, y, r, r, core);
+}
+
+/** 둥글둥글한 활엽수 */
+function roundTree(p: Painter, x: number, baseY: number, h: number, leaf: string, rnd: Rnd) {
+  const trunk = '#a86a3a';
+  p.rect(x - 1, baseY - h * 0.4, 3, h * 0.4, trunk);
+  p.px(x + 1, baseY - h * 0.3, darken(trunk, 0.25));
+  const r = h * 0.38;
+  const cy = baseY - h * 0.62;
+  const light = lighten(leaf, 0.35), dark = darken(leaf, 0.22);
+  p.ellipse(x, cy, r, r * 0.9, leaf);
+  p.ellipse(x - r * 0.55, cy + r * 0.3, r * 0.6, r * 0.55, leaf);
+  p.ellipse(x + r * 0.55, cy + r * 0.3, r * 0.6, r * 0.55, leaf);
+  p.ellipseWhere(x, cy, r * 1.4, r * 1.3, dark, (px, py) => p.get(px, py) === leaf && px - x + (py - cy) * 0.8 > r * 0.45);
+  p.ellipseWhere(x - r * 0.3, cy - r * 0.35, r * 0.45, r * 0.35, light, (px, py) => p.get(px, py) === leaf);
+  if (rnd() < 0.4) {
+    // 열매
+    p.px(x - 2, cy + 1, '#ff5a6a');
+    p.px(x + 3, cy - 2, '#ff5a6a');
+  }
+}
+
+function pine(p: Painter, x: number, baseY: number, h: number, c: string, snowy = false) {
   const w = h * 0.38;
+  const light = lighten(c, 0.3);
   for (let i = 0; i < 4; i++) {
     const ty = baseY - h + i * h * 0.2;
     const tw = w * (0.45 + i * 0.2);
     p.poly([[x - tw, ty + h * 0.32], [x, ty], [x + tw, ty + h * 0.32]], c);
-    if (light) p.line(x, ty + 1, x - tw * 0.7, ty + h * 0.3, light);
+    p.poly([[x - tw, ty + h * 0.32], [x, ty], [x - tw * 0.2, ty + h * 0.32]], light);
+    if (snowy) p.line(x - tw, ty + h * 0.32, x + tw, ty + h * 0.32, '#ffffff');
   }
-  p.rect(x - 1, baseY - h * 0.12, 2, h * 0.12, darken(c, 0.4));
+  p.rect(x - 1, baseY - h * 0.12, 2, h * 0.12, '#8a5a32');
 }
 
-function deadTree(p: Painter, x: number, baseY: number, h: number, c: string) {
-  p.rect(x - 1, baseY - h, 3, h, c);
-  const branch = (bx: number, by: number, dx: number, len: number) => {
-    p.line(bx, by, bx + dx * len, by - len * 0.7, c);
-    p.line(bx + dx * len, by - len * 0.7, bx + dx * len * 1.4, by - len * 0.6, c);
-  };
-  branch(x, baseY - h * 0.6, -1, h * 0.35);
-  branch(x + 1, baseY - h * 0.75, 1, h * 0.3);
-  branch(x, baseY - h * 0.9, -1, h * 0.2);
-  branch(x + 1, baseY - h, 1, h * 0.15);
+function flowers(p: Painter, rnd: Rnd, y0: number, y1: number, n: number) {
+  const cols = ['#ff7aa8', '#ffe05a', '#ffffff', '#8ad0ff', '#c89aff'];
+  for (let i = 0; i < n; i++) {
+    const x = Math.floor(rnd() * p.w), y = Math.floor(y0 + rnd() * (y1 - y0));
+    const c = cols[Math.floor(rnd() * cols.length)];
+    p.px(x, y, c);
+    if (rnd() < 0.4) { p.px(x - 1, y, c); p.px(x + 1, y, c); p.px(x, y - 1, c); p.px(x, y, '#fff6a0'); }
+  }
 }
 
-function cottage(p: Painter, x: number, baseY: number, w: number, h: number, wall: string, roof: string, lit: string | null, glows: Fx & { kind: 'glow' }) {
+function grass(p: Painter, y: number, time: TimeOfDay) {
+  p.vGradient(0, y, p.w, p.h - y, [tint('#7ae070', time), tint('#4ab858', time), tint('#38984a', time)]);
+  for (let x = 0; x < p.w; x += 2) {
+    const gy = y + ((x * 37) % (p.h - y));
+    p.px(x, gy, tint('#a8f090', time));
+    p.px(x, gy - 1, tint('#a8f090', time));
+  }
+}
+
+function cottage(p: Painter, x: number, baseY: number, w: number, h: number, wall: string, roof: string, glows: Fx & { kind: 'glow' }, time: TimeOfDay) {
   p.rect(x, baseY - h, w, h, wall);
-  p.rect(x + w - 3, baseY - h, 3, h, darken(wall, 0.3));
+  p.rect(x + w - 3, baseY - h, 3, h, darken(wall, 0.12));
+  // 목조 기둥 (하프팀버)
+  p.rect(x, baseY - h, 1, h, '#a87a50');
+  p.rect(x + w - 1, baseY - h, 1, h, '#a87a50');
+  p.rect(x, baseY - h + Math.floor(h / 2), w, 1, '#a87a50');
   p.poly([[x - 3, baseY - h + 1], [x + w / 2, baseY - h - w * 0.45], [x + w + 3, baseY - h + 1]], roof);
-  p.line(x - 3, baseY - h + 1, x + w / 2, baseY - h - w * 0.45, lighten(roof, 0.2));
-  p.rect(x + w * 0.62, baseY - h - w * 0.45, 3, w * 0.3, darken(wall, 0.4)); // 굴뚝
-  if (lit) {
-    const wx = x + 3, wy = baseY - h + 4;
-    p.rect(wx, wy, 4, 4, lit);
-    p.rect(wx + 2, wy, 1, 4, darken(lit, 0.4));
-    glows.pts.push([wx + 2, wy + 2, 6, lit]);
-  }
-  p.rect(x + w - 8, baseY - 7, 4, 7, darken(wall, 0.55)); // 문
+  p.poly([[x - 3, baseY - h + 1], [x + w / 2, baseY - h - w * 0.45], [x + w / 2, baseY - h + 1]], lighten(roof, 0.2));
+  p.line(x - 3, baseY - h + 1, x + w + 3, baseY - h + 1, darken(roof, 0.3));
+  p.rect(x + w * 0.65, baseY - h - w * 0.42, 3, w * 0.28, '#c86a5a');
+  const lit = time !== 'day';
+  const wc = lit ? '#ffe070' : '#8ad8ff';
+  const wx = x + 3, wy = baseY - h + 4;
+  p.rect(wx, wy, 5, 4, wc);
+  p.rect(wx + 2, wy, 1, 4, '#ffffff');
+  p.px(wx, wy, '#ffffff');
+  if (lit) glows.pts.push([wx + 2, wy + 2, 7, '#ffd060']);
+  // 화분과 문
+  p.rect(x + w - 9, baseY - 8, 5, 8, '#c8784a');
+  p.px(x + w - 5, baseY - 4, '#ffe070');
+  p.rect(wx - 1, wy + 4, 7, 1, '#ff7aa8');
 }
 
-function castle(p: Painter, x: number, baseY: number, w: number, h: number, c: string, lit: string, glows: Fx & { kind: 'glow' }, spiky = false) {
+/** 동화풍 성: 흰 벽에 푸른 원뿔 지붕 */
+function castle(p: Painter, x: number, baseY: number, w: number, h: number, wall: string, roof: string, glows: Fx & { kind: 'glow' }, time: TimeOfDay, spiky = false) {
+  const wallShade = darken(wall, 0.15);
+  const win = time === 'day' ? '#5aa8ff' : '#ffe070';
   const tower = (tx: number, tw: number, th: number) => {
-    p.rect(tx, baseY - th, tw, th, c);
-    if (spiky) p.poly([[tx - 1, baseY - th], [tx + tw / 2, baseY - th - tw * 1.4], [tx + tw + 1, baseY - th]], c);
-    else {
-      for (let i = 0; i < tw; i += 3) p.rect(tx + i, baseY - th - 2, 2, 2, c);
-      p.poly([[tx - 1, baseY - th - 2], [tx + tw / 2, baseY - th - tw], [tx + tw + 1, baseY - th - 2]], darken(c, 0.2));
-    }
-    for (let i = 0; i < th / 10; i++) {
-      if ((tx + i) % 3 === 0) continue;
-      const wy = baseY - th + 5 + i * 9;
-      if (wy > baseY - 6) break;
-      p.rect(tx + tw / 2 - 1, wy, 2, 3, lit);
-      glows.pts.push([tx + tw / 2, wy + 1, 4, lit]);
+    p.rect(tx, baseY - th, tw, th, wall);
+    p.rect(tx + tw - 2, baseY - th, 2, th, wallShade);
+    const rh = spiky ? tw * 1.8 : tw * 1.3;
+    p.poly([[tx - 2, baseY - th + 1], [tx + tw / 2, baseY - th - rh], [tx + tw + 2, baseY - th + 1]], roof);
+    p.poly([[tx - 2, baseY - th + 1], [tx + tw / 2, baseY - th - rh], [tx + tw / 2, baseY - th + 1]], lighten(roof, 0.22));
+    p.rect(tx + tw / 2, baseY - th - rh - 5, 1, 5, '#a87a50');
+    p.poly([[tx + tw / 2 + 1, baseY - th - rh - 5], [tx + tw / 2 + 5, baseY - th - rh - 4], [tx + tw / 2 + 1, baseY - th - rh - 3]], spiky ? '#ff3a7a' : '#ff5a6a');
+    for (let i = 0; i < th / 11; i++) {
+      const wy = baseY - th + 5 + i * 10;
+      if (wy > baseY - 8) break;
+      p.rect(tx + tw / 2 - 1, wy, 3, 4, win);
+      p.ellipse(tx + tw / 2 + 0.5, wy, 1.5, 1, win);
+      if (time !== 'day') glows.pts.push([tx + tw / 2, wy + 2, 5, win]);
     }
   };
-  p.rect(x, baseY - h * 0.45, w, h * 0.45, c);
-  for (let i = 0; i < w; i += 4) p.rect(x + i, baseY - h * 0.45 - 2, 2, 2, c);
-  tower(x - 4, 10, h * 0.7);
-  tower(x + w - 6, 10, h * 0.75);
-  tower(x + w * 0.3, 12, h);
-  tower(x + w * 0.58, 9, h * 0.82);
-  p.rect(x + w / 2 - 4, baseY - 10, 8, 10, darken(c, 0.5));
-  p.ellipse(x + w / 2, baseY - 10, 4, 3, darken(c, 0.5));
+  p.rect(x, baseY - h * 0.45, w, h * 0.45, wall);
+  for (let i = 0; i < w; i += 4) p.rect(x + i, baseY - h * 0.45 - 2, 2, 2, wall);
+  tower(x - 4, 11, h * 0.7);
+  tower(x + w - 7, 11, h * 0.75);
+  tower(x + w * 0.3, 13, h);
+  tower(x + w * 0.58, 10, h * 0.82);
+  p.rect(x + w / 2 - 4, baseY - 11, 8, 11, '#a86a3a');
+  p.ellipse(x + w / 2, baseY - 11, 4, 3, '#a86a3a');
+  p.rect(x + w / 2 - 1, baseY - 11, 1, 11, '#d8a060');
 }
 
 function bricks(p: Painter, x0: number, y0: number, w: number, h: number, base: string, rnd: Rnd) {
-  const mortar = darken(base, 0.45);
+  const mortar = darken(base, 0.2);
   p.rect(x0, y0, w, h, base);
   for (let y = y0; y < y0 + h; y += 6) {
     p.rect(x0, y, w, 1, mortar);
@@ -148,8 +256,8 @@ function bricks(p: Painter, x0: number, y0: number, w: number, h: number, base: 
     for (let x = x0 + off; x < x0 + w; x += 12) {
       p.rect(x, y, 1, 6, mortar);
       const v = rnd();
-      if (v < 0.25) p.rect(x + 1, y + 1, 11, 5, darken(base, 0.12));
-      else if (v > 0.85) p.rect(x + 1, y + 1, 11, 1, lighten(base, 0.12));
+      if (v < 0.25) p.rect(x + 1, y + 1, 11, 5, darken(base, 0.06));
+      else if (v > 0.8) p.rect(x + 1, y + 1, 11, 1, lighten(base, 0.2));
     }
   }
 }
@@ -159,332 +267,416 @@ function floorPlanks(p: Painter, y0: number, base: string) {
     const t = (y - y0) / (p.h - y0);
     for (let x = 0; x < p.w; x++) {
       const seam = Math.round((x - p.w / 2) / (6 + t * 18)) !== Math.round((x - 1 - p.w / 2) / (6 + t * 18));
-      p.px(x, y, seam ? darken(base, 0.4) : bayer(x, y) < t * 0.6 ? lighten(base, 0.08) : base);
+      p.px(x, y, seam ? darken(base, 0.18) : bayer(x, y) < t * 0.5 ? lighten(base, 0.08) : base);
     }
   }
 }
 
-function torch(p: Painter, x: number, y: number, glows: Fx & { kind: 'glow' }) {
-  p.rect(x - 1, y, 3, 7, '#4a3020');
-  p.ellipse(x, y - 2, 2.5, 3.5, '#f09030');
-  p.ellipse(x, y - 1, 1.2, 2, '#ffe080');
-  glows.pts.push([x, y - 2, 18, '#f0a040']);
+function torch(p: Painter, x: number, y: number, glows: Fx & { kind: 'glow' }, flame = '#ffa040') {
+  p.rect(x - 1, y, 3, 7, '#8a5a32');
+  p.ellipse(x, y - 2, 2.5, 3.5, flame);
+  p.ellipse(x, y - 1, 1.2, 2, '#fff4a0');
+  glows.pts.push([x, y - 2, 18, flame]);
 }
 
 function pillar(p: Painter, x: number, top: number, bottom: number, w: number, c: string) {
   p.rect(x, top, w, bottom - top, c);
-  p.rect(x, top, 2, bottom - top, lighten(c, 0.15));
-  p.rect(x + w - 3, top, 3, bottom - top, darken(c, 0.3));
-  p.rect(x - 2, top, w + 4, 4, lighten(c, 0.1));
-  p.rect(x - 2, bottom - 4, w + 4, 4, darken(c, 0.15));
-}
-
-function groundFill(p: Painter, y: number, top: string, bottom: string) {
-  p.vGradient(0, y, p.w, p.h - y, [top, bottom]);
+  p.rect(x + 1, top, 2, bottom - top, lighten(c, 0.3));
+  p.rect(x + w - 3, top, 3, bottom - top, darken(c, 0.15));
+  p.rect(x - 2, top, w + 4, 4, lighten(c, 0.15));
+  p.rect(x - 2, bottom - 4, w + 4, 4, darken(c, 0.08));
 }
 
 function banner(p: Painter, x: number, y: number, c: string) {
-  p.rect(x, y, 1, 30, '#3a2a1e');
+  p.rect(x, y, 1, 30, '#a87a50');
   p.poly([[x + 1, y + 1], [x + 12, y + 3], [x + 9, y + 7], [x + 12, y + 11], [x + 1, y + 10]], c);
+  p.line(x + 1, y + 1, x + 11, y + 3, lighten(c, 0.3));
+}
+
+function crystal(p: Painter, x: number, baseY: number, h: number, c: string, glows: Fx & { kind: 'glow' }) {
+  const w = h * 0.35;
+  p.poly([[x - w, baseY], [x - w * 0.6, baseY - h * 0.7], [x, baseY - h], [x + w * 0.6, baseY - h * 0.7], [x + w, baseY]], c);
+  p.poly([[x, baseY - h], [x + w * 0.6, baseY - h * 0.7], [x + w, baseY], [x, baseY]], darken(c, 0.2));
+  p.line(x - w * 0.4, baseY - h * 0.6, x - 1, baseY - h * 0.95, '#ffffff');
+  glows.pts.push([x, baseY - h * 0.5, h * 0.9, c]);
 }
 
 // ───────────────────────── 장면 ─────────────────────────
 
-export function drawScene(kind: SceneKind, seed = 1): Scene {
+/** 장면마다 기본 시간대. 호출자가 덮어쓸 수 있다 */
+export const DEFAULT_TIME: Record<SceneKind, TimeOfDay> = {
+  title: 'dusk', village: 'day', snow: 'day', room: 'day', port: 'day', castle: 'day',
+  demon_castle: 'dusk', forest: 'day', temple: 'day', academy: 'day', library: 'day',
+  dungeon: 'night', road: 'day', battlefield: 'day', tavern: 'night', throne: 'day',
+  graveyard: 'dusk', grave: 'dusk', burning: 'night',
+};
+
+export function drawScene(kind: SceneKind, seed = 1, time: TimeOfDay = DEFAULT_TIME[kind]): Scene {
   const rnd = seeded(seed * 7919 + kind.length * 104729);
   const p = new Painter(SCENE_W, SCENE_H);
   const glows: Fx & { kind: 'glow' } = { kind: 'glow', pts: [] };
   const fx: Fx[] = [glows];
   let groundY = 116;
+  const T = (c: string) => tint(c, time);
+
+  /** 바깥 장면 공통: 하늘 + 해/달 + 구름 + 새 */
+  const outdoor = (skyH: number, cloudN = 3) => {
+    sky(p, time, skyH);
+    if (time === 'night') {
+      fx.push({ kind: 'twinkle', pts: stars(p, rnd, 90, skyH * 0.7) });
+      moon(p, 196, 24, 9);
+    } else {
+      sun(p, time === 'dusk' ? 190 : 40, time === 'dusk' ? skyH - 26 : 20, time === 'dusk' ? 9 : 6, time);
+      fx.push({ kind: 'birds', count: 3 + Math.floor(rnd() * 3), color: time === 'dusk' ? '#5a3a6a' : '#3a5a8a' });
+    }
+    staticClouds(p, rnd, cloudN, skyH * 0.45, time);
+    fx.push(driftClouds(rnd, 3, skyH * 0.4, time));
+  };
 
   switch (kind) {
     case 'title': {
-      p.vGradient(0, 0, p.w, 100, SKY.night);
-      fx.push({ kind: 'twinkle', pts: stars(p, rnd, 130, 80) });
-      moon(p, 178, 34, 16);
-      ridge(p, rnd, 82, 10, '#161c34', 0.6);
-      ridge(p, rnd, 96, 7, '#10142a', 0.6);
-      // 절벽 위의 성
-      p.poly([[0, 135], [0, 92], [30, 86], [62, 90], [80, 100], [92, 135]], '#0a0c1a');
-      castle(p, 14, 90, 48, 44, '#0a0c1a', '#f0b860', glows);
-      ridge(p, rnd, 118, 4, '#080a14', 0.5);
-      fx.push({ kind: 'particles', type: 'fireflies', count: 14, area: [90, 96, 150, 36] });
-      fx.push({ kind: 'fog', y: 100, h: 20, color: '#2a3460' });
-      groundY = 124;
+      outdoor(110, 4);
+      mountains(p, rnd, 92, T('#9ab0f0'), '#ffffff');
+      hills(p, rnd, 100, 5, T('#6ad07a'), T('#a8f0a0'));
+      // 언덕 위의 성
+      p.ellipse(60, 120, 70, 26, T('#58c068'));
+      castle(p, 26, 102, 60, 50, T('#ffffff'), T('#4a7aff'), glows, time);
+      hills(p, rnd, 118, 3, T('#4ab858'), T('#7ae070'));
+      flowers(p, rnd, 120, 135, 40);
+      fx.push({ kind: 'particles', type: 'petals', count: 24, area: [0, -10, 240, 145] });
+      fx.push({ kind: 'particles', type: 'sparkles', count: 14, area: [0, 0, 240, 100] });
+      groundY = 126;
       break;
     }
     case 'village':
     case 'snow': {
       const snowy = kind === 'snow';
-      p.vGradient(0, 0, p.w, 90, snowy ? SKY.gray : SKY.dusk);
-      if (snowy) fx.push({ kind: 'particles', type: 'snow', count: 70, area: [0, -10, 240, 145] });
-      ridge(p, rnd, 70, 12, snowy ? '#5a5e6e' : '#3a2a44', 0.6, snowy ? '#9aa0b0' : undefined);
-      ridge(p, rnd, 88, 6, snowy ? '#7a8090' : '#2a2436', 0.5, snowy ? '#c8ccd8' : undefined);
-      groundFill(p, 100, snowy ? '#c8ccd8' : '#3e4a2a', snowy ? '#8a90a0' : '#1e2614');
-      for (let i = 0; i < 9; i++) pine(p, 8 + i * 27 + rnd() * 8, 101, 14 + rnd() * 10, snowy ? '#3a4a46' : '#1e2a1e', snowy ? '#dce0ea' : undefined);
-      cottage(p, 40, 112, 26, 16, snowy ? '#6a5a4e' : '#6a5038', snowy ? '#d8dce6' : '#7a3a2a', '#f4b860', glows);
-      cottage(p, 120, 108, 22, 14, snowy ? '#5e5046' : '#5e4632', snowy ? '#d8dce6' : '#6a3424', '#f4b860', glows);
-      cottage(p, 182, 114, 28, 17, snowy ? '#6a5a4e' : '#6a5038', snowy ? '#d8dce6' : '#7a3a2a', '#f4b860', glows);
-      for (let x = 0; x < p.w; x += 6) p.rect(x, 121, 1, 5, '#4a3a28');
-      p.rect(0, 122, p.w, 1, '#4a3a28');
-      if (!snowy) fx.push({ kind: 'particles', type: 'fireflies', count: 8, area: [0, 100, 240, 30] });
+      outdoor(90, 3);
+      mountains(p, rnd, 78, T(snowy ? '#b8c8f0' : '#8aa8e8'), '#ffffff');
+      if (snowy) {
+        hills(p, rnd, 88, 4, T('#e8f0ff'), '#ffffff');
+        p.vGradient(0, 100, p.w, 35, [T('#f4f8ff'), T('#d0dcf4')]);
+        fx.push({ kind: 'particles', type: 'snow', count: 70, area: [0, -10, 240, 145] });
+      } else {
+        hills(p, rnd, 90, 4, T('#68cc6a'), T('#a8f09a'));
+        grass(p, 100, time);
+      }
+      for (let i = 0; i < 7; i++) {
+        const tx = 10 + i * 36 + rnd() * 10;
+        if (snowy) pine(p, tx, 101, 16 + rnd() * 8, T('#3a9a7a'), true);
+        else roundTree(p, tx, 101, 18 + rnd() * 8, T('#4ac860'), rnd);
+      }
+      const roofs = ['#ff6a5a', '#5a8aff', '#ffa040'];
+      cottage(p, 40, 112, 26, 16, T('#fff4e4'), snowy ? '#ffffff' : T(roofs[0]), glows, time);
+      cottage(p, 120, 108, 22, 14, T('#fff0dc'), snowy ? '#ffffff' : T(roofs[1]), glows, time);
+      cottage(p, 182, 114, 28, 17, T('#fff4e4'), snowy ? '#ffffff' : T(roofs[2]), glows, time);
+      // 울타리
+      for (let x = 0; x < p.w; x += 6) p.rect(x, 121, 2, 6, T('#e8c08a'));
+      p.rect(0, 123, p.w, 1, T('#d0a070'));
+      if (!snowy) {
+        flowers(p, rnd, 124, 135, 30);
+        fx.push({ kind: 'particles', type: time === 'night' ? 'fireflies' : 'petals', count: 14, area: [0, 0, 240, 135] });
+      }
       groundY = 128;
       break;
     }
     case 'room': {
-      p.rect(0, 0, p.w, 100, '#3a2a1e');
-      for (let x = 0; x < p.w; x += 14) p.rect(x, 0, 1, 100, '#2a1e14');
-      p.rect(0, 0, p.w, 6, '#22160e');
-      floorPlanks(p, 100, '#4a3424');
-      // 창 (밤)
-      p.rect(40, 24, 34, 30, '#1a1e36');
-      p.vGradient(42, 26, 30, 26, SKY.night);
-      moon(p, 64, 34, 4);
-      p.rect(56, 24, 2, 30, '#5a4028');
-      p.rect(40, 38, 34, 2, '#5a4028');
-      p.rect(38, 54, 38, 3, '#6a4a30');
-      // 벽난로
-      bricks(p, 150, 46, 56, 54, '#5a4a44', rnd);
-      p.rect(160, 70, 36, 30, '#120a08');
-      p.ellipse(178, 94, 12, 6, '#d06020');
-      p.ellipse(178, 92, 6, 5, '#f0b040');
-      glows.pts.push([178, 90, 40, '#f08030']);
-      fx.push({ kind: 'particles', type: 'embers', count: 10, area: [166, 70, 24, 24] });
+      p.rect(0, 0, p.w, 100, '#ffe8d0');
+      for (let x = 0; x < p.w; x += 14) p.rect(x, 0, 1, 100, '#f4d4b8');
+      p.rect(0, 0, p.w, 6, '#d8a878');
+      p.rect(0, 92, p.w, 8, '#e8b888');
+      floorPlanks(p, 100, '#d89a68');
+      // 창: 시간대에 맞는 하늘
+      p.rect(36, 18, 42, 36, '#ffffff');
+      p.vGradient(38, 20, 38, 32, SKY[time].slice(1));
+      if (time === 'night') moon(p, 64, 30, 4);
+      else p.blit(cloudPainter(18, 3), 42, 26);
+      p.rect(56, 18, 2, 36, '#ffffff');
+      p.rect(36, 35, 42, 2, '#ffffff');
+      p.rect(30, 16, 6, 42, '#ff9ab8');
+      p.rect(78, 16, 6, 42, '#ff9ab8');
+      p.rect(34, 54, 46, 3, '#c8885a');
+      p.rect(46, 50, 4, 4, '#ff7a8a'); // 화분 꽃
+      p.rect(47, 47, 2, 3, '#5ac860');
+      // 난로 대신 따뜻한 책장과 장난감
+      p.rect(150, 40, 60, 60, '#c8885a');
+      for (let sy = 46; sy < 96; sy += 16) {
+        p.rect(152, sy + 12, 56, 2, '#a86a3a');
+        for (let bx = 154; bx < 206; bx += 4) p.rect(bx, sy + 3 + Math.floor(rnd() * 3), 3, 9, ['#ff7aa8', '#5aa8ff', '#ffd05a', '#7ae07a', '#b07aff'][Math.floor(rnd() * 5)]);
+      }
       // 요람
-      p.ellipse(100, 108, 18, 8, '#7a5838');
-      p.rect(82, 100, 36, 6, '#e0d4c0');
-      p.rect(84, 112, 2, 10, '#5a3e26');
-      p.rect(114, 112, 2, 10, '#5a3e26');
+      p.ellipse(100, 108, 18, 8, '#ffffff');
+      p.ellipseWhere(100, 108, 18, 8, '#ffd0e4', (_x, y) => y > 108);
+      p.rect(84, 112, 2, 10, '#c8885a');
+      p.rect(114, 112, 2, 10, '#c8885a');
+      p.ellipse(100, 101, 6, 3, '#ffe8f0');
+      // 창으로 드는 햇빛
+      if (time !== 'night') p.map((c, x, y) => (y > 56 && y < 100 && x - (y - 56) * 0.6 > 34 && x - (y - 56) * 0.6 < 80 && bayer(x, y) < 0.3 ? lighten(c, 0.25) : c));
+      fx.push({ kind: 'particles', type: 'dust', count: 16, area: [30, 20, 100, 80] });
       groundY = 124;
       break;
     }
     case 'port': {
-      p.vGradient(0, 0, p.w, 80, SKY.dusk);
-      p.ellipse(120, 78, 18, 18, '#f4c070');
-      p.vGradient(0, 80, p.w, 55, ['#6a3a4a', '#3a2a44', '#1a1a30']);
-      for (let y = 82; y < 135; y += 3) for (let x = (y * 7) % 11; x < p.w; x += 9 + (y % 5)) p.rect(x, y, 3, 1, mix('#f4c070', '#3a2a44', (y - 80) / 60));
-      // 배
+      outdoor(80, 3);
+      p.vGradient(0, 80, p.w, 55, [T('#5ac0ff'), T('#2a8ae8'), T('#1a68c0')]);
+      for (let y = 82; y < 135; y += 3) for (let x = (y * 7) % 11; x < p.w; x += 9 + (y % 5)) p.rect(x, y, 3, 1, T('#c8ecff'));
       const ship = (x: number, y: number, s: number) => {
-        p.poly([[x - 16 * s, y], [x + 18 * s, y], [x + 12 * s, y + 7 * s], [x - 12 * s, y + 7 * s]], '#1a1420');
-        p.rect(x - 1, y - 30 * s, 2, 30 * s, '#1a1420');
-        p.poly([[x + 1, y - 28 * s], [x + 14 * s, y - 8 * s], [x + 1, y - 6 * s]], '#2a2230');
-        p.poly([[x - 1, y - 24 * s], [x - 12 * s, y - 6 * s], [x - 1, y - 6 * s]], '#2a2230');
+        p.poly([[x - 16 * s, y], [x + 18 * s, y], [x + 12 * s, y + 7 * s], [x - 12 * s, y + 7 * s]], T('#c8784a'));
+        p.rect(x - 14 * s, y, 30 * s, 1, T('#ffffff'));
+        p.rect(x - 1, y - 30 * s, 2, 30 * s, T('#8a5a32'));
+        p.poly([[x + 1, y - 28 * s], [x + 14 * s, y - 8 * s], [x + 1, y - 6 * s]], T('#ffffff'));
+        p.poly([[x - 1, y - 24 * s], [x - 12 * s, y - 6 * s], [x - 1, y - 6 * s]], T('#f0f4ff'));
+        p.poly([[x + 1, y - 30 * s], [x + 6 * s, y - 28 * s], [x + 1, y - 26 * s]], '#ff5a6a');
       };
       ship(60, 92, 1);
       ship(170, 86, 0.6);
-      // 부두 창고
-      p.rect(0, 100, 240, 35, '#1a1218');
-      for (let i = 0; i < 4; i++) cottage(p, 8 + i * 62, 116, 34, 18, '#3a2a2a', '#4a2a28', '#f4b860', glows);
+      p.rect(0, 102, 240, 33, T('#e8c08a'));
+      p.rect(0, 102, 240, 2, T('#c8985a'));
+      const roofs = ['#ff6a5a', '#5a8aff', '#ffa040', '#7ad06a'];
+      for (let i = 0; i < 4; i++) cottage(p, 8 + i * 62, 118, 34, 18, T('#fffaf0'), T(roofs[i]), glows, time);
       groundY = 128;
       break;
     }
     case 'castle': {
-      p.vGradient(0, 0, p.w, 100, SKY.night);
-      fx.push({ kind: 'twinkle', pts: stars(p, rnd, 80, 60) });
-      moon(p, 40, 28, 10);
-      ridge(p, rnd, 86, 8, '#141a30', 0.6);
-      p.ellipse(130, 140, 110, 44, '#0e1222');
-      castle(p, 92, 100, 80, 64, '#1a1e34', '#f0c070', glows);
-      banner(p, 102, 46, '#8a2a3a');
-      banner(p, 158, 48, '#2a4a8a');
-      groundFill(p, 118, '#141826', '#0a0c16');
-      groundY = 126;
+      outdoor(124, 3);
+      mountains(p, rnd, 86, T('#9ab0f0'), '#ffffff');
+      p.ellipse(130, 142, 120, 46, T('#5ac86a'));
+      p.ellipseWhere(130, 142, 120, 46, T('#8ae880'), (_x, y) => y < 100);
+      castle(p, 92, 104, 80, 64, T('#ffffff'), T('#4a7aff'), glows, time);
+      banner(p, 100, 52, '#ff5a6a');
+      banner(p, 162, 54, '#ffd05a');
+      grass(p, 120, time);
+      flowers(p, rnd, 122, 135, 25);
+      fx.push({ kind: 'particles', type: time === 'night' ? 'sparkles' : 'petals', count: 14, area: [0, 0, 240, 135] });
+      groundY = 128;
       break;
     }
     case 'demon_castle': {
-      p.vGradient(0, 0, p.w, 100, SKY.blood);
-      p.ellipse(190, 30, 14, 14, '#e8402e');
-      p.ellipse(190, 30, 11, 11, '#f87040');
-      ridge(p, rnd, 80, 14, '#2a0a10', 0.65);
-      castle(p, 70, 104, 96, 80, '#120408', '#ff3a3a', glows, true);
-      groundFill(p, 108, '#1a0608', '#080204');
+      p.vGradient(0, 0, p.w, 100, ['#2a1060', '#6a2aa8', '#c84ac8', '#ff7aa8', '#ffb0a0']);
+      fx.push({ kind: 'twinkle', pts: stars(p, rnd, 40, 40) });
+      p.ellipse(190, 30, 14, 14, '#ff8ac0');
+      p.ellipse(190, 30, 11, 11, '#ffd0ec');
+      hills(p, rnd, 82, 8, '#4a2a88', '#8a5ad0');
+      castle(p, 70, 106, 96, 80, '#5a3a98', '#2a1a58', glows, 'night', true);
+      p.vGradient(0, 108, p.w, 27, ['#3a2070', '#1e1040']);
       for (let i = 0; i < 6; i++) {
         const lx = rnd() * 240;
-        p.ellipse(lx, 122 + rnd() * 8, 10 + rnd() * 10, 2, '#c8401a');
-        glows.pts.push([lx, 124, 14, '#e0501a']);
+        p.ellipse(lx, 122 + rnd() * 8, 10 + rnd() * 10, 2, '#ff5ac0');
+        glows.pts.push([lx, 124, 14, '#ff5ac0']);
       }
-      fx.push({ kind: 'particles', type: 'embers', count: 40, area: [0, 60, 240, 75] });
+      for (let i = 0; i < 5; i++) crystal(p, 10 + i * 52 + rnd() * 10, 128, 10 + rnd() * 8, '#c87aff', glows);
+      fx.push({ kind: 'particles', type: 'sparkles', count: 26, area: [0, 40, 240, 95] });
       groundY = 126;
       break;
     }
     case 'forest': {
-      p.vGradient(0, 0, p.w, 135, ['#0a1418', '#12242a', '#1a3634', '#0e1a1a']);
+      sky(p, time, 70);
+      p.vGradient(0, 64, p.w, 60, [T('#c8f4dc'), T('#8ae0b0')]);
+      staticClouds(p, rnd, 2, 20, time);
       for (let layer = 0; layer < 3; layer++) {
-        const c = ['#18302e', '#10221f', '#0a1614'][layer];
-        const l = ['#24443e', '#1a3430', undefined][layer];
-        for (let i = 0; i < 12 - layer * 2; i++) pine(p, rnd() * 250 - 5, 100 + layer * 12, 50 + layer * 18 + rnd() * 20, c, l);
+        const c = T(['#7ad8a0', '#4ab878', '#2a9a60'][layer]);
+        for (let i = 0; i < 12 - layer * 2; i++) {
+          const x = rnd() * 250 - 5, base = 92 + layer * 14, h = 44 + layer * 16 + rnd() * 18;
+          if (rnd() < 0.5) pine(p, x, base, h, c);
+          else roundTree(p, x, base, h, c, rnd);
+        }
       }
-      // 신비한 빛
-      p.ellipse(150, 98, 3, 3, '#9af0ff');
-      glows.pts.push([150, 98, 30, '#5ad0e0']);
-      groundFill(p, 118, '#0e1c18', '#060c0a');
-      fx.push({ kind: 'particles', type: 'fireflies', count: 24, area: [0, 40, 240, 90] });
-      fx.push({ kind: 'fog', y: 96, h: 26, color: '#2a4a4a' });
+      grass(p, 118, time);
+      flowers(p, rnd, 120, 135, 20);
+      // 정령의 빛
+      p.ellipse(150, 100, 3, 3, '#c8ffff');
+      glows.pts.push([150, 100, 30, '#7af0ff']);
+      // 나뭇잎 사이로 드는 빛줄기
+      if (time !== 'night') for (let i = 0; i < 3; i++) p.map((c, x, y) => (Math.abs(x - (60 + i * 60) - y * 0.35) < 5 && y < 118 && bayer(x, y) < 0.35 ? lighten(c, 0.3) : c));
+      fx.push({ kind: 'particles', type: time === 'night' ? 'fireflies' : 'leaves', count: 22, area: [0, 0, 240, 135] });
+      fx.push({ kind: 'particles', type: 'fireflies', count: 10, area: [0, 60, 240, 70] });
       groundY = 126;
       break;
     }
     case 'temple': {
-      p.vGradient(0, 0, p.w, 100, SKY.gold);
-      ridge(p, rnd, 84, 6, '#8a7488', 0.5);
-      groundFill(p, 102, '#c8b490', '#7a6a54');
-      // 계단 + 신전
-      for (let i = 0; i < 4; i++) p.rect(60 - i * 6, 102 + i * 4, 120 + i * 12, 4, i % 2 ? '#d8d0c0' : '#c4bcac');
-      p.rect(66, 58, 108, 6, '#e8e0d0');
-      p.poly([[60, 58], [120, 34], [180, 58]], '#e0d8c8');
-      p.poly([[72, 56], [120, 40], [168, 56]], '#c8bca8');
-      for (let i = 0; i < 6; i++) pillar(p, 72 + i * 18, 64, 102, 8, '#ece4d4');
-      p.ellipse(120, 48, 4, 4, '#f0c860');
-      glows.pts.push([120, 48, 22, '#f8d880']);
-      // 빛줄기
-      for (let i = 0; i < 4; i++) p.map((c, x, y) => (Math.abs(x - (30 + i * 60) - y * 0.4) < 4 && y < 100 && bayer(x, y) < 0.3 ? lighten(c, 0.25) : c));
-      fx.push({ kind: 'particles', type: 'dust', count: 20, area: [40, 30, 160, 80] });
+      outdoor(100, 3);
+      hills(p, rnd, 86, 4, T('#a8c8ff'), '#ffffff');
+      p.vGradient(0, 102, p.w, 33, [T('#fff4dc'), T('#f0dcb0')]);
+      for (let i = 0; i < 4; i++) p.rect(60 - i * 6, 102 + i * 4, 120 + i * 12, 4, i % 2 ? T('#ffffff') : T('#f0ecf8'));
+      p.rect(66, 58, 108, 6, T('#ffffff'));
+      p.poly([[60, 58], [120, 34], [180, 58]], T('#ffffff'));
+      p.poly([[72, 56], [120, 40], [168, 56]], T('#e4ecff'));
+      p.poly([[60, 58], [120, 34], [120, 36], [62, 58]], T('#ffd85a'));
+      for (let i = 0; i < 6; i++) pillar(p, 72 + i * 18, 64, 102, 8, T('#ffffff'));
+      p.ellipse(120, 48, 4, 4, '#ffe070');
+      glows.pts.push([120, 48, 24, '#fff0a0']);
+      flowers(p, rnd, 118, 135, 20);
+      fx.push({ kind: 'particles', type: 'sparkles', count: 20, area: [40, 20, 160, 90] });
       groundY = 124;
       break;
     }
     case 'academy': {
-      p.vGradient(0, 0, p.w, 120, SKY.night);
-      fx.push({ kind: 'twinkle', pts: stars(p, rnd, 70, 50) });
-      moon(p, 206, 22, 8);
-      const c = '#1e2240';
-      p.rect(50, 40, 140, 80, c);
-      p.poly([[44, 42], [120, 14], [196, 42]], '#262a4e');
-      p.rect(28, 30, 22, 90, c);
-      p.poly([[24, 30], [39, 6], [54, 30]], '#262a4e');
-      p.rect(190, 30, 22, 90, c);
-      p.poly([[186, 30], [201, 6], [216, 30]], '#262a4e');
+      outdoor(120, 3);
+      const wall = T('#fff4e4'), roof = T('#4a6aff');
+      p.rect(50, 40, 140, 80, wall);
+      p.rect(186, 40, 4, 80, darken(wall, 0.12));
+      p.poly([[44, 42], [120, 14], [196, 42]], roof);
+      p.poly([[44, 42], [120, 14], [120, 42]], lighten(roof, 0.2));
+      p.rect(28, 30, 22, 90, wall);
+      p.poly([[24, 30], [39, 4], [54, 30]], roof);
+      p.rect(190, 30, 22, 90, wall);
+      p.poly([[186, 30], [201, 4], [216, 30]], roof);
+      const win = time === 'day' ? '#5ab0ff' : '#ffe070';
       for (let y = 50; y < 112; y += 14) {
         for (let x = 58; x < 184; x += 12) {
-          const lit = rnd() < 0.6;
-          p.rect(x, y, 5, 8, lit ? '#f0c878' : '#141830');
-          p.ellipse(x + 2.5, y, 2.5, 2, lit ? '#f0c878' : '#141830');
-          if (lit) glows.pts.push([x + 2, y + 4, 5, '#f0c070']);
+          p.rect(x, y, 5, 8, win);
+          p.ellipse(x + 2.5, y, 2.5, 2, win);
+          p.px(x + 1, y, '#ffffff');
+          if (time !== 'day' && rnd() < 0.7) glows.pts.push([x + 2, y + 4, 5, win]);
         }
       }
-      p.ellipse(120, 30, 7, 7, '#e8dcb0');
-      p.line(120, 30, 120, 25, '#1e2240');
-      p.line(120, 30, 124, 31, '#1e2240');
-      groundFill(p, 120, '#1a2030', '#0a0c16');
+      p.ellipse(120, 30, 7, 7, '#ffffff');
+      p.ellipse(120, 30, 6, 6, '#ffe8a0');
+      p.line(120, 30, 120, 25, '#5a3a2a');
+      p.line(120, 30, 124, 31, '#5a3a2a');
+      grass(p, 120, time);
+      flowers(p, rnd, 122, 135, 20);
+      fx.push({ kind: 'particles', type: 'petals', count: 18, area: [0, 0, 240, 135] });
       groundY = 128;
       break;
     }
     case 'library': {
-      p.rect(0, 0, p.w, 110, '#2a1e18');
-      const spines = ['#7a2a2a', '#2a4a6a', '#5a6a2a', '#6a4a2a', '#4a2a5a', '#8a6a3a'];
-      for (let sx = 6; sx < 234; sx += 58) {
-        p.rect(sx, 10, 50, 96, '#4a3020');
+      p.rect(0, 0, p.w, 110, '#ffe4c8');
+      // 큰 아치창
+      p.ellipse(120, 30, 22, 22, '#ffffff');
+      p.rect(98, 30, 44, 50, '#ffffff');
+      p.ellipse(120, 30, 20, 20, '#a8daff');
+      p.rect(100, 30, 40, 48, '#a8daff');
+      p.rect(119, 10, 2, 68, '#ffffff');
+      p.rect(100, 44, 40, 2, '#ffffff');
+      glows.pts.push([120, 40, 40, '#fff4d0']);
+      const spines = ['#ff7a8a', '#5aa8ff', '#7ad07a', '#ffb05a', '#b07aff', '#ffd85a'];
+      for (const sx of [6, 60, 150, 196]) {
+        const w = sx === 196 ? 40 : 44;
+        p.rect(sx, 10, w, 96, '#c8885a');
         for (let sy = 16; sy < 100; sy += 18) {
-          p.rect(sx + 2, sy + 14, 46, 3, '#5a3a26');
-          for (let bx = sx + 3; bx < sx + 47;) {
+          p.rect(sx + 2, sy + 14, w - 4, 3, '#a86a3a');
+          for (let bx = sx + 3; bx < sx + w - 3;) {
             const bw = 2 + Math.floor(rnd() * 3);
             const bh = 9 + Math.floor(rnd() * 5);
             p.rect(bx, sy + 14 - bh, bw, bh, spines[Math.floor(rnd() * spines.length)]);
-            p.px(bx, sy + 14 - bh + 2, '#e0c060');
+            p.px(bx, sy + 14 - bh + 2, '#ffffff');
             bx += bw + (rnd() < 0.1 ? 3 : 0);
           }
         }
       }
-      floorPlanks(p, 110, '#3a281a');
-      p.rect(80, 104, 80, 6, '#5a3c26');
-      p.rect(86, 110, 4, 14, '#4a3020');
-      p.rect(150, 110, 4, 14, '#4a3020');
-      p.rect(110, 96, 18, 8, '#e8dcc0');
-      p.rect(140, 97, 2, 7, '#e8e0d0');
-      p.px(141, 95, '#ffd060');
-      glows.pts.push([141, 95, 28, '#f0b040']);
-      fx.push({ kind: 'particles', type: 'dust', count: 25, area: [0, 0, 240, 110] });
+      floorPlanks(p, 110, '#d89a68');
+      p.rect(80, 104, 80, 6, '#b8784a');
+      p.rect(86, 110, 4, 14, '#a86a3a');
+      p.rect(150, 110, 4, 14, '#a86a3a');
+      p.rect(108, 96, 20, 8, '#ffffff');
+      p.rect(118, 96, 1, 8, '#d8d0e8');
+      // 떠다니는 마법 책
+      p.rect(170, 86, 10, 7, '#b07aff');
+      p.rect(171, 87, 8, 5, '#ffffff');
+      glows.pts.push([175, 89, 12, '#c8a0ff']);
+      p.map((c, x, y) => (y < 110 && Math.abs(x - 120 - (y - 40) * 0.5) < 14 && y > 40 && bayer(x, y) < 0.25 ? lighten(c, 0.3) : c));
+      fx.push({ kind: 'particles', type: 'sparkles', count: 16, area: [0, 0, 240, 110] });
+      fx.push({ kind: 'particles', type: 'dust', count: 14, area: [90, 30, 80, 80] });
       groundY = 126;
       break;
     }
     case 'dungeon': {
-      bricks(p, 0, 0, p.w, 112, '#3a3a44', rnd);
-      // 아치 통로
-      p.ellipse(120, 60, 34, 34, '#2a2a32');
-      p.rect(86, 60, 68, 52, '#2a2a32');
-      p.ellipse(120, 62, 28, 28, '#06060a');
-      p.rect(92, 62, 56, 50, '#06060a');
-      p.ellipse(120, 78, 3, 2, '#e04040');
-      p.ellipse(128, 78, 3, 2, '#e04040');
-      p.vGradient(0, 112, p.w, 23, ['#2a2a30', '#121216']);
-      torch(p, 60, 50, glows);
-      torch(p, 180, 50, glows);
-      // 해골 더미
-      p.ellipse(34, 114, 5, 4, '#c8c0a8');
-      p.px(32, 114, '#1a1a1a');
-      p.px(35, 114, '#1a1a1a');
-      p.ellipse(204, 116, 4, 3, '#b8b098');
-      fx.push({ kind: 'particles', type: 'embers', count: 8, area: [50, 30, 140, 30] });
-      fx.push({ kind: 'fog', y: 104, h: 20, color: '#3a3a4a' });
+      // 수정 동굴: 푸른 보랏빛
+      p.vGradient(0, 0, p.w, 135, ['#1e1a5a', '#2e2a7a', '#3a3a98', '#2a2a70']);
+      bricks(p, 0, 0, p.w, 112, '#4a4a9a', rnd);
+      p.ellipse(120, 60, 34, 34, '#5a5aaa');
+      p.rect(86, 60, 68, 52, '#5a5aaa');
+      p.ellipse(120, 62, 28, 28, '#140e38');
+      p.rect(92, 62, 56, 50, '#140e38');
+      p.ellipse(116, 80, 2.5, 2.5, '#ffe060');
+      p.ellipse(126, 80, 2.5, 2.5, '#ffe060');
+      p.vGradient(0, 112, p.w, 23, ['#3a3a80', '#22225a']);
+      torch(p, 60, 50, glows, '#7ad0ff');
+      torch(p, 180, 50, glows, '#7ad0ff');
+      for (let i = 0; i < 6; i++) crystal(p, 8 + i * 44 + rnd() * 8, 126, 10 + rnd() * 12, ['#7af0ff', '#c87aff', '#ff8ad0'][i % 3], glows);
+      // 보물 상자
+      p.rect(28, 108, 14, 9, '#e8a040');
+      p.rect(28, 108, 14, 3, '#ffd05a');
+      p.rect(34, 111, 2, 3, '#fff4a0');
+      fx.push({ kind: 'particles', type: 'sparkles', count: 22, area: [0, 20, 240, 110] });
+      fx.push({ kind: 'fog', y: 104, h: 20, color: '#7a7ad8' });
       groundY = 126;
       break;
     }
     case 'road': {
-      p.vGradient(0, 0, p.w, 90, SKY.dusk);
-      ridge(p, rnd, 60, 18, '#3a2a40', 0.65);
-      ridge(p, rnd, 80, 10, '#2a2234', 0.55);
-      groundFill(p, 94, '#3a3a24', '#1e1e12');
-      p.poly([[110, 94], [130, 94], [200, 135], [40, 135]], '#5a4a32');
-      p.poly([[116, 94], [124, 94], [150, 135], [90, 135]], '#6a583a');
+      outdoor(90, 3);
+      mountains(p, rnd, 70, T('#9ab0f0'), '#ffffff');
+      hills(p, rnd, 82, 6, T('#7ad06a'), T('#b0f09a'));
+      grass(p, 94, time);
+      p.poly([[110, 94], [130, 94], [200, 135], [40, 135]], T('#f0d0a0'));
+      p.poly([[116, 94], [124, 94], [150, 135], [90, 135]], T('#f8e0b8'));
       for (let i = 0; i < 6; i++) {
         const rx = rnd() * 240, ry = 100 + rnd() * 30;
         if (Math.abs(rx - 120) < 40) continue;
-        p.ellipse(rx, ry, 4 + rnd() * 4, 2 + rnd() * 2, '#4a4434');
+        p.ellipse(rx, ry, 4 + rnd() * 4, 2 + rnd() * 2, T('#c8c0d8'));
+        p.ellipseWhere(rx, ry, 4, 2, T('#ffffff'), (_x, y) => y < ry);
       }
-      deadTree(p, 30, 112, 40, '#1a1418');
-      pine(p, 214, 118, 40, '#1a221a');
+      roundTree(p, 30, 112, 40, T('#4ac860'), rnd);
+      pine(p, 214, 118, 40, T('#3aa070'));
+      // 이정표
+      p.rect(160, 100, 2, 14, '#a86a3a');
+      p.poly([[156, 100], [170, 100], [173, 103], [170, 106], [156, 106]], '#e8b878');
+      flowers(p, rnd, 100, 135, 30);
+      fx.push({ kind: 'particles', type: 'leaves', count: 12, area: [0, 0, 240, 135] });
       groundY = 128;
       break;
     }
     case 'battlefield': {
-      p.vGradient(0, 0, p.w, 100, ['#1a1416', '#3a2220', '#6a3220', '#8a4428']);
-      ridge(p, rnd, 78, 10, '#2a1a1a', 0.6);
-      groundFill(p, 96, '#3a2e22', '#1a140e');
-      for (let i = 0; i < 7; i++) banner(p, 10 + i * 34 + rnd() * 10, 70 + rnd() * 20, rnd() < 0.5 ? '#8a2a2a' : '#2a3a6a');
-      for (let i = 0; i < 18; i++) {
-        const sx = rnd() * 240, sy = 100 + rnd() * 30;
-        p.line(sx, sy, sx + (rnd() - 0.5) * 12, sy - 8 - rnd() * 6, '#5a4a3a');
+      outdoor(96, 2);
+      mountains(p, rnd, 80, T('#a8b8f0'), '#ffffff');
+      hills(p, rnd, 88, 5, T('#7ad06a'), T('#b0f09a'));
+      grass(p, 96, time);
+      for (let i = 0; i < 7; i++) banner(p, 10 + i * 34 + rnd() * 10, 70 + rnd() * 20, rnd() < 0.5 ? '#ff5a6a' : '#4a7aff');
+      for (let i = 0; i < 10; i++) {
+        const sx = rnd() * 240, sy = 102 + rnd() * 28;
+        p.line(sx, sy, sx + (rnd() - 0.5) * 6, sy - 10, '#c8d0e0');
+        p.rect(sx - 2, sy - 7, 5, 1, '#ffd05a');
       }
-      fx.push({ kind: 'particles', type: 'ash', count: 40, area: [0, 0, 240, 135] });
-      fx.push({ kind: 'fog', y: 80, h: 30, color: '#4a3a34' });
+      fx.push({ kind: 'particles', type: 'leaves', count: 16, area: [0, 0, 240, 135] });
       groundY = 126;
       break;
     }
     case 'tavern': {
-      p.rect(0, 0, p.w, 104, '#4a3220');
-      for (let x = 0; x < p.w; x += 20) p.rect(x, 0, 3, 104, '#3a2616');
-      p.rect(0, 20, p.w, 3, '#3a2616');
-      floorPlanks(p, 104, '#3e2a1a');
-      // 벽난로
-      bricks(p, 170, 40, 60, 64, '#5a4a40', rnd);
-      p.rect(182, 66, 36, 38, '#140a06');
-      p.ellipse(200, 98, 12, 6, '#d06020');
-      p.ellipse(200, 95, 6, 5, '#f8c040');
-      glows.pts.push([200, 92, 46, '#f08030']);
-      fx.push({ kind: 'particles', type: 'embers', count: 10, area: [188, 70, 24, 26] });
-      // 테이블과 잔
+      p.rect(0, 0, p.w, 104, '#e8a868');
+      for (let x = 0; x < p.w; x += 20) p.rect(x, 0, 3, 104, '#c8885a');
+      p.rect(0, 20, p.w, 3, '#c8885a');
+      floorPlanks(p, 104, '#c88a5a');
+      bricks(p, 170, 40, 60, 64, '#e8c0a8', rnd);
+      p.rect(182, 66, 36, 38, '#5a2a1e');
+      p.ellipse(200, 98, 12, 6, '#ff8a3a');
+      p.ellipse(200, 95, 6, 5, '#fff070');
+      glows.pts.push([200, 92, 46, '#ffa040']);
+      fx.push({ kind: 'particles', type: 'embers', count: 8, area: [188, 70, 24, 26] });
       for (const tx of [40, 110]) {
-        p.ellipse(tx, 108, 26, 6, '#6a4628');
-        p.ellipse(tx, 106, 26, 5, '#7e5634');
-        p.rect(tx - 2, 110, 4, 14, '#4a3020');
-        p.rect(tx - 10, 98, 5, 7, '#c8c0b0');
-        p.rect(tx - 10, 98, 5, 2, '#f8f4e8');
-        p.rect(tx + 6, 99, 5, 6, '#a07040');
-        p.rect(tx - 1, 101, 2, 4, '#e8e0d0');
-        glows.pts.push([tx, 100, 14, '#f0b050']);
+        p.ellipse(tx, 108, 26, 6, '#b8784a');
+        p.ellipse(tx, 106, 26, 5, '#d8985a');
+        p.rect(tx - 2, 110, 4, 14, '#a86a3a');
+        p.rect(tx - 10, 97, 5, 8, '#ffd05a');
+        p.rect(tx - 10, 97, 5, 2, '#ffffff');
+        p.rect(tx + 6, 99, 6, 6, '#ff7a8a');
+        p.rect(tx - 1, 101, 2, 4, '#ffffff');
+        glows.pts.push([tx, 100, 16, '#ffd070']);
       }
-      // 걸린 방패
-      p.ellipse(80, 50, 10, 12, '#6a2a2a');
-      p.ellipse(80, 50, 3, 3, '#c8a050');
+      // 걸린 깃발 장식
+      for (let x = 10; x < 160; x += 12) p.poly([[x, 6], [x + 10, 6], [x + 5, 14]], ['#ff6a8a', '#5aa8ff', '#ffd05a', '#7ae07a'][(x / 12) % 4 | 0]);
+      p.line(0, 6, 170, 6, '#a86a3a');
+      fx.push({ kind: 'particles', type: 'dust', count: 10, area: [0, 20, 240, 80] });
       groundY = 126;
       break;
     }
     case 'throne': {
-      p.rect(0, 0, p.w, 108, '#16121e');
+      p.rect(0, 0, p.w, 108, '#f4ecff');
       for (let i = 0; i < 4; i++) {
-        pillar(p, 16 + i * 30, 10, 108, 12, '#2a2434');
-        pillar(p, 212 - i * 30, 10, 108, 12, '#2a2434');
+        pillar(p, 16 + i * 30, 10, 108, 12, '#ffffff');
+        pillar(p, 212 - i * 30, 10, 108, 12, '#ffffff');
       }
       // 스테인드글라스
-      p.ellipse(120, 30, 16, 20, '#3a1a2a');
       for (let y = 12; y < 50; y++) for (let x = 104; x < 136; x++) {
         const dx = (x - 120) / 14, dy = (y - 30) / 18;
         const r2 = dx * dx + dy * dy;
@@ -492,79 +684,80 @@ export function drawScene(kind: SceneKind, seed = 1): Scene {
         const a = Math.floor(((Math.atan2(dy, dx) + Math.PI) / (2 * Math.PI)) * 8);
         const ring = r2 < 0.12 ? 2 : r2 > 0.8 ? 3 : a % 2;
         const lead = Math.abs(r2 - 0.12) < 0.04 || Math.abs(r2 - 0.8) < 0.05;
-        p.px(x, y, lead ? '#1a1018' : ['#a02a3a', '#2a4a9a', '#c8a040', '#6a2a8a'][ring]);
+        p.px(x, y, lead ? '#a88ac8' : ['#ff7aa8', '#5aa8ff', '#ffd85a', '#b07aff'][ring]);
       }
-      glows.pts.push([120, 30, 34, '#c84050']);
-      p.vGradient(0, 108, p.w, 27, ['#241e2c', '#100c14']);
-      p.poly([[106, 108], [134, 108], [170, 135], [70, 135]], '#7a1a24');
-      // 왕좌
-      p.rect(108, 60, 24, 48, '#3a2a1a');
-      p.poly([[106, 62], [120, 46], [134, 62]], '#c8a040');
-      p.rect(104, 86, 32, 6, '#c8a040');
-      p.rect(112, 66, 16, 20, '#8a1a24');
+      glows.pts.push([120, 30, 34, '#ffd0f0']);
+      p.vGradient(0, 108, p.w, 27, ['#e8dcf8', '#c8b8e8']);
+      p.poly([[106, 108], [134, 108], [170, 135], [70, 135]], '#ff5a7a');
+      p.poly([[110, 108], [130, 108], [160, 135], [80, 135]], '#ff8aa0');
+      p.rect(108, 60, 24, 48, '#ffd85a');
+      p.poly([[106, 62], [120, 46], [134, 62]], '#ffd85a');
+      p.rect(104, 86, 32, 6, '#ffe890');
+      p.rect(112, 66, 16, 20, '#ff5a7a');
       torch(p, 60, 60, glows);
       torch(p, 180, 60, glows);
+      fx.push({ kind: 'particles', type: 'sparkles', count: 18, area: [0, 0, 240, 108] });
       groundY = 126;
       break;
     }
     case 'graveyard':
     case 'grave': {
-      p.vGradient(0, 0, p.w, 100, ['#0a0a14', '#16162a', '#26283e', '#36384e']);
-      fx.push({ kind: 'twinkle', pts: stars(p, rnd, 50, 50) });
-      moon(p, 190, 28, 12, '#e0dcd0');
-      ridge(p, rnd, 88, 6, '#1a1c2a', 0.5);
-      groundFill(p, 100, '#22261e', '#0e100c');
-      deadTree(p, 34, 104, 56, '#100e12');
+      outdoor(100, 2);
+      hills(p, rnd, 88, 4, T('#8ad0a0'), T('#c0f0c0'));
+      grass(p, 100, time);
+      roundTree(p, 34, 106, 54, T('#ffa8c8'), rnd); // 벚나무
       for (let i = 0; i < 7; i++) {
         const gx = 70 + i * 24 + rnd() * 8, gy = 104 + (i % 3) * 7;
         const gh = 10 + rnd() * 6;
-        p.rect(gx - 4, gy - gh, 9, gh, '#4a4a52');
-        p.ellipse(gx, gy - gh, 4.5, 3, '#4a4a52');
-        p.rect(gx + 3, gy - gh, 2, gh, '#34343c');
-        if (rnd() < 0.5) { p.rect(gx - 1, gy - gh + 3, 3, 1, '#2a2a30'); p.rect(gx, gy - gh + 2, 1, 4, '#2a2a30'); }
+        p.rect(gx - 4, gy - gh, 9, gh, T('#e0e4f0'));
+        p.ellipse(gx, gy - gh, 4.5, 3, T('#e0e4f0'));
+        p.rect(gx + 3, gy - gh, 2, gh, T('#b8c0d8'));
+        p.rect(gx - 1, gy - gh + 3, 3, 1, T('#a8b0c8'));
+        p.rect(gx, gy - gh + 2, 1, 4, T('#a8b0c8'));
       }
       if (kind === 'grave') {
         // 주인공의 묘비
         const gx = 120, gy = 118;
-        p.ellipse(gx, gy + 2, 30, 4, '#161a12');
-        p.rect(gx - 16, gy - 42, 32, 42, '#6a6a74');
-        p.ellipse(gx, gy - 42, 16, 12, '#6a6a74');
-        p.rect(gx + 10, gy - 44, 6, 44, '#4e4e58');
-        p.ellipseWhere(gx, gy - 42, 16, 12, '#8a8a94', (x, y) => x < gx - 6 && y < gy - 42);
-        p.rect(gx - 16, gy - 36, 3, 36, '#8a8a94');
-        p.rect(gx - 2, gy - 46, 4, 18, '#3a3a42');
-        p.rect(gx - 8, gy - 40, 16, 4, '#3a3a42');
-        for (let i = 0; i < 3; i++) p.rect(gx - 9, gy - 22 + i * 5, 18, 1, '#52525c');
-        p.rect(gx - 20, gy - 2, 40, 3, '#4a4a52');
-        // 꽃
-        p.px(gx - 12, gy + 1, '#e0e0f0'); p.px(gx - 10, gy, '#e04a5a'); p.px(gx + 13, gy + 1, '#f0d060');
+        p.ellipse(gx, gy + 2, 30, 4, T('#4aa060'));
+        p.rect(gx - 16, gy - 42, 32, 42, T('#f4f4ff'));
+        p.ellipse(gx, gy - 42, 16, 12, T('#f4f4ff'));
+        p.rect(gx + 10, gy - 44, 6, 44, T('#c8d0e8'));
+        p.rect(gx - 2, gy - 46, 4, 18, T('#a8b0d8'));
+        p.rect(gx - 8, gy - 40, 16, 4, T('#a8b0d8'));
+        for (let i = 0; i < 3; i++) p.rect(gx - 9, gy - 22 + i * 5, 18, 1, T('#d0d8f0'));
+        p.rect(gx - 20, gy - 2, 40, 3, T('#c8d0e8'));
+        // 꽃다발
+        for (let i = 0; i < 9; i++) p.px(gx - 14 + i * 3.5, gy + (i % 2), ['#ff7aa8', '#ffe05a', '#ffffff', '#8ad0ff'][i % 4]);
       }
-      fx.push({ kind: 'fog', y: 96, h: 30, color: '#5a5e74' });
-      if (kind === 'graveyard') fx.push({ kind: 'particles', type: 'fireflies', count: 6, area: [0, 90, 240, 40] });
+      flowers(p, rnd, 112, 135, 40);
+      fx.push({ kind: 'particles', type: 'petals', count: 26, area: [0, -10, 240, 145] });
+      if (kind === 'graveyard') fx.push({ kind: 'particles', type: 'fireflies', count: 8, area: [0, 90, 240, 40] });
       groundY = 128;
       break;
     }
     case 'burning': {
-      p.vGradient(0, 0, p.w, 110, ['#1a0606', '#3e0e0a', '#7a2210', '#c84a14']);
+      p.vGradient(0, 0, p.w, 110, ['#2a1a6a', '#7a2a8a', '#e85a6a', '#ffa04a']);
+      fx.push({ kind: 'twinkle', pts: stars(p, rnd, 30, 30) });
       // 용 실루엣
-      const dx = 160, dy = 30;
-      p.poly([[dx - 30, dy - 4], [dx - 6, dy + 2], [dx - 18, dy - 22]], '#120406');
-      p.poly([[dx + 30, dy - 4], [dx + 6, dy + 2], [dx + 22, dy - 24]], '#120406');
-      p.ellipse(dx, dy + 2, 10, 4, '#120406');
-      p.poly([[dx + 8, dy], [dx + 20, dy - 4], [dx + 22, dy - 1], [dx + 10, dy + 4]], '#120406');
-      p.poly([[dx - 8, dy + 2], [dx - 30, dy + 10], [dx - 8, dy + 5]], '#120406');
-      // 불타는 도시
+      const dx = 160, dy = 30, dc = '#4a1a5a';
+      p.poly([[dx - 30, dy - 4], [dx - 6, dy + 2], [dx - 18, dy - 22]], dc);
+      p.poly([[dx + 30, dy - 4], [dx + 6, dy + 2], [dx + 22, dy - 24]], dc);
+      p.ellipse(dx, dy + 2, 10, 4, dc);
+      p.poly([[dx + 8, dy], [dx + 20, dy - 4], [dx + 22, dy - 1], [dx + 10, dy + 4]], dc);
+      p.poly([[dx - 8, dy + 2], [dx - 30, dy + 10], [dx - 8, dy + 5]], dc);
+      p.px(dx + 18, dy - 2, '#fff070');
       for (let i = 0; i < 12; i++) {
         const bx = i * 21 + rnd() * 6, bh = 20 + rnd() * 30;
-        p.rect(bx, 110 - bh, 16, bh, '#140808');
-        p.poly([[bx - 1, 110 - bh], [bx + 8, 110 - bh - 8], [bx + 17, 110 - bh]], '#140808');
+        p.rect(bx, 110 - bh, 16, bh, '#5a2a5a');
+        p.poly([[bx - 1, 110 - bh], [bx + 8, 110 - bh - 8], [bx + 17, 110 - bh]], '#7a3a6a');
+        p.rect(bx + 4, 116 - bh, 3, 4, '#ffd070');
         if (rnd() < 0.7) {
-          p.ellipse(bx + 8, 110 - bh, 6, 8, '#e05a1a');
-          p.ellipse(bx + 8, 110 - bh + 2, 3, 5, '#f8c040');
-          glows.pts.push([bx + 8, 108 - bh, 18, '#f06020']);
+          p.ellipse(bx + 8, 110 - bh, 6, 8, '#ff7a3a');
+          p.ellipse(bx + 8, 110 - bh + 2, 3, 5, '#fff070');
+          glows.pts.push([bx + 8, 108 - bh, 18, '#ff8a40']);
         }
       }
-      groundFill(p, 110, '#2a0e08', '#0e0404');
+      p.vGradient(0, 110, p.w, 25, ['#5a2a4a', '#2a1030']);
       fx.push({ kind: 'particles', type: 'embers', count: 60, area: [0, 40, 240, 95] });
       groundY = 126;
       break;

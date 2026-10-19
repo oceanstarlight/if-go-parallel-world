@@ -38,7 +38,8 @@ show('표정 (기본 / 기쁨 / 슬픔 / 부상)', (['neutral', 'happy', 'sad', 
 })), 3);
 show('사망', [{ label: 'dead', p: drawPortrait({ seed: 5, stage: 'adult', houseId: 'noble', jobId: 'knight', jobRank: 3, dead: true }) }], 3);
 
-show('장면', ALL_SCENES.map((k) => ({ label: k, p: drawScene(k).p })), 2);
+show('장면 (기본 시간대)', ALL_SCENES.map((k) => ({ label: k, p: drawScene(k).p })), 2);
+show('시간대 (마을: 낮/노을/밤)', (['day', 'dusk', 'night'] as const).map((t) => ({ label: t, p: drawScene('village', 1, t).p })), 2);
 
 const enemies: EnemyKind[] = ['bandit', 'soldier', 'rival', 'bully', 'stalker', 'hero', 'demon_lord', 'traitor', 'wolf', 'shadow', 'wyvern', 'dragon'];
 const poses = ['idle', 'breathe', 'attack', 'hurt'] as const;

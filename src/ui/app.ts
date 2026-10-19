@@ -12,7 +12,7 @@ import type { StoneLine } from '../engine/score';
 import { buy, isUnlocked, loadMeta, loadRun, saveRun, settleLife } from '../meta';
 import { GfxStage } from '../gfx/stage';
 import { specFromLife } from '../gfx/portrait';
-import { ENEMY_HP, battleFor, graveWeather, sceneFor } from '../gfx/mapping';
+import { ENEMY_HP, battleFor, graveWeather, sceneFor, timeFor } from '../gfx/mapping';
 import { enemySprite, playerSprite } from '../gfx/sprites';
 import { hashStr } from '../gfx/painter';
 
@@ -496,7 +496,10 @@ function syncGfx(app: App, root: HTMLElement) {
     const s = app.life;
     g.setPortrait(specFromLife(s));
     // 전투 중에는 장면을 바꾸지 않는다
-    if (app.battleLogFrom === null) g.setScene(sceneFor(s), hashStr(s.name) % 97);
+    if (app.battleLogFrom === null) {
+      const kind = sceneFor(s);
+      g.setScene(kind, hashStr(s.name) % 97, undefined, timeFor(s, kind));
+    }
   } else if (app.screen === 'death' && app.settlement) {
     const s = app.settlement.life;
     g.setPortrait(specFromLife(s));

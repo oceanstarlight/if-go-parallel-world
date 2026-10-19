@@ -1,7 +1,7 @@
 import { Application, Container, Graphics, Sprite, Texture, TextureStyle, TilingSprite } from 'pixi.js';
 import { Painter, bayer, hashStr } from './painter';
 import { drawPortrait, specKey, type PortraitSpec } from './portrait';
-import { SCENE_H, SCENE_W, drawScene, type Fx, type SceneKind } from './scenes';
+import { SCENE_H, SCENE_W, cloudPainter, drawScene, type Fx, type SceneKind, type TimeOfDay } from './scenes';
 import { BattleDirector, type BattleOptions } from './battle';
 import { GodrayFilter } from 'pixi-filters/godray';
 import gsap from 'gsap';
@@ -50,7 +50,30 @@ const PARTICLE_COLOR: Record<ParticleType, number[]> = {
   fireflies: [0xe0f070, 0xb0f0a0],
   dust: [0xf0e0b0, 0xfff0d0],
   ash: [0x8a8480, 0x5e5a58],
+  petals: [0xffb0d0, 0xffd8e8, 0xffffff],
+  leaves: [0x7ae07a, 0xb0f07a, 0xffd05a],
+  sparkles: [0xffffff, 0xfff4a0, 0xa8f0ff, 0xffc8f0],
 };
+
+/** 파티클 모양: 꽃잎·잎은 작은 조각, 반짝이는 십자 별 */
+const SHAPES: Partial<Record<ParticleType, string[]>> = {
+  petals: ['##.', '.##'],
+  leaves: ['.#', '##'],
+  sparkles: ['.#.', '###', '.#.'],
+};
+const shapeCache = new Map<string, Texture>();
+function shapeTex(type: ParticleType): Texture {
+  const rows = SHAPES[type];
+  if (!rows) return white();
+  let t = shapeCache.get(type);
+  if (!t) {
+    const p = new Painter(rows[0].length, rows.length);
+    rows.forEach((r, y) => [...r].forEach((ch, x) => ch === '#' && p.px(x, y, '#ffffff')));
+    t = texOf(p);
+    shapeCache.set(type, t);
+  }
+  return t;
+}
 
 
 /** 캔버스를 정수 배율로 키워 도트를 선명하게 유지한다 */
@@ -89,7 +112,9 @@ export class GfxStage {
 
   private portraitKey = '';
   private portraitSprite = new Sprite();
+  private swaySprite = new Sprite();
   private blinkSprite = new Sprite();
+  private swayTimer = 0;
   private blinkTimer = 2500;
 
   // ───────────────── 장면 ─────────────────
@@ -113,9 +138,16 @@ export class GfxStage {
   });
 
   private init() {
-    this.portraitApp.stage.addChild(this.portraitSprite, this.blinkSprite);
+    this.portraitApp.stage.addChild(this.portraitSprite, this.swaySprite, this.blinkSprite);
     this.blinkSprite.visible = false;
+    this.swaySprite.visible = false;
     this.portraitApp.ticker.add((tk) => {
+      // 머리카락이 바람에 살랑 (700ms마다 1px)
+      this.swayTimer += tk.deltaMS;
+      if (this.swayTimer > 700) {
+        this.swayTimer = 0;
+        this.swaySprite.visible = !this.swaySprite.visible;
+      }
       this.blinkTimer -= tk.deltaMS;
       this.blinkSprite.visible = this.blinkTimer < 0 && this.blinkTimer > -130;
       if (this.blinkTimer < -130) this.blinkTimer = 2500 + Math.random() * 3500;
@@ -147,15 +179,16 @@ export class GfxStage {
     if (key === this.portraitKey) return;
     this.portraitKey = key;
     swap(this.portraitSprite, texOf(drawPortrait(spec)));
+    swap(this.swaySprite, spec.dead ? Texture.EMPTY : texOf(drawPortrait(spec, false, 1)));
     swap(this.blinkSprite, spec.dead ? Texture.EMPTY : texOf(drawPortrait(spec, true)));
   }
 
   /** extraWeather: 묘지 등에서 덧붙일 날씨 */
-  setScene(kind: SceneKind, seed = 1, extraWeather?: ParticleType) {
-    const key = `${kind}|${seed}|${extraWeather ?? ''}`;
+  setScene(kind: SceneKind, seed = 1, extraWeather?: ParticleType, time?: TimeOfDay) {
+    const key = `${kind}|${seed}|${extraWeather ?? ''}|${time ?? ''}`;
     if (key === this.sceneKey) return;
     this.sceneKey = key;
-    const scene = drawScene(kind, seed);
+    const scene = drawScene(kind, seed, time);
     this.groundY = scene.groundY;
     const first = this.bgSprite.texture === Texture.EMPTY;
     const old = this.bgSprite.texture;
@@ -163,6 +196,8 @@ export class GfxStage {
     if (!first) this.ditherOut(old);
     this.applyGodray(kind);
     for (const c of this.fxLayer.removeChildren()) c.destroy({ children: true });
+    for (const t of this.sceneTex) t.destroy(true);
+    this.sceneTex = [];
     this.particles = [];
     this.updaters = [];
     const fx = [...scene.fx];
@@ -171,6 +206,12 @@ export class GfxStage {
   }
 
   groundY = 120;
+  /** 현재 장면에서만 쓰는 텍스처 (장면 전환 시 해제) */
+  private sceneTex: Texture[] = [];
+  private own(t: Texture) {
+    this.sceneTex.push(t);
+    return t;
+  }
 
   // ───────────────── 장면 전환 / 빛줄기 ─────────────────
 
@@ -268,15 +309,47 @@ export class GfxStage {
           if (bayer(x, y) < n * fy * 0.55) p.px(x, y, f.color);
         }
       }
-      const ts = new TilingSprite({ texture: texOf(p), width: SCENE_W, height: f.h });
+      const ts = new TilingSprite({ texture: this.own(texOf(p)), width: SCENE_W, height: f.h });
       ts.position.set(0, f.y);
       ts.alpha = 0.45;
       this.fxLayer.addChild(ts);
       this.updaters.push((dt) => { ts.tilePosition.x += dt * 0.004; });
+    } else if (f.kind === 'clouds') {
+      f.items.forEach(([x, y, w], i) => {
+        const s = new Sprite(this.own(texOf(cloudPainter(w, seed + i, f.tint))));
+        s.position.set(Math.round(x), Math.round(y));
+        s.alpha = 0.92;
+        this.fxLayer.addChild(s);
+        const speed = f.speed * (0.7 + (i % 3) * 0.3);
+        let fx = x;
+        this.updaters.push((dt) => {
+          fx += dt * speed;
+          if (fx > SCENE_W) fx = -w;
+          s.x = Math.round(fx);
+        });
+      });
+    } else if (f.kind === 'birds') {
+      // 작은 V 자 새가 날갯짓하며 가로지른다
+      const up = new Painter(5, 2), down = new Painter(5, 2);
+      up.px(0, 0, f.color); up.px(1, 1, f.color); up.px(2, 1, f.color); up.px(3, 1, f.color); up.px(4, 0, f.color);
+      down.px(0, 1, f.color); down.px(1, 0, f.color); down.px(2, 1, f.color); down.px(3, 0, f.color); down.px(4, 1, f.color);
+      const tu = this.own(texOf(up)), td = this.own(texOf(down));
+      for (let i = 0; i < f.count; i++) {
+        const s = new Sprite(tu);
+        let bx = -10 - rnd() * 200;
+        const by = 12 + rnd() * 40, ph = rnd() * 10, sp = 0.025 + rnd() * 0.015;
+        this.fxLayer.addChild(s);
+        this.updaters.push((dt, t) => {
+          bx += dt * sp;
+          if (bx > SCENE_W + 10) bx = -20 - rnd() * 120;
+          s.position.set(Math.round(bx), Math.round(by + Math.sin(t / 700 + ph) * 3));
+          s.texture = Math.floor(t / 180 + ph) % 2 ? tu : td;
+        });
+      }
     } else {
       const colors = PARTICLE_COLOR[f.type];
       for (let i = 0; i < f.count; i++) {
-        const s = new Sprite(white());
+        const s = new Sprite(shapeTex(f.type));
         s.tint = colors[i % colors.length];
         if (f.type === 'rain') s.height = 3;
         const [ax, ay, aw, ah] = f.area;
@@ -321,6 +394,16 @@ export class GfxStage {
       case 'ash':
         s.y += 0.12 * k;
         s.x += 0.1 * k + Math.sin(t / 900 + p.phase) * 0.1 * k;
+        break;
+      case 'petals':
+      case 'leaves':
+        s.y += 0.22 * k;
+        s.x += (0.18 + Math.sin(t / 500 + p.phase) * 0.25) * k;
+        s.scale.x = Math.sin(t / 300 + p.phase) > 0 ? 1 : -1;
+        break;
+      case 'sparkles':
+        s.y -= 0.04 * k;
+        s.alpha = Math.max(0, Math.sin(t / 420 + p.phase));
         break;
       case 'fireflies':
       case 'dust':
