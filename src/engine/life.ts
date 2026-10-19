@@ -131,7 +131,7 @@ export function kill(s: LifeState, causeId: string): boolean {
   if (causeId !== 'old_age' && s.extraLives > 0) {
     s.extraLives--;
     s.stats.vit = Math.max(s.stats.vit, 25);
-    log(s, '죽음이 손을 뻗었다. 그러나 불굴의 육체가 그것을 거부했다. 당신은 다시 숨을 쉬었다.', 'good');
+    log(s, '눈앞이 하얘졌다… 그런데 불굴의 육체가 발동! "아직 안 끝났어!" 당신은 벌떡 일어났다.', 'good');
     return false;
   }
   s.death = { causeId, age: s.age };

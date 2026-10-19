@@ -75,7 +75,7 @@ export function settleLife(m: MetaSave, s: LifeState): { lines: StoneLine[]; tot
     name: s.name,
     age: s.age,
     houseId: s.houseId,
-    title: s.jobId ? jobTitle(s.jobId, s.jobRank) : s.age < 18 ? '어린 영혼' : '무직',
+    title: s.jobId ? jobTitle(s.jobId, s.jobRank) : s.age < 18 ? '어린 영혼' : '자유로운 영혼',
     causeId,
     stones: total,
   });

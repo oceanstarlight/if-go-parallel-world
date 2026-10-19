@@ -221,8 +221,8 @@ function viewTitle(app: App): string {
       <div class="scene-host title-scene" data-gfx="scene" data-maxh="${Math.floor(window.innerHeight * 0.5)}"></div>
       <p class="eyebrow">이세계 인생 연대기</p>
       <h1>환생록</h1>
-      <p class="lede">눈을 뜨면 낯선 세계. 태어날 곳도, 쥐고 갈 권능도 고를 수 있다.<br>
-      그러나 어떻게 죽을지는, 아무도 고를 수 없다.</p>
+      <p class="lede">눈을 뜨니 이세계! 태어날 집안도, 치트 능력도 마음대로 고를 수 있다.<br>
+      하지만 어떻게 죽을지는… 아무도 모른다. 몇 번이고 다시 태어나 보자!</p>
       <div class="menu">
         ${app.life ? `<button class="btn primary" data-act="continue">이어서 살아간다 · ${esc(app.life.name)} ${app.life.age}세</button>` : ''}
         <button class="btn ${app.life ? '' : 'primary'}" data-act="go" data-arg="setup">새로운 삶</button>
@@ -322,7 +322,7 @@ function viewLife(app: App): string {
     panel = `
       <div class="death-call">
         <p class="death-cause">${esc(deathById(s.death.causeId).name)}</p>
-        <p class="muted">${esc(s.name)}의 두 번째 삶이 끝났다.</p>
+        <p class="muted">${esc(s.name)}의 이번 생은 여기까지! 다음 생을 기약하자.</p>
         <button class="btn primary wide" data-act="see-grave">묘비 앞에 선다</button>
       </div>`;
   } else if (ev) {
@@ -368,7 +368,7 @@ function viewLife(app: App): string {
       </div>
       <div class="stats">${stats}</div>
       <h4>인연</h4>
-      <ul class="rels">${rels || '<li class="muted small">아직 아무도 없다.</li>'}</ul>
+      <ul class="rels">${rels || '<li class="muted small">아직 아무도 없다. 인연을 만들어 보자!</li>'}</ul>
       <button class="link" data-act="abandon">이 삶을 포기한다</button>
     </aside>
     <section class="center">
@@ -384,7 +384,7 @@ function viewDeath(app: App): string {
   if (!st) return viewTitle(app);
   const s = st.life;
   const d = deathById(s.death!.causeId);
-  const title = s.jobId ? jobTitle(s.jobId, s.jobRank) : s.age < 18 ? '어린 영혼' : '이름 없는 자';
+  const title = s.jobId ? jobTitle(s.jobId, s.jobRank) : s.age < 18 ? '어린 영혼' : '자유로운 영혼';
   return `
     <div class="grave-wrap">
       <div class="grave-left">
@@ -442,7 +442,7 @@ function viewAltar(app: App): string {
     `<h3>${title}</h3><ul class="altar">${SHOP.filter((i) => i.kind === kind).map((i) => row(i.id)).join('')}</ul>`;
   return `
     <h2 class="screen-title">윤회의 제단</h2>
-    <p class="muted">지나온 삶이 남긴 환생석을 바쳐, 다음 삶의 문을 넓힌다.</p>
+    <p class="muted">모은 환생석으로 다음 생을 더 화려하게! 가문과 치트를 해금하자.</p>
     ${section('가문', 'house')}
     ${section('권능', 'cheat')}
     ${section('잔향', 'upgrade')}
@@ -473,7 +473,7 @@ function viewLives(app: App): string {
   const lives = app.meta.lives;
   return `
     <h2 class="screen-title">지난 생애</h2>
-    ${lives.length === 0 ? '<p class="muted">아직 아무 삶도 끝나지 않았다.</p>' : `
+    ${lives.length === 0 ? '<p class="muted">아직 끝난 삶이 없다. 첫 번째 이세계 인생을 시작해 보자!</p>' : `
     <table class="lives">
       <thead><tr><th>이름</th><th>가문</th><th>칭호</th><th>향년</th><th>사인</th><th>환생석</th></tr></thead>
       <tbody>${lives.map((l) => `
