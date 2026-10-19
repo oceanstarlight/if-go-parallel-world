@@ -45,6 +45,15 @@ export function viewDungeon(s: LifeState): string {
   const scene = `<div class="scene-host" data-gfx="scene" data-maxh="${Math.floor(window.innerHeight * 0.32)}"></div>`;
   const potions = (s.bag ?? []).filter((x) => x.kind === 'potion').length;
 
+  if (d?.fallen) {
+    return `${head}${scene}
+      <div class="dg-card dead">
+        <p class="death-cause">${icon('skull')} 던전에서 쓰러졌다… 하지만 살아남았다</p>
+        <p class="warn">장비·소지품·돈을 모두 잃었다. 3년간 악몽(스트레스 100), ${s.dgBanUntil}세까지 던전 출입 금지. <b>다음에 또 쓰러지면 진짜 죽음이다.</b></p>
+        ${diveLog(s)}
+        <button class="btn primary wide" data-act="retreat">지상으로 돌아간다</button>
+      </div>`;
+  }
   if (s.death) {
     return `${head}${scene}
       <div class="dg-card dead">
@@ -56,7 +65,7 @@ export function viewDungeon(s: LifeState): string {
 
   if (!d) {
     if (!canEnterDungeon(s)) {
-      return `${head}${scene}<div class="dg-card"><p>${s.age < DUNGEON_MIN_AGE ? `던전은 ${DUNGEON_MIN_AGE}세부터 들어갈 수 있다.` : '지금은 던전에 갈 수 없다. (진행 중인 사건이 있다)'}</p>
+      return `${head}${scene}<div class="dg-card"><p>${s.age < DUNGEON_MIN_AGE ? `던전은 ${DUNGEON_MIN_AGE}세부터 들어갈 수 있다.` : s.age < (s.dgBanUntil ?? 0) ? `던전의 기억이 발을 붙잡는다… ${s.dgBanUntil}세부터 다시 도전할 수 있다.` : '지금은 던전에 갈 수 없다. (진행 중인 사건이 있다)'}</p>
         <button class="btn" data-act="go" data-arg="life">돌아간다</button></div>`;
     }
     const floors = startFloors(s);

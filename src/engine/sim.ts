@@ -97,7 +97,8 @@ function autoDive(s: LifeState, rng: Rng) {
   const floors = startFloors(s);
   beginDive(s, floors[floors.length - 1]);
   for (let k = 0; k < 20 && s.dive; k++) {
-    if (preview(s).p < 72 || (s.hp ?? 0) < maxHp(s) * 0.7 || s.dive.floor >= 100) break;
+    // 한 번 쓰러진 뒤에는 (다음은 진짜 죽음) 훨씬 조심한다
+    if (s.dive.fallen || preview(s).p < (s.dgFallen ? 88 : 72) || (s.hp ?? 0) < maxHp(s) * (s.dgFallen ? 0.9 : 0.7) || s.dive.floor >= 100) break;
     if (descend(s, rng) !== 'cleared') break;
   }
   if (s.death) endDiveOnDeath(s);

@@ -88,3 +88,39 @@ describe('v1.0 남쪽 무역로', () => {
     expect(s.gold).toBe(1_030_000);
   });
 });
+
+describe('v1.0 던전에서 쓰러짐', () => {
+  it('처음엔 모든 것을 잃고 살아남는다: 3년 악몽, 10년 출입 금지. 두 번째엔 죽는다', async () => {
+    const { beginDive, descend, retreat, canEnterDungeon } = await import('../src/engine/dungeon');
+    const s = createLife(base, seededRng(13));
+    s.age = 20;
+    s.gold = 5000;
+    beginDive(s, 0);
+    s.hp = 1;
+    expect(descend(s, seededRng(14))).toBe('fallen');
+    expect(s.death).toBeNull();
+    expect(s.gold).toBe(0);
+    expect(s.bag).toEqual([]);
+    expect(s.equip?.armor).toBeNull();
+    expect(s.stress).toBe(100);
+    expect(s.trauma).toBe(36);
+    retreat(s);
+    expect(s.dive).toBeNull();
+    expect(canEnterDungeon(s)).toBe(false);
+    // 3년 동안 스트레스는 100에 묶인다
+    const rng = seededRng(15);
+    for (let i = 0; i < 30; i++) {
+      s.pendingEventId = null;
+      advanceMonth(s, rng);
+      if (s.death) break;
+      expect(s.stress).toBe(100);
+    }
+    s.age = 30;
+    s.trauma = 0;
+    expect(canEnterDungeon(s)).toBe(true);
+    beginDive(s, 0);
+    s.hp = 1;
+    expect(descend(s, seededRng(16))).toBe('dead');
+    expect(s.death?.causeId).toBe('dungeon');
+  });
+});
