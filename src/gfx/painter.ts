@@ -123,6 +123,22 @@ export class Painter {
     for (const i of add) this.data[i] = c;
   }
 
+  /**
+   * 애니풍 '색 외곽선': 검정 대신 인접한 색을 어둡게 한 색으로 테두리를 두른다.
+   * amount 가 클수록 진하다.
+   */
+  outlineTinted(amount = 0.62) {
+    const add: [number, string][] = [];
+    for (let y = 0; y < this.h; y++) {
+      for (let x = 0; x < this.w; x++) {
+        if (this.get(x, y)) continue;
+        const n = this.get(x, y + 1) || this.get(x - 1, y) || this.get(x + 1, y) || this.get(x, y - 1);
+        if (n) add.push([y * this.w + x, mix(darken(n, amount), '#3a1a4a', 0.25)]);
+      }
+    }
+    for (const [i, c] of add) this.data[i] = c;
+  }
+
   /** 특정 색을 다른 색으로 치환 */
   replace(from: string, to: Color) {
     for (let i = 0; i < this.data.length; i++) if (this.data[i] === from) this.data[i] = to;
