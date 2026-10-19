@@ -91,13 +91,13 @@ function autoTown(s: LifeState, rng: Rng) {
   }
 }
 
-/** 자동 플레이의 던전 원정: 승률 60% 이상, HP 60% 이상일 때만 내려간다 */
+/** 자동 플레이의 던전 원정: 승률 72% 이상, HP 70% 이상일 때만 내려간다 */
 function autoDive(s: LifeState, rng: Rng) {
   if (!canEnterDungeon(s)) return;
   const floors = startFloors(s);
   beginDive(s, floors[floors.length - 1]);
   for (let k = 0; k < 20 && s.dive; k++) {
-    if (preview(s).p < 60 || (s.hp ?? 0) < maxHp(s) * 0.6 || s.dive.floor >= 100) break;
+    if (preview(s).p < 72 || (s.hp ?? 0) < maxHp(s) * 0.7 || s.dive.floor >= 100) break;
     if (descend(s, rng) !== 'cleared') break;
   }
   if (s.death) endDiveOnDeath(s);

@@ -42,10 +42,10 @@ describe('v0.7 경제', () => {
     s.age = 25;
     const g = s.gold!;
     yearlyEconomy(s, seededRng(4));
-    expect(s.gold! - g).toBe(90 - 15);
+    expect(s.gold! - g).toBe(360 - 60);
     s.gold = -1000;
     yearlyEconomy(s, seededRng(5));
-    expect(s.gold!).toBeLessThan(-1000 + 90);
+    expect(s.gold!).toBeLessThan(-1000 + 360 - 60);
   });
   it('사고팔기: 서비스는 살 때마다 비싸지고, 소유물은 한 번만', () => {
     const s = createLife(base, seededRng(6));

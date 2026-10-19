@@ -44,6 +44,11 @@ describe('v0.6 스트레스 · 휴식 · 의지력', () => {
       advanceYear(s, rng);
     }
     s.death = null;
+    // 하던 해를 마저 보낸다 (한 해 = 12달, 마음은 새해에 정산된다)
+    while ((s.month ?? 0) !== 0) {
+      s.pendingEventId = null;
+      advanceYear(s, rng);
+    }
     expect(s.stress).toBeGreaterThanOrEqual(STRESS_HIGH);
     const before = s.stress!;
     const willBefore = s.will!;

@@ -11,10 +11,10 @@ export const BRANCH_EVENTS: GameEvent[] = [
     text: '수상할 만큼 매력적인 투자 제안이 들어왔다. "동방 무역선에 투자하면 세 배로 돌려드리죠!"',
     choices: [
       { label: '재산의 30%를 건다', cond: { goldMin: 100 }, check: { stat: 'int', dc: 35 },
-        success: { text: '무역선이 무사히 돌아왔다! 투자금이 불어났다.', effect: { goldPct: 0.6 }, tone: 'good' },
+        success: { text: '무역선이 무사히 돌아왔다! 투자금이 불어났다.', effect: { goldPct: 0.6, goldCap: 5000 }, tone: 'good' },
         fail: { text: '배가 돌아오지 않았다… 투자금을 날렸다.', effect: { goldPct: -0.3, stress: 10 } } },
       { label: '재산의 80%를 건다', cond: { goldMin: 100 }, check: { stat: 'int', dc: 45 },
-        success: { text: '대박이다!! 금화가 산더미처럼 쌓였다!', effect: { goldPct: 1.6, stats: { fame: 3 }, mood: 'joy' }, tone: 'milestone' },
+        success: { text: '대박이다!! 금화가 산더미처럼 쌓였다!', effect: { goldPct: 1.6, goldCap: 15000, stats: { fame: 3 }, mood: 'joy' }, tone: 'milestone' },
         fail: { text: '전 재산이 바다에 가라앉았다… 장부를 보며 멍하니 앉아 있었다.', effect: { goldPct: -0.8, stress: 25, mood: 'gloom' } } },
       { label: '빚을 내서 2,000G를 건다', check: { stat: 'int', dc: 50 },
         success: { text: '빚을 갚고도 남았다! 하이 리스크 하이 리턴!', effect: { gold: 4000, stats: { fame: 4 } }, tone: 'milestone' },

@@ -3,6 +3,7 @@ import { jobById } from '../data/jobs';
 import { gearByBase, makeItem, nextUid, sellPrice } from '../data/items';
 import { OWNED_CALM, marketById, marketPrice, owns } from '../data/market';
 import { applyEffect, type Rng } from './life';
+import { earn } from './record';
 
 /** 가방 크기 */
 export const bagCap = (s: LifeState) => 30 + (owns(s, 'big_bag') ? 20 : 0);
@@ -15,18 +16,30 @@ export const goldOf = (s: LifeState) => s.gold ?? 0;
 /** 1,234G */
 export const fmtGold = (g: number) => `${g < 0 ? '-' : ''}${Math.abs(Math.round(g)).toLocaleString('ko-KR')}G`;
 
+/** 이번 달 돈벌이의 이름 (UI 팝업) */
+export function payLabel(s: LifeState): string {
+  if (s.jobId === 'merchant') return '장사 수익';
+  if (s.jobId === 'farmer' || s.jobId === null) return '수입';
+  if (s.jobId === 'thief') return '수입';
+  return '월급';
+}
+
+/** 농부·농지의 수확 달 (0부터 세어 9 = 10월) */
+export const HARVEST_MONTH = 9;
+
 /**
- * 한 해의 살림: 직업 수입 + 농지 − 생활비 − 빚 이자.
- * 돌려주는 문장이 있으면 연대기에 남긴다 (풍년·흉년·빚 등 눈에 띄는 일만).
+ * 한 달의 살림: 월급(연봉 ÷ 12), 상인은 장사 수익이 달마다 오르내리고 밑천이 돈을 번다.
+ * 농부와 농지는 가을에 한꺼번에 거둔다. 요양 중에는 반만 번다.
+ * 돌려주는 문장이 있으면 연대기에 남긴다 (풍년·흉년처럼 눈에 띄는 일만).
  */
-export function yearlyEconomy(s: LifeState, rng: Rng): string | null {
+export function monthlyEconomy(s: LifeState, month: number, rng: Rng): string | null {
   let note: string | null = null;
-  let income = 0;
+  let pay = 0;
   const job = jobById(s.jobId);
-  if (job) {
-    let base = job.income[Math.max(1, Math.min(5, s.jobRank))] ?? 0;
-    if (job.id === 'merchant') base = Math.round(base * (0.6 + rng() * 0.8));
-    if (job.id === 'farmer') {
+  const rankIncome = job ? job.income[Math.max(1, Math.min(5, s.jobRank))] ?? 0 : 0;
+  if (job?.id === 'farmer') {
+    if (month === HARVEST_MONTH) {
+      let base = rankIncome;
       const r = rng();
       if (r < 0.12) {
         base = Math.round(base * 0.4);
@@ -34,28 +47,58 @@ export function yearlyEconomy(s: LifeState, rng: Rng): string | null {
       } else if (r > 0.9) {
         base = Math.round(base * 1.6);
         note = '대풍년! 곳간이 넘쳐난다.';
-      }
+      } else note = `가을걷이를 마쳤다. 수확을 팔아 ${fmtGold(base)}를 벌었다.`;
+      pay += base;
     }
-    income += base;
+  } else if (job?.id === 'merchant') {
+    pay += Math.round((rankIncome / 12) * (0.4 + rng() * 1.2));
+    // 밑천이 돈을 번다: 가진 돈의 0.5% (직급에 따라 한도)
+    if (goldOf(s) > 0) pay += Math.min(Math.round(goldOf(s) * 0.005), 60 * s.jobRank);
+  } else if (job) {
+    pay += Math.round(rankIncome / 12);
   } else if (s.age >= 16) {
-    income += 10; // 잡일
+    pay += 1; // 잡일
   }
-  if (owns(s, 'land')) income += s.jobId === 'farmer' ? 150 : 60;
-  const living = s.age >= 18 && !owns(s, 'house') && !owns(s, 'villa') ? 15 : 0;
-  let net = income - living;
+  if (month === HARVEST_MONTH && owns(s, 'land')) pay += s.jobId === 'farmer' ? 600 : 240;
+  if ((s.recover ?? 0) > 0) pay = Math.round(pay / 2);
+  s.gold = goldOf(s) + pay;
+  s.lastPay = pay;
+  s.yearIncome = (s.yearIncome ?? 0) + pay;
+  earn(s, pay);
+  return note;
+}
+
+/**
+ * 한 해 마무리: 생활비, 빚 이자, 소유물이 주는 안정.
+ * 돌려주는 문장이 있으면 연대기에 남긴다.
+ */
+export function yearEndEconomy(s: LifeState, rng: Rng): string | null {
+  let note: string | null = null;
+  const living = s.age >= 18 && !owns(s, 'house') && !owns(s, 'villa') ? 60 : 0;
+  let net = (s.yearIncome ?? 0) - living;
+  s.gold = goldOf(s) - living;
+  earn(s, -living);
   const gold = goldOf(s);
   if (gold < 0) {
     const interest = Math.ceil(-gold * 0.1);
+    s.gold = gold - interest;
     net -= interest;
     note = `빚 이자로 ${fmtGold(interest)}가 나갔다. 빚이 눈덩이처럼 불어난다…`;
   }
-  s.gold = gold + net;
   s.lastIncome = net;
+  s.yearIncome = 0;
   // 집·고양이·별장은 마음을 편하게 한다
   const calm = (s.owned ?? []).reduce((a, o) => a + (OWNED_CALM[o] ?? 0), 0);
   if (calm) s.stress = Math.max(0, (s.stress ?? 0) - calm);
   if (owns(s, 'cat') && rng() < 0.2 && s.mood === 'calm') s.mood = 'joy';
   return note;
+}
+
+/** 한 해 살림을 한꺼번에 (시뮬레이션·테스트용) */
+export function yearlyEconomy(s: LifeState, rng: Rng): string | null {
+  let note: string | null = null;
+  for (let m = 0; m < 12; m++) note = monthlyEconomy(s, m, rng) ?? note;
+  return yearEndEconomy(s, rng) ?? note;
 }
 
 export interface Result {
@@ -73,6 +116,7 @@ export function buy(s: LifeState, id: string): Result {
   const price = marketPrice(s, m);
   if (goldOf(s) < price) return { ok: false, msg: '골드가 모자라다.' };
   s.gold = goldOf(s) - price;
+  earn(s, -price);
   if (m.type === 'gear' && m.gear) {
     s.bag = [...(s.bag ?? []), makeItem(m.gear)];
   } else {
@@ -96,6 +140,7 @@ export function sell(s: LifeState, uid: number): Result {
   const it = takeFromBag(s, uid);
   if (!it) return { ok: false, msg: '가방에 없다.' };
   s.gold = goldOf(s) + sellPrice(it);
+  earn(s, sellPrice(it));
   return { ok: true, msg: `「${it.name}」을(를) ${fmtGold(sellPrice(it))}에 팔았다.` };
 }
 
@@ -106,6 +151,7 @@ export function sellAllLoot(s: LifeState): Result {
   const total = loot.reduce((a, it) => a + sellPrice(it), 0);
   s.bag = (s.bag ?? []).filter((it) => it.kind !== 'loot');
   s.gold = goldOf(s) + total;
+  earn(s, total);
   return { ok: true, msg: `전리품 ${loot.length}개를 ${fmtGold(total)}에 팔았다!` };
 }
 
@@ -146,6 +192,7 @@ export function innRest(s: LifeState): Result {
   if ((s.hp ?? maxHp(s)) >= maxHp(s)) return { ok: false, msg: '이미 HP가 가득하다.' };
   if (goldOf(s) < INN_PRICE) return { ok: false, msg: '여관비가 모자라다.' };
   s.gold = goldOf(s) - INN_PRICE;
+  earn(s, -INN_PRICE);
   s.hp = maxHp(s);
   return { ok: true, msg: `여관에서 푹 쉬었다. HP 가득! (-${fmtGold(INN_PRICE)})` };
 }

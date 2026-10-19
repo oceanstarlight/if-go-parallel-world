@@ -17,8 +17,36 @@ export type Tone = 'normal' | 'good' | 'bad' | 'milestone' | 'death';
 
 export interface LogEntry {
   age: number;
+  /** 몇 월의 일인가 (1~12). 예전 기록에는 없다 */
+  m?: number;
   text: string;
   tone: Tone;
+}
+
+/** 한 생의 기록 (사망 화면에서 보여준다) */
+export interface LifeRecord {
+  /** 사건 전투 횟수 · 승리 횟수 */
+  battles: number;
+  wins: number;
+  /** 사건 전투 상대별 횟수 */
+  foes: Record<string, number>;
+  /** 던전에서 쓰러뜨린 마물 · 보스 */
+  slain: Record<string, number>;
+  bosses: Record<string, number>;
+  dives: number;
+  /** 가장 깊이 내려간 계층 */
+  maxFloor: number;
+  /** 번 돈 · 쓴 돈 */
+  earned: number;
+  spent: number;
+  /** 겪은 사건 수 */
+  events: number;
+  /** 죽을 뻔한 일 (사인 id) */
+  nearDeaths: string[];
+  /** 거쳐 간 직업 */
+  jobs: string[];
+  /** 던전에서 주운 물건 수 */
+  loot: number;
 }
 
 export interface Death {
@@ -92,6 +120,23 @@ export interface LifeState {
   dive?: Dive | null;
   /** 도둑질로 붙잡힌 횟수 */
   caught?: number;
+
+  // ── 시간 · 중상 · 기록 (v1.0) ──
+  /** 올해 지난 달 수 (0~11). 0이면 새해를 시작할 차례 */
+  month?: number;
+  /** 올해 일어난 사건 수 */
+  yearEvents?: number;
+  /** 올해 수입 (해가 끝나면 lastIncome 으로) */
+  yearIncome?: number;
+  /** 이번 달 들어온 돈 (UI 팝업용) */
+  lastPay?: number;
+  /** 중상 횟수. 3번째에는 죽는다 */
+  injuries?: number;
+  /** 요양 남은 달 수 */
+  recover?: number;
+  /** 방금 입은 중상 (사건 결과 문장 뒤에 알린다) */
+  pendingInjury?: string | null;
+  record?: LifeRecord;
 }
 
 export type ItemKind = 'weapon' | 'armor' | 'loot' | 'potion';
@@ -196,6 +241,8 @@ export interface Effect {
   gold?: number;
   /** 가진 골드(양수일 때)의 비율만큼 증감. 0.5 = +50%, -1 = 전부 잃음 */
   goldPct?: number;
+  /** goldPct 로 늘어나는 돈의 상한 (복리로 끝없이 불어나지 않게) */
+  goldCap?: number;
   /** 골드를 이 값으로 (파산 등) */
   goldSet?: number;
   /** 도둑질로 붙잡힘: 재산 몰수, 세 번째면 교수대 */

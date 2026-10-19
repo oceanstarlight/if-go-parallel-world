@@ -99,14 +99,19 @@ export const CAREER: GameEvent[] = [
   },
   // ───── 상인 ─────
   {
-    id: 'e_merchant_deal', title: '남쪽 무역로', weight: 2,
+    id: 'e_merchant_deal', title: '남쪽 무역로', weight: 3, once: true,
     cond: { minAge: 18, maxAge: 65, jobs: ['merchant'] },
-    text: '남쪽 무역로를 독점할 기회가 찾아왔다! 단, 전 재산을 걸어야 한다.',
+    text: '남쪽 무역로를 독점할 기회가 찾아왔다! 단, 전 재산을 걸어야 한다. 돈이 없다면… 빚을 낼 수도 있다.',
     choices: [
       {
-        label: '올인한다', check: { stat: 'int', dc: 40 },
-        success: { text: '배가 금화와 향신료를 산더미처럼 싣고 돌아왔다! 대박!', effect: { stats: { fame: 12 }, jobRank: 1 }, tone: 'good' },
-        fail: { text: '…배가 돌아오지 않았다. 지갑도 마음도 텅 비었다.', effect: { stats: { fame: -12, cha: -2 } } },
+        label: '전 재산을 올인한다', check: { stat: 'int', dc: 40 }, cond: { goldMin: 1 },
+        success: { text: '배가 금화와 향신료를 산더미처럼 싣고 돌아왔다! 재산이 세 배로 불었다. 대박!', effect: { stats: { fame: 12 }, jobRank: 1, goldPct: 2, goldCap: 30000 }, tone: 'good' },
+        fail: { text: '…배가 돌아오지 않았다. 지갑도 마음도 텅 비었다.', effect: { stats: { fame: -12, cha: -2 }, goldSet: 0 } },
+      },
+      {
+        label: '빚을 내서 올인한다', check: { stat: 'int', dc: 44 }, cond: { goldMax: 0 },
+        success: { text: '빌린 돈으로 띄운 배가 보물을 싣고 돌아왔다! 빚을 갚고도 큰돈이 남았다!', effect: { stats: { fame: 12 }, jobRank: 1, gold: 3000 }, tone: 'good' },
+        fail: { text: '…배가 돌아오지 않았다. 남은 건 차용증 한 장. 빚이 크게 늘었다.', effect: { stats: { fame: -12, cha: -2 }, gold: -1500, stress: 20 } },
       },
       { label: '안전하게 간다', success: { text: '티끌 모아 태산. 차곡차곡 이익을 쌓았다.', effect: { stats: { int: 1 } } } },
     ],

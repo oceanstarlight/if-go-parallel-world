@@ -81,9 +81,8 @@ describe('시뮬레이션', () => {
   });
 
   it('연대기에 치환되지 않은 {변수} 가 남지 않는다', () => {
-    for (const s of lives) {
-      for (const l of s.log) expect(l.text, l.text).not.toMatch(/\{\w+(:[가-힣]+)?\}/);
-    }
+    const bad = lives.flatMap((s) => s.log.map((l) => l.text)).filter((t) => /\{\w+(:[가-힣]+)?\}/.test(t));
+    expect(bad).toEqual([]);
   });
 
   it('분포 리포트', () => {

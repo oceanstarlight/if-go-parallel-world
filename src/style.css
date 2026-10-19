@@ -701,3 +701,32 @@ h4 { font-size: 13px; color: var(--muted); margin: 20px 0 6px; letter-spacing: 0
   .toast { bottom: calc(var(--ub-h) + 20px + env(safe-area-inset-bottom)); z-index: 60; }
   .tombstone h2 { font-size: 28px; }
 }
+
+/* ───── v1.0: 시간 흐름 · 월급 · 성별 · 생애 기록 ───── */
+.timebar { display: flex; align-items: center; gap: 10px; padding: 8px 24px; border-bottom: 1px solid var(--line); font-size: 13px; flex-wrap: wrap; }
+.tb-play { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line-2); background: var(--panel); color: var(--gold); font-weight: 700; cursor: pointer; flex: none; }
+.timebar.paused .tb-play { background: var(--gold); color: #fff; }
+.tb-month { font-weight: 700; color: var(--gold); min-width: 64px; font-variant-numeric: tabular-nums; }
+.year-bar { flex: 1; min-width: 80px; height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.year-bar > i { display: block; height: 100%; background: linear-gradient(90deg, #8aa8ff, #c48aff); border-radius: 999px; }
+.timebar.paused .year-bar > i, .timebar.held .year-bar > i { background: #b8bfd8; }
+.tb-state { min-width: 34px; font-size: 12px; color: var(--muted); }
+.timebar.held .tb-state { color: #e08a00; font-weight: 700; }
+.tb-pace { display: flex; gap: 4px; }
+.tb-pace .chip { padding: 3px 9px; font-size: 12px; cursor: pointer; }
+.mon { font-style: normal; font-size: 11px; color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
+.econ .gold { position: relative; }
+.pay-pop { position: absolute; left: 0; top: -2px; white-space: nowrap; font-size: 11px; color: var(--good); font-weight: 700; pointer-events: none; animation: pay-up 1.4s ease-out forwards; }
+@keyframes pay-up { from { opacity: 0; transform: translateY(4px); } 20% { opacity: 1; } to { opacity: 0; transform: translateY(-14px); } }
+.sex { font-size: 0.8em; margin-left: 2px; }
+.sex-f { color: #e8608a; }
+.sex-m { color: #4a7ae8; }
+.life-record { list-style: none; padding: 0; margin: 0 0 16px; }
+.life-record li { display: grid; grid-template-columns: 7.5em 1fr; gap: 0 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.life-record li b { text-align: right; font-variant-numeric: tabular-nums; }
+.life-record li small { grid-column: 1 / -1; font-size: 12px; }
+@media (max-width: 760px) {
+  .timebar { padding: 6px 14px; gap: 8px; }
+  .tb-pace .chip { padding: 2px 7px; }
+  .ub-main.paused { background: linear-gradient(180deg, #b8c0dc 0%, #8a94b8 100%); }
+}

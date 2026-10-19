@@ -2,8 +2,10 @@ import type {
   Check, Choice, Effect, Focus, GameEvent, Legend, LifeState, MoodKey, Outcome, RelKey, Resolution, StatKey, Trait,
 } from '../types';
 import { rollTraits, traitById } from '../data/traits';
-import { battleOdds, isCombat } from './combat';
-import { maxHp, starterKit, yearlyEconomy } from './economy';
+import { BATTLE_ENEMY, ENEMY_NAME, battleOdds, isCombat } from './combat';
+import { maxHp, monthlyEconomy, starterKit, yearEndEconomy } from './economy';
+import { bump, rec } from './record';
+import { deathById } from '../data/deaths';
 import { OWNED_FOCUS } from '../data/market';
 import { inBranch } from '../data/branches';
 import { HOUSES, houseById } from '../data/houses';
@@ -156,6 +158,8 @@ export function createLife(opt: NewLifeOptions, rng: Rng = Math.random): LifeSta
     caught: 0,
   };
   s.hp = maxHp(s);
+  s.month = 0;
+  rec(s);
   s.goals = pickGoals(s, rng);
   if ((opt.lifeNo ?? 1) > 1) {
     // 매 생마다 다시 만나는 환생의 여신
@@ -171,7 +175,8 @@ export function createLife(opt: NewLifeOptions, rng: Rng = Math.random): LifeSta
 }
 
 function log(s: LifeState, text: string, tone: LifeState['log'][number]['tone'] = 'normal') {
-  s.log.push({ age: s.age, text, tone });
+  // 새해 첫 달(0)의 일은 1월로 적는다
+  s.log.push({ age: s.age, m: Math.max(1, s.month ?? 0), text, tone });
 }
 
 // ───────────────────────── 성장 ─────────────────────────
@@ -200,7 +205,8 @@ export function gainStat(s: LifeState, k: StatKey, amount: number, rng: Rng) {
 }
 
 function grow(s: LifeState, rng: Rng) {
-  const m = ageMul(s.age);
+  // 요양 중에는 성장이 반으로 준다
+  const m = ageMul(s.age) * ((s.recover ?? 0) > 0 ? 0.5 : 1);
   if (s.age < 3) {
     gainStat(s, 'vit', 1, rng);
     gainStat(s, pick(STAT_KEYS.filter((k) => k !== 'fame'), rng), 1, rng);
@@ -271,8 +277,9 @@ function overwork(s: LifeState, rng: Rng): boolean {
   s.stress = Math.max(0, (s.stress ?? 0) - 25);
   s.mood = 'gloom';
   if (s.stats.vit <= 0) {
-    log(s, '쉬지 않고 달리던 어느 날, 그대로 쓰러져 다시 일어나지 못했다…', 'death');
-    kill(s, 'overwork');
+    log(s, '쉬지 않고 달리던 어느 날, 그대로 쓰러졌다…', 'bad');
+    if (kill(s, 'overwork')) log(s, '다시는 일어나지 못했다.', 'death');
+    flushInjury(s);
   } else {
     log(s, '과로로 쓰러졌다! 한 달 내내 앓아누웠다. 가끔은 쉬어야 한다. (체력 -12)', 'bad');
   }
@@ -300,7 +307,21 @@ export function naturalDeathChance(s: LifeState): number {
 
 // ───────────────────────── 죽음 ─────────────────────────
 
-/** 죽음을 시도한다. 불굴의 육체가 막으면 false */
+/** 늘 진짜 죽음인 사인: 노환, 교수대(세 번째 체포), 던전에서 쓰러짐 */
+const REAL_DEATH = new Set(['old_age', 'gallows', 'dungeon', 'abyss']);
+/** 중상이 이 횟수에 이르면 죽는다 */
+export const MAX_INJURY = 3;
+/** 중상 뒤 요양 기간 (달) */
+const RECOVER_MONTHS = 12;
+
+/** 스스로 고른 확정 죽음(대신 죽기 등)을 처리하는 중인가 */
+let sureDeath = false;
+
+/**
+ * 죽음을 시도한다. 죽지 않으면 false.
+ * 사고·병·결투 같은 급사는 바로 죽지 않고 '중상'이 된다. 중상이 세 번째면 그때 죽는다.
+ * 노환·교수대·던전, 그리고 스스로 고른 죽음은 그대로 죽음이다.
+ */
 export function kill(s: LifeState, causeId: string): boolean {
   if (s.death) return true;
   if (causeId !== 'old_age' && s.extraLives > 0) {
@@ -309,9 +330,41 @@ export function kill(s: LifeState, causeId: string): boolean {
     log(s, '눈앞이 하얘졌다… 그런데 불굴의 육체가 발동! "아직 안 끝났어!" 당신은 벌떡 일어났다.', 'good');
     return false;
   }
+  if (!sureDeath && !REAL_DEATH.has(causeId) && (s.injuries ?? 0) < MAX_INJURY - 1) {
+    injure(s, causeId);
+    return false;
+  }
   s.death = { causeId, age: s.age };
   s.pendingEventId = null;
   return true;
+}
+
+/** 중상: 체력·돈을 잃고 1년간 요양한다 */
+function injure(s: LifeState, causeId: string) {
+  s.injuries = (s.injuries ?? 0) + 1;
+  s.stats.vit = s.stats.vit <= 0 ? 10 : Math.max(5, s.stats.vit - 10);
+  const lost = (s.gold ?? 0) > 0 ? Math.round((s.gold ?? 0) * 0.2) : 0;
+  s.gold = (s.gold ?? 0) - lost;
+  s.stress = clamp((s.stress ?? 0) + 25, 0, 100);
+  s.will = clamp((s.will ?? 50) - 10, 0, 100);
+  s.mood = 'fear';
+  s.recover = RECOVER_MONTHS;
+  s.hp = Math.min(s.hp ?? maxHp(s), Math.round(maxHp(s) * 0.3));
+  rec(s).nearDeaths.push(causeId);
+  s.pendingInjury = `${causeId}|${lost}`;
+}
+
+/** 중상 소식을 연대기에 남긴다 (사건 결과 문장 뒤에) */
+function flushInjury(s: LifeState) {
+  if (!s.pendingInjury || s.death) {
+    s.pendingInjury = null;
+    return;
+  }
+  const [causeId, lost] = s.pendingInjury.split('|');
+  s.pendingInjury = null;
+  const n = s.injuries ?? 1;
+  const last = n >= MAX_INJURY - 1;
+  log(s, `…눈을 떠 보니 침대 위였다. 「${deathById(causeId).name}」 직전에서 살아났다! 중상 ${n}/${MAX_INJURY} — 1년간 요양해야 한다. (체력 -10${Number(lost) ? `, 치료비 ${Number(lost).toLocaleString('ko-KR')}G` : ''})${last ? ' 다음에 또 이런 일이 생기면 정말 끝이다…' : ''}`, 'bad');
 }
 
 // ───────────────────────── 판정 / 효과 ─────────────────────────
@@ -362,15 +415,21 @@ export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
   if (e.job) {
     s.jobId = e.job;
     s.jobRank = 1;
+    if (!rec(s).jobs.includes(e.job)) rec(s).jobs.push(e.job);
   }
   if (e.jobRank && s.jobId) s.jobRank = clamp(s.jobRank + e.jobRank, 1, 5);
   if (e.mood) s.mood = e.mood;
   if (e.stress) s.stress = clamp((s.stress ?? 0) + e.stress, 0, 100);
   if (e.will) s.will = clamp((s.will ?? 50) + e.will, 0, 100);
   if (e.extraLives) s.extraLives = Math.max(0, s.extraLives + e.extraLives);
+  const g0 = s.gold ?? 0;
   if (e.gold) s.gold = (s.gold ?? 0) + e.gold;
-  if (e.goldPct && (s.gold ?? 0) > 0) s.gold = Math.round((s.gold ?? 0) * (1 + e.goldPct));
+  if (e.goldPct && (s.gold ?? 0) > 0) {
+    const delta = (s.gold ?? 0) * e.goldPct;
+    s.gold = Math.round((s.gold ?? 0) + (delta > 0 ? Math.min(delta, e.goldCap ?? Infinity) : delta));
+  }
   if (e.goldSet !== undefined) s.gold = e.goldSet;
+  if ((s.gold ?? 0) > g0) rec(s).earned += (s.gold ?? 0) - g0;
   if (e.own && !(s.owned ?? []).includes(e.own)) s.owned = [...(s.owned ?? []), e.own];
   if (e.caught) {
     s.caught = (s.caught ?? 0) + 1;
@@ -420,6 +479,7 @@ function applyOutcome(s: LifeState, o: Outcome, passed: boolean | null, rng: Rng
     else if (tone === 'bad' && rng() < 0.6) s.mood = pick(['gloom', 'anger', 'fear'] as MoodKey[], rng);
   }
   log(s, fill(o.text, s, before), tone);
+  flushInjury(s);
 }
 
 // ───────────────────────── 사건 ─────────────────────────
@@ -435,10 +495,6 @@ export function visibleChoices(s: LifeState, ev: GameEvent): Choice[] {
 }
 
 function pickEvent(s: LifeState, rng: Rng): GameEvent | null {
-  const milestone = ALL_EVENTS.find((e) => e.milestone && eligible(s, e));
-  if (milestone) return milestone;
-  const rate = traitsOf(s).reduce((a, t) => a * (t.eventRate ?? 1), 1);
-  if (rng() > Math.min(0.95, (s.age < 3 ? 0.35 : 0.7) * rate)) return null;
   const pool = ALL_EVENTS.filter((e) => !e.milestone && eligible(s, e));
   const weights = pool.map((e) => (e.weight ?? 1) * (e.focus && e.focus === s.focus ? 3 : 1));
   const total = weights.reduce((a, b) => a + b, 0);
@@ -453,6 +509,8 @@ function pickEvent(s: LifeState, rng: Rng): GameEvent | null {
 
 function startEvent(s: LifeState, ev: GameEvent, rng: Rng) {
   s.seen.push(ev.id);
+  rec(s).events++;
+  s.yearEvents = (s.yearEvents ?? 0) + 1;
   s.lastEventId = ev.id;
   log(s, `「${fill(ev.title, s)}」 ${fill(ev.text, s)}`, ev.milestone ? 'milestone' : 'normal');
   if (ev.auto) {
@@ -473,34 +531,74 @@ export function canAdvance(s: LifeState) {
   return !s.death && !s.pendingEventId;
 }
 
-export function advanceYear(s: LifeState, rng: Rng = Math.random) {
-  if (!canAdvance(s)) return;
+/** 한 해 = 12달. UI 는 한 달마다 advanceMonth 를 부른다 */
+export const MONTHS = 12;
+/** 이정표 사건 (달마다 확인하므로 미리 골라 둔다) */
+const MILESTONES = ALL_EVENTS.filter((e) => e.milestone);
+/** 한 해에 일어날 수 있는 사건 수 (이정표 제외) */
+const MAX_YEAR_EVENTS = 3;
+
+/** 새해: 나이를 먹고 한 해치 성장·마음·노화를 정산한다 */
+function startYear(s: LifeState, rng: Rng) {
   s.age++;
   s.lastEventId = null;
+  s.yearEvents = 0;
   grow(s, rng);
   updateMind(s, rng);
-  const money = yearlyEconomy(s, rng);
-  if (money) log(s, money, (s.gold ?? 0) < 0 ? 'bad' : 'normal');
   s.hp = maxHp(s);
   if (overwork(s, rng) && s.death) return;
+  if (rng() < naturalDeathChance(s)) kill(s, 'old_age');
+}
 
-  if (rng() < naturalDeathChance(s)) {
-    kill(s, 'old_age');
+/** 이번 달에 사건이 일어날 확률 (한 해 평균 약 1.3개) */
+function monthlyEventChance(s: LifeState): number {
+  const rate = traitsOf(s).reduce((a, t) => a * (t.eventRate ?? 1), 1);
+  if ((s.yearEvents ?? 0) >= MAX_YEAR_EVENTS) return 0;
+  return Math.min(0.3, (s.age < 3 ? 0.04 : 0.11) * rate);
+}
+
+/** 한 달을 보낸다. 선택이 필요한 사건이 생기면 거기서 멈춘다 (canAdvance 가 false) */
+export function advanceMonth(s: LifeState, rng: Rng = Math.random) {
+  if (!canAdvance(s)) return;
+  const month = s.month ?? 0;
+  if (month === 0) {
+    startYear(s, rng);
+    if (s.death) return;
+  }
+  const money = monthlyEconomy(s, month, rng);
+  if (money) log(s, money, 'normal');
+  if ((s.recover ?? 0) > 0) {
+    s.recover = (s.recover ?? 0) - 1;
+    if (s.recover === 0) log(s, '긴 요양이 끝났다. 다시 걸을 수 있다!', 'good');
+  }
+  s.month = (month + 1) % MONTHS;
+  // 이정표는 조건이 맞으면 바로, 나머지는 달마다 확률로
+  const milestone = MILESTONES.find((e) => eligible(s, e));
+  const ev = milestone ?? (rng() < monthlyEventChance(s) ? pickEvent(s, rng) : null);
+  if (ev) startEvent(s, ev, rng);
+  if (s.month === 0) endYear(s, rng);
+}
+
+/** 한 해 마무리: 생활비·빚 이자, 아무 일 없던 해에는 한 줄 */
+function endYear(s: LifeState, rng: Rng) {
+  const money = yearEndEconomy(s, rng);
+  if (money) log(s, money, (s.gold ?? 0) < 0 ? 'bad' : 'normal');
+  if ((s.yearEvents ?? 0) > 0 || s.death) return;
+  if ((s.stress ?? 0) >= STRESS_HIGH && s.focus !== 'rest' && rng() < 0.5) {
+    log(s, pick(TIRED_LINES, rng), 'bad');
     return;
   }
+  // 직전 해와 같은 문장은 피한다
+  const lines = QUIET_YEAR[s.age < 3 ? 'infant' : s.focus];
+  const prev = s.log[s.log.length - 1]?.text;
+  log(s, fill(pick(lines.filter((l) => l !== prev), rng), s));
+}
 
-  const ev = pickEvent(s, rng);
-  if (ev) startEvent(s, ev, rng);
-  else {
-    // 직전 해와 같은 문장은 피한다
-    const lines = QUIET_YEAR[s.age < 3 ? 'infant' : s.focus];
-    if ((s.stress ?? 0) >= STRESS_HIGH && s.focus !== 'rest' && rng() < 0.5) {
-      log(s, pick(TIRED_LINES, rng), 'bad');
-      return;
-    }
-    const prev = s.log[s.log.length - 1]?.text;
-    log(s, fill(pick(lines.filter((l) => l !== prev), rng), s));
-  }
+/** 해가 바뀌거나 사건으로 멈출 때까지 달을 보낸다 (시뮬레이션·테스트용) */
+export function advanceYear(s: LifeState, rng: Rng = Math.random) {
+  if (!canAdvance(s)) return;
+  do advanceMonth(s, rng);
+  while (canAdvance(s) && (s.month ?? 0) !== 0);
 }
 
 export interface ChoiceResult {
@@ -528,6 +626,18 @@ export function choose(s: LifeState, index: number, rng: Rng = Math.random): Cho
   if (choice.will) s.will = clamp((s.will ?? 50) - choice.will, 0, 100);
   log(s, `▸ ${fill(choice.label, s)}`);
   const { outcome, passed } = resolve(s, choice, rng, ev.id);
-  applyOutcome(s, outcome, passed, rng);
+  if (isCombat(ev.id, choice)) {
+    const r = rec(s);
+    r.battles++;
+    if (passed) r.wins++;
+    bump(r.foes, ENEMY_NAME[BATTLE_ENEMY[ev.id]] ?? '적');
+  }
+  // 판정 없이 스스로 고른 죽음(대신 죽기 등)은 중상으로 넘기지 않는다
+  sureDeath = !choice.check && !!outcome.effect?.death;
+  try {
+    applyOutcome(s, outcome, passed, rng);
+  } finally {
+    sureDeath = false;
+  }
   return { choice, passed };
 }
