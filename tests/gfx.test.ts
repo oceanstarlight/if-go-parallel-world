@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { drawPortrait, type Stage } from '../src/gfx/portrait';
 import { ALL_SCENES, SCENE_H, SCENE_W, drawScene } from '../src/gfx/scenes';
 import { enemySprite, playerSprite, type EnemyKind } from '../src/gfx/sprites';
+import { pixelText } from '../src/gfx/pixelfont';
 import { battleFor, sceneFor } from '../src/gfx/mapping';
 import { ALL_EVENTS } from '../src/data/events';
 import { HOUSES } from '../src/data/houses';
@@ -33,8 +34,17 @@ describe('도트 그래픽', () => {
 
   it('전투 스프라이트를 그린다', () => {
     const kinds: EnemyKind[] = ['bandit', 'soldier', 'rival', 'bully', 'stalker', 'hero', 'demon_lord', 'traitor', 'wolf', 'shadow', 'dragon', 'wyvern'];
-    for (const k of kinds) expect(filled(enemySprite(k).data), k).toBeGreaterThan(0.05);
-    expect(filled(playerSprite({ seed: 1, stage: 'adult', houseId: 'hero', jobId: 'hero', jobRank: 3, dead: false }, false).data)).toBeGreaterThan(0.05);
+    for (const k of kinds) for (const ps of ['idle', 'breathe', 'attack', 'hurt'] as const) expect(filled(enemySprite(k)[ps].data), k).toBeGreaterThan(0.05);
+    for (const magic of [false, true]) {
+      const set = playerSprite({ seed: 1, stage: 'adult', houseId: 'hero', jobId: 'hero', jobRank: 3, dead: false }, magic);
+      for (const ps of ['idle', 'breathe', 'attack', 'hurt'] as const) expect(filled(set[ps].data)).toBeGreaterThan(0.05);
+    }
+  });
+
+  it('픽셀 숫자 폰트', () => {
+    const p = pixelText('128!', '#ffffff', 2);
+    expect(p.w).toBe(4 * 2 * 4 + 1);
+    expect(filled(p.data)).toBeGreaterThan(0.3);
   });
 
   it('사건 매핑: 전투는 체력·마력 판정에만 붙는다', () => {

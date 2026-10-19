@@ -2,7 +2,11 @@ import { Application, Container, Graphics, Sprite, Texture, TextureStyle, Tiling
 import { Painter, bayer, hashStr } from './painter';
 import { drawPortrait, specKey, type PortraitSpec } from './portrait';
 import { SCENE_H, SCENE_W, drawScene, type Fx, type SceneKind } from './scenes';
-import { boltSprite, slashSprite } from './sprites';
+import { BattleDirector, type BattleOptions } from './battle';
+import { GodrayFilter } from 'pixi-filters/godray';
+import gsap from 'gsap';
+
+export type { BattleOptions };
 
 TextureStyle.defaultOptions.scaleMode = 'nearest';
 
@@ -48,14 +52,6 @@ const PARTICLE_COLOR: Record<ParticleType, number[]> = {
   ash: [0x8a8480, 0x5e5a58],
 };
 
-export interface BattleOptions {
-  player: Painter;
-  enemy: Painter;
-  magic: boolean;
-  win: boolean;
-  died: boolean;
-  groundY: number;
-}
 
 /** 캔버스를 정수 배율로 키워 도트를 선명하게 유지한다 */
 function fitCanvas(canvas: HTMLCanvasElement, host: HTMLElement, w: number, h: number, maxK = 8) {
@@ -108,7 +104,6 @@ export class GfxStage {
   private time = 0;
   private caption = document.createElement('div');
   private shake = 0;
-  private battle: { skip: () => void } | null = null;
   private resizeObs = new ResizeObserver((entries) => {
     for (const e of entries) {
       const host = e.target as HTMLElement;
@@ -162,7 +157,11 @@ export class GfxStage {
     this.sceneKey = key;
     const scene = drawScene(kind, seed);
     this.groundY = scene.groundY;
-    swap(this.bgSprite, texOf(scene.p));
+    const first = this.bgSprite.texture === Texture.EMPTY;
+    const old = this.bgSprite.texture;
+    this.bgSprite.texture = texOf(scene.p);
+    if (!first) this.ditherOut(old);
+    this.applyGodray(kind);
     for (const c of this.fxLayer.removeChildren()) c.destroy({ children: true });
     this.particles = [];
     this.updaters = [];
@@ -172,6 +171,67 @@ export class GfxStage {
   }
 
   groundY = 120;
+
+  // ───────────────── 장면 전환 / 빛줄기 ─────────────────
+
+  private ditherMasks: Texture[] = [];
+  private transition: { sprite: Sprite; mask: Sprite; tween: gsap.core.Tween } | null = null;
+
+  /** 베이어 디더 패턴으로 이전 장면을 조금씩 지운다 */
+  private ditherOut(old: Texture) {
+    if (this.transition) {
+      this.transition.tween.progress(1);
+    }
+    if (!this.ditherMasks.length) {
+      for (let lv = 0; lv < 16; lv++) {
+        const p = new Painter(SCENE_W, SCENE_H);
+        for (let y = 0; y < SCENE_H; y++) for (let x = 0; x < SCENE_W; x++) if (bayer(x, y) >= lv / 16) p.px(x, y, '#ffffff');
+        this.ditherMasks.push(texOf(p));
+      }
+    }
+    const sprite = new Sprite(old);
+    const mask = new Sprite(this.ditherMasks[0]);
+    sprite.mask = mask;
+    this.sceneRoot.addChildAt(sprite, this.sceneRoot.getChildIndex(this.fxLayer));
+    this.sceneRoot.addChild(mask);
+    const state = { lv: 0 };
+    const tween = gsap.to(state, {
+      lv: 15,
+      duration: 0.45,
+      ease: 'none',
+      onUpdate: () => { mask.texture = this.ditherMasks[Math.round(state.lv)]; },
+      onComplete: () => {
+        sprite.destroy();
+        mask.destroy();
+        old.destroy(true);
+        this.transition = null;
+      },
+    });
+    this.transition = { sprite, mask, tween };
+  }
+
+  private godray: GodrayFilter | null = null;
+
+  /** 신전·숲·묘지 등에 은은한 빛줄기 */
+  private applyGodray(kind: SceneKind) {
+    const cfg: Partial<Record<SceneKind, { angle: number; gain: number; alpha: number }>> = {
+      temple: { angle: 25, gain: 0.55, alpha: 0.6 },
+      forest: { angle: 20, gain: 0.5, alpha: 0.35 },
+      graveyard: { angle: -25, gain: 0.45, alpha: 0.3 },
+      grave: { angle: -25, gain: 0.45, alpha: 0.3 },
+      throne: { angle: 15, gain: 0.5, alpha: 0.35 },
+      library: { angle: 30, gain: 0.45, alpha: 0.3 },
+      title: { angle: -20, gain: 0.4, alpha: 0.25 },
+    };
+    const c = cfg[kind];
+    if (!c) {
+      this.bgSprite.filters = null;
+      return;
+    }
+    if (!this.godray) this.godray = new GodrayFilter({ angle: c.angle, gain: c.gain, lacunarity: 2.5, parallel: true, alpha: c.alpha, time: 0 });
+    Object.assign(this.godray, c);
+    this.bgSprite.filters = [this.godray];
+  }
 
   private buildFx(f: Fx, seed: number) {
     let r = seed;
@@ -230,8 +290,10 @@ export class GfxStage {
   private tick(dt: number) {
     this.time += dt;
     const t = this.time;
+    if (this.godray && this.bgSprite.filters) this.godray.time += dt * 0.0004;
     for (const u of this.updaters) u(dt, t);
     for (const p of this.particles) this.moveParticle(p, dt, t);
+    this.battle?.update(dt);
     if (this.shake > 0) {
       this.sceneRoot.position.set(Math.round((Math.random() - 0.5) * this.shake * 2), Math.round((Math.random() - 0.5) * this.shake * 2));
       this.shake = Math.max(0, this.shake - dt * 0.012);
@@ -275,6 +337,8 @@ export class GfxStage {
 
   // ───────────────── 전투 연출 ─────────────────
 
+  private battle: BattleDirector | null = null;
+
   get inBattle() {
     return this.battle !== null;
   }
@@ -284,143 +348,14 @@ export class GfxStage {
   }
 
   playBattle(o: BattleOptions): Promise<void> {
-    return new Promise((resolve) => {
-      const layer = this.battleLayer;
-      const dim = new Graphics().rect(0, 0, SCENE_W, SCENE_H).fill({ color: 0x000000, alpha: 0.35 });
-      const shadowG = new Graphics();
-      const hp = new Graphics();
-      const pTex = texOf(o.player), eTex = texOf(o.enemy);
-      const ps = new Sprite(pTex), es = new Sprite(eTex);
-      ps.anchor.set(0.5, 1);
-      es.anchor.set(0.5, 1);
-      es.scale.x = -1;
-      const gy = Math.min(o.groundY + 4, SCENE_H - 4);
-      const big = o.enemy.w > 60;
-      const pHome = 64, eHome = big ? 178 : 172;
-      ps.position.set(-30, gy);
-      es.position.set(SCENE_W + 60, gy);
-      const fxTex = o.magic ? texOf(boltSprite()) : texOf(slashSprite());
-      const fxSprite = new Sprite(fxTex);
-      fxSprite.anchor.set(0.5);
-      fxSprite.visible = false;
-      const eFx = new Sprite(texOf(slashSprite('#ffb0a0')));
-      eFx.anchor.set(0.5);
-      eFx.scale.x = -1;
-      eFx.visible = false;
-      layer.addChild(dim, shadowG, es, ps, fxSprite, eFx, hp);
-
-      let t = 0;
-      let pHp = 1, eHp = 1, pShown = 1, eShown = 1;
-      const hits = new Set<string>();
-      const once = (id: string, at: number, fn: () => void) => { if (t >= at && !hits.has(id)) { hits.add(id); fn(); } };
-      const END = 2800;
-      this.caption.textContent = '';
-      this.caption.className = 'battle-caption';
-
-      const enemyMid = () => es.y - o.enemy.h * 0.55;
-      const playerMid = () => ps.y - o.player.h * 0.55;
-
-      const step = (dt: number) => {
-        t += dt;
-        const seg = (a: number, b: number) => Math.min(1, Math.max(0, (t - a) / (b - a)));
-        const ease = (x: number) => 1 - (1 - x) * (1 - x);
-        const lunge = (a: number, b: number, d: number) => Math.sin(Math.PI * seg(a, b)) * d;
-
-        // 등장
-        const intro = ease(seg(0, 380));
-        let px = -30 + (pHome + 30) * intro;
-        let ex = SCENE_W + 60 - (SCENE_W + 60 - eHome) * intro;
-        // 1합: 플레이어 → 적
-        px += lunge(380, 720, o.magic ? 4 : 18);
-        once('p1', 540, () => { eHp = 0.62; this.shake = 2; es.tint = 0xff7070; });
-        // 2합: 적 → 플레이어
-        ex -= lunge(820, 1160, big ? 10 : 18);
-        once('e1', 990, () => { pHp = o.win ? 0.7 : 0.5; this.shake = 2; ps.tint = 0xff7070; });
-        // 결정타
-        if (o.win) {
-          px += lunge(1240, 1640, o.magic ? 6 : 26);
-          once('p2', 1440, () => { eHp = 0; this.shake = 4; es.tint = 0xff5050; });
-        } else {
-          ex -= lunge(1240, 1640, big ? 14 : 24);
-          once('e2', 1440, () => { pHp = o.died ? 0 : 0.15; this.shake = 4; ps.tint = 0xff5050; });
-        }
-        if (t > 620 && t < 900) es.tint = 0xffffff;
-        if (t > 1080 && t < 1300) ps.tint = 0xffffff;
-        ps.position.set(Math.round(px), gy);
-        es.position.set(Math.round(ex), gy);
-
-        // 쓰러짐
-        const fall = seg(1520, 1900);
-        if (o.win) {
-          es.alpha = 1 - fall * 0.85;
-          es.y = gy + Math.round(fall * 6);
-          if (fall > 0) es.tint = 0x806060;
-        } else if (o.died) {
-          ps.rotation = -fall * Math.PI / 2;
-          ps.alpha = 1 - fall * 0.4;
-          if (fall > 0) ps.tint = 0x808090;
-        } else {
-          ps.y = gy + Math.round(fall * 3);
-        }
-
-        // 공격 효과
-        const fxActive = (a: number, b: number) => t >= a && t < b;
-        if (o.magic) {
-          const shot = (a: number, b: number) => {
-            if (!fxActive(a, b)) return false;
-            const u = seg(a, b);
-            fxSprite.position.set(Math.round(ps.x + 14 + (es.x - ps.x - 14) * u), Math.round(playerMid() - 6 + (enemyMid() - playerMid()) * u));
-            return true;
-          };
-          fxSprite.visible = shot(400, 540) || (o.win && shot(1300, 1440));
-        } else {
-          fxSprite.visible = fxActive(520, 660) || (o.win && fxActive(1420, 1580));
-          fxSprite.position.set(Math.round(es.x - 4), Math.round(enemyMid()));
-          fxSprite.alpha = 1 - ((t % 140) / 140) * 0.6;
-        }
-        eFx.visible = fxActive(970, 1110) || (!o.win && fxActive(1420, 1580));
-        eFx.position.set(Math.round(ps.x + 4), Math.round(playerMid()));
-
-        // 그림자 + HP
-        shadowG.clear();
-        shadowG.ellipse(ps.x, gy, 10, 2).fill({ color: 0x000000, alpha: 0.35 });
-        shadowG.ellipse(es.x, gy, big ? 30 : 10, 2).fill({ color: 0x000000, alpha: 0.35 * es.alpha });
-        pShown += (pHp - pShown) * Math.min(1, dt / 120);
-        eShown += (eHp - eShown) * Math.min(1, dt / 120);
-        const bar = (x: number, v: number, right: boolean) => {
-          const w = 70;
-          hp.rect(x - 1, 7, w + 2, 6).fill(0x120c10);
-          hp.rect(x, 8, w, 4).fill(0x3a2a2a);
-          const fw = Math.round(w * v);
-          const col = v > 0.5 ? 0x7ac05a : v > 0.25 ? 0xe0b040 : 0xd04030;
-          hp.rect(right ? x + w - fw : x, 8, fw, 4).fill(col);
-          hp.rect(right ? x + w - fw : x, 8, fw, 1).fill(0xffffff);
-        };
-        hp.clear();
-        bar(8, pShown, false);
-        bar(SCENE_W - 78, eShown, true);
-
-        if (t >= 1750 && !this.caption.textContent) {
-          this.caption.textContent = o.win ? '승리' : o.died ? '쓰러졌다' : '패배';
-          this.caption.className = `battle-caption show ${o.win ? 'win' : 'lose'}`;
-        }
-        if (t >= END) finish();
-      };
-
-      const finish = () => {
-        this.sceneApp.ticker.remove(tickFn);
-        for (const c of layer.removeChildren()) c.destroy();
-        pTex.destroy(true);
-        eTex.destroy(true);
-        fxTex.destroy(true);
-        this.caption.textContent = '';
-        this.caption.className = 'battle-caption';
-        this.battle = null;
-        resolve();
-      };
-      const tickFn = (tk: { deltaMS: number }) => step(tk.deltaMS);
-      this.battle = { skip: () => { t = Math.max(t, END - 1); } };
-      this.sceneApp.ticker.add(tickFn);
+    const director = new BattleDirector({
+      layer: this.battleLayer,
+      sceneRoot: this.sceneRoot,
+      caption: this.caption,
+      shake: (n) => { this.shake = Math.max(this.shake, n); },
+      texOf,
     });
+    this.battle = director;
+    return director.play(o).then(() => { this.battle = null; });
   }
 }

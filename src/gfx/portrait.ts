@@ -1,6 +1,8 @@
 import type { LifeState } from '../types';
 import { Painter, bayer, darken, grayscale, hashStr, lighten, mix, seeded } from './painter';
 
+export type Mood = 'neutral' | 'happy' | 'sad';
+
 export type Stage = 'baby' | 'child' | 'teen' | 'adult' | 'elder';
 
 export interface PortraitSpec {
@@ -10,6 +12,10 @@ export interface PortraitSpec {
   jobId: string | null;
   jobRank: number;
   dead: boolean;
+  /** 표정: 올해 일어난 일의 결과에 따라 */
+  mood?: Mood;
+  /** 체력이 낮으면 붕대와 멍 */
+  injured?: boolean;
 }
 
 export function stageOf(age: number): Stage {
@@ -28,10 +34,24 @@ export function specFromLife(s: LifeState): PortraitSpec {
     jobId: s.jobId,
     jobRank: s.jobRank,
     dead: !!s.death,
+    mood: moodOf(s),
+    injured: !s.death && s.age >= 3 && s.stats.vit < 25,
   };
 }
 
-export const specKey = (p: PortraitSpec) => `${p.seed}|${p.stage}|${p.houseId}|${p.jobId}|${p.jobRank}|${p.dead}`;
+export const specKey = (p: PortraitSpec) =>
+  `${p.seed}|${p.stage}|${p.houseId}|${p.jobId}|${p.jobRank}|${p.dead}|${p.mood ?? ''}|${p.injured ?? ''}`;
+
+/** 올해 기록의 마지막 결과로 표정을 정한다 */
+function moodOf(s: LifeState): Mood {
+  if (s.death || s.pendingEventId) return 'neutral';
+  for (let i = s.log.length - 1; i >= 0 && s.log[i].age === s.age; i--) {
+    const t = s.log[i].tone;
+    if (t === 'good') return 'happy';
+    if (t === 'bad') return 'sad';
+  }
+  return 'neutral';
+}
 
 // ───────────────────────── 팔레트 ─────────────────────────
 
@@ -244,8 +264,15 @@ export function drawPortrait(spec: PortraitSpec, blink = false): Painter {
     // 눈썹
     if (spec.stage !== 'baby') {
       const by = ey - 3 - (big ? 1 : 0);
-      fig.rect(ex - 2, by, 5, 1, hair[2]);
-      fig.px(side < 0 ? ex - 2 : ex + 2, by + 1, hair[2]);
+      if (spec.mood === 'sad') {
+        // 안쪽 끝이 올라간 눈썹
+        fig.rect(ex - 2, by + 1, 5, 1, hair[2]);
+        fig.px(side < 0 ? ex + 2 : ex - 2, by, hair[2]);
+        fig.px(side < 0 ? ex + 2 : ex - 2, by + 1, null);
+      } else {
+        fig.rect(ex - 2, by, 5, 1, hair[2]);
+        fig.px(side < 0 ? ex - 2 : ex + 2, by + 1, hair[2]);
+      }
     }
   }
   // 코
@@ -253,7 +280,18 @@ export function drawPortrait(spec: PortraitSpec, blink = false): Painter {
   if (!big) fig.px(g.cx + 1, g.eyeY + 5, skin[2]);
   // 입
   const my = g.eyeY + (big ? 7 : 8);
-  fig.rect(g.cx - 2, my, 4, 1, spec.dead ? darken(skin[2], 0.3) : mix(skin[2], '#902838', 0.5));
+  const lip = spec.dead ? darken(skin[2], 0.3) : mix(skin[2], '#902838', 0.5);
+  if (!spec.dead && spec.mood === 'happy') {
+    fig.rect(g.cx - 1, my + 1, 2, 1, lip);
+    fig.px(g.cx - 2, my, lip);
+    fig.px(g.cx + 1, my, lip);
+  } else if (!spec.dead && spec.mood === 'sad') {
+    fig.rect(g.cx - 1, my, 2, 1, lip);
+    fig.px(g.cx - 2, my + 1, lip);
+    fig.px(g.cx + 1, my + 1, lip);
+  } else {
+    fig.rect(g.cx - 2, my, 4, 1, lip);
+  }
   // 주름 (노인)
   if (spec.stage === 'elder') {
     fig.px(g.cx - g.eyeDx - 2, g.eyeY + 2, skin[2]);
@@ -270,6 +308,19 @@ export function drawPortrait(spec: PortraitSpec, blink = false): Painter {
 
   // 2-6) 앞머리
   drawFrontHair(fig, g, spec, hair, style);
+
+  // 부상: 이마의 붕대, 볼의 멍, 반쯤 감긴 눈
+  if (spec.injured) {
+    const fy = g.cy - g.ry + 5;
+    fig.rect(g.cx - g.rx, fy, g.rx * 2 + 1, 3, '#ece4d4');
+    fig.rect(g.cx - g.rx, fy + 2, g.rx * 2 + 1, 1, '#b8ae9c');
+    fig.rect(g.cx + 3, fy, 2, 2, '#b8323a');
+    fig.px(g.cx + g.rx + 1, fy + 3, '#ece4d4');
+    fig.px(g.cx + g.rx + 2, fy + 4, '#ece4d4');
+    fig.rect(g.cx + g.eyeDx - 1, g.eyeY + 3, 3, 2, mix(skin[2], '#6a3a7a', 0.45));
+    for (const side of [-1, 1]) fig.rect(g.cx + side * g.eyeDx - 2, g.eyeY, 5, 1, skin[2]);
+    fig.line(g.cx - g.eyeDx - 3, g.eyeY + 4, g.cx - g.eyeDx - 1, g.eyeY + 6, '#a83a3a');
+  }
 
   // 2-7) 머리 장식 (뿔, 모자, 관)
   drawHeadgear(fig, g, spec, job, outfit, hair);

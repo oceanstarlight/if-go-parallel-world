@@ -25,101 +25,209 @@ export interface HumanoidOpts {
   crown?: boolean;
 }
 
-export function drawHumanoid(o: HumanoidOpts): Painter {
+export type Pose = 'idle' | 'breathe' | 'attack' | 'hurt';
+
+/** 한 캐릭터의 포즈 묶음 */
+export interface SpriteSet {
+  idle: Painter;
+  breathe: Painter;
+  attack: Painter;
+  hurt: Painter;
+}
+
+export function humanoidSet(o: HumanoidOpts): SpriteSet {
+  return {
+    idle: drawHumanoid(o, 'idle'),
+    breathe: drawHumanoid(o, 'breathe'),
+    attack: drawHumanoid(o, 'attack'),
+    hurt: drawHumanoid(o, 'hurt'),
+  };
+}
+
+/** 몬스터처럼 포즈가 하나뿐인 것: 숨쉬기만 1px 내린다 */
+function singleSet(p: Painter): SpriteSet {
+  const breathe = new Painter(p.w, p.h);
+  for (let y = 0; y < p.h; y++) {
+    for (let x = 0; x < p.w; x++) {
+      // 아래 1/4(다리)은 고정, 위쪽은 1px 아래로
+      const c = y > p.h * 0.75 ? p.get(x, y) : p.get(x, y - 1);
+      breathe.px(x, y, c);
+    }
+  }
+  return { idle: p, breathe, attack: p, hurt: p };
+}
+
+const POSE = {
+  idle: { lean: 0, drop: 0, hand: [9, 8], angle: -0.8, step: 0, squint: false },
+  breathe: { lean: 0, drop: 1, hand: [9, 9], angle: -0.75, step: 0, squint: false },
+  attack: { lean: 3, drop: 1, hand: [14, 7], angle: 0.15, step: 3, squint: false },
+  hurt: { lean: -3, drop: 1, hand: [6, 11], angle: 1.2, step: -1, squint: true },
+} as const;
+
+export function drawHumanoid(o: HumanoidOpts, pose: Pose = 'idle'): Painter {
   const k = o.size ?? 1;
-  const W = Math.round(40 * k), H = Math.round(50 * k);
+  const W = Math.round(44 * k), H = Math.round(50 * k);
   const p = new Painter(W, H);
   const S = (v: number) => Math.round(v * k);
-  const cx = S(16); // 몸 중심
+  const P = POSE[pose];
+  const bx = S(17); // 하체 중심
+  const cx = bx + S(P.lean); // 상체 중심
   const ground = H - 1;
   const hipY = ground - S(14);
-  const neckY = S(17);
-  const headY = S(10);
+  const neckY = S(17) + P.drop;
+  const headY = S(10) + P.drop + (pose === 'hurt' ? 1 : 0);
+  const legDark = darken(o.legs, 0.3);
+  const bodyLight = lighten(o.body, 0.18);
 
-  // 망토 (뒤)
-  if (o.cape) p.poly([[cx - S(3), neckY], [cx + S(3), neckY], [cx - S(2), hipY + S(10)], [cx - S(11), hipY + S(11)]], o.cape);
+  // 망토 (뒤, 바람에 날림)
+  if (o.cape) {
+    const sway = pose === 'attack' ? -3 : pose === 'hurt' ? 2 : 0;
+    p.poly([[cx - S(3), neckY], [cx + S(3), neckY], [cx - S(1), hipY + S(10)], [cx - S(12) + sway, hipY + S(12)], [cx - S(9) + sway, hipY]], o.cape);
+    p.line(cx - S(4), neckY + S(4), cx - S(9) + sway, hipY + S(10), darken(o.cape, 0.35));
+    p.line(cx - S(1), neckY + S(6), cx - S(4) + sway, hipY + S(11), darken(o.cape, 0.25));
+  }
 
-  // 다리
-  p.rect(cx - S(5), hipY, S(4), ground - hipY, darken(o.legs, 0.25));
-  p.rect(cx + S(1), hipY, S(4), ground - hipY, o.legs);
-  p.rect(cx - S(6), ground - S(3), S(6), S(3), '#2a1e18');
-  p.rect(cx + S(1), ground - S(3), S(7), S(3), '#3a2a20');
+  // 다리 (뒷다리는 어둡게, 공격 시 앞으로 내딛음)
+  const backX = bx - S(5) - S(Math.max(0, P.step)), frontX = bx + S(1) + S(P.step);
+  p.rect(backX, hipY, S(4), ground - hipY, legDark);
+  p.rect(frontX, hipY, S(4), ground - hipY, o.legs);
+  p.rect(frontX, hipY + S(5), S(1), S(2), lighten(o.legs, 0.2)); // 무릎 하이라이트
+  // 부츠
+  p.rect(backX - S(1), ground - S(4), S(6), S(4), '#2a1e18');
+  p.rect(frontX, ground - S(4), S(7), S(4), '#3e2c20');
+  p.rect(frontX + S(1), ground - S(4), S(4), S(1), '#6a4e3a');
 
   // 뒷팔
-  p.rect(cx - S(7), neckY + S(2), S(3), S(11), o.bodyShadow);
+  p.rect(cx - S(7), neckY + S(2), S(3), S(10), o.bodyShadow);
+  p.rect(cx - S(7), neckY + S(11), S(3), S(2), darken(o.skin[1], 0.25));
 
-  // 몸통
-  p.poly([[cx - S(6), neckY + S(1)], [cx + S(6), neckY + S(1)], [cx + S(5), hipY + S(1)], [cx - S(5), hipY + S(1)]], o.body);
+  // 몸통 + 명암
+  p.poly([[cx - S(6), neckY + S(1)], [cx + S(6), neckY + S(1)], [bx + S(5), hipY + S(1)], [bx - S(5), hipY + S(1)]], o.body);
   p.rect(cx - S(6), neckY + S(1), S(3), hipY - neckY, o.bodyShadow);
-  p.rect(cx - S(5), hipY - S(2), S(10), S(2), o.trim);
+  p.rect(cx + S(4), neckY + S(2), S(1), S(7), bodyLight);
+  // 옷깃 V
+  p.line(cx - S(2), neckY + S(1), cx, neckY + S(4), o.trim);
+  p.line(cx + S(2), neckY + S(1), cx, neckY + S(4), o.trim);
+  // 벨트와 버클
+  p.rect(bx - S(5), hipY - S(2), S(10), S(2), darken(o.trim, 0.35));
+  p.rect(bx, hipY - S(2), S(2), S(2), '#e0c060');
 
   // 머리
   if (o.hood) p.ellipse(cx, headY, S(7.5), S(7.5), o.hood);
   p.ellipse(cx + S(1), headY + S(1), S(5.5), S(6), o.skin[1]);
-  p.rect(cx + S(4), headY + S(2), S(2), S(3), o.skin[2]);
-  // 머리카락 (뒤통수/윗머리)
+  p.ellipseWhere(cx + S(1), headY + S(1), S(5.5), S(6), o.skin[2], (x, y) => x < cx - S(2) || y > headY + S(5));
+  p.px(cx + S(4), headY + S(4), o.skin[2]); // 턱선
+  p.px(cx - S(1), headY + S(2), o.skin[2]); // 귀
+  // 머리카락
   if (!o.hood && !o.helmet) {
     p.ellipseWhere(cx, headY - S(1), S(6.5), S(6), o.hair[1], (x, y) => y < headY - S(1) || x < cx - S(1));
-    p.rect(cx - S(2), headY - S(5), S(4), S(1), o.hair[0]);
+    p.rect(cx + S(2), headY - S(2), S(3), S(2), o.hair[1]); // 앞머리
+    p.px(cx + S(5), headY - S(1), o.hair[1]);
+    p.line(cx - S(3), headY - S(5), cx + S(2), headY - S(6), o.hair[0]); // 광택
+    p.ellipseWhere(cx, headY - S(1), S(6.5), S(6), o.hair[2], (x, y) => p.get(x, y) === o.hair[1] && x < cx - S(3));
   }
-  if (o.hood) p.ellipseWhere(cx, headY, S(7.5), S(7.5), o.hood, (x, y) => y < headY - S(2) || x < cx - S(2));
+  if (o.hood) {
+    p.ellipseWhere(cx, headY, S(7.5), S(7.5), o.hood, (x, y) => y < headY - S(2) || x < cx - S(2));
+    p.line(cx - S(5), headY - S(4), cx + S(3), headY - S(6), lighten(o.hood, 0.2));
+  }
   if (o.helmet) {
     p.ellipseWhere(cx, headY, S(7), S(7), o.helmet, (_x, y) => y < headY + S(1));
     p.rect(cx - S(6), headY + S(1), S(4), S(5), o.helmet);
     p.rect(cx - S(6), headY - S(1), S(13), S(1), lighten(o.helmet, 0.3));
+    p.line(cx - S(3), headY - S(5), cx + S(1), headY - S(6), lighten(o.helmet, 0.4));
   }
-  // 눈
-  p.px(cx + S(3), headY + S(1), o.eye);
-  p.px(cx + S(3), headY, OUTLINE);
+  // 눈 / 눈썹 / 입
+  if (P.squint) {
+    p.rect(cx + S(2), headY + S(1), S(2), 1, OUTLINE);
+  } else {
+    p.px(cx + S(3), headY, OUTLINE);
+    p.px(cx + S(3), headY + 1, o.eye);
+    p.rect(cx + S(2), headY - 2, S(3), 1, darken(o.hair[2], 0.2));
+  }
+  p.px(cx + S(4), headY + S(3), pose === 'attack' || pose === 'hurt' ? OUTLINE : darken(o.skin[2], 0.2));
   if (o.horns) {
     p.poly([[cx - S(3), headY - S(4)], [cx - S(6), headY - S(11)], [cx - S(1), headY - S(5)]], '#3a3044');
     p.poly([[cx + S(1), headY - S(5)], [cx + S(4), headY - S(12)], [cx + S(4), headY - S(4)]], '#4a3e56');
+    p.line(cx + S(2), headY - S(6), cx + S(3), headY - S(10), '#7a6a8a');
   }
   if (o.crown) {
     p.rect(cx - S(4), headY - S(7), S(9), S(2), '#e0b850');
     for (let i = 0; i < 3; i++) p.px(cx - S(3) + i * S(3), headY - S(8), '#e0b850');
+    p.px(cx, headY - S(7), '#ff3040');
   }
 
-  // 앞팔 + 무기 (앞으로 뻗음)
-  const handX = cx + S(9), handY = neckY + S(8);
-  p.line(cx + S(2), neckY + S(3), handX, handY, o.body);
-  p.line(cx + S(3), neckY + S(3), handX, handY + 1, o.body);
+  // 앞팔 + 무기
+  const sx = cx + S(2), sy = neckY + S(3);
+  const handX = cx + S(P.hand[0]), handY = neckY + S(P.hand[1]);
+  p.line(sx, sy, handX, handY, o.body);
+  p.line(sx + 1, sy, handX, handY + 1, o.body);
+  p.line(sx, sy + 1, (sx + handX) / 2, (sy + handY) / 2 + 1, o.bodyShadow);
   p.rect(handX - 1, handY - 1, S(3), S(3), o.skin[1]);
-  drawWeapon(p, o.weapon, handX, handY, k);
+  drawWeapon(p, o.weapon, handX, handY, k, P.angle);
 
   p.outline(OUTLINE);
   return p;
 }
 
-function drawWeapon(p: Painter, w: Weapon, x: number, y: number, k: number) {
-  const S = (v: number) => Math.round(v * k);
+/** angle: 손에서 뻗는 방향 (라디안, 0 = 정면, 음수 = 위) */
+function drawWeapon(p: Painter, w: Weapon, x: number, y: number, k: number, angle: number) {
+  const S = (v: number) => v * k;
+  const dx = Math.cos(angle), dy = Math.sin(angle);
+  const at = (d: number, side = 0): [number, number] => [x + dx * S(d) - dy * S(side), y + dy * S(d) + dx * S(side)];
+  const seg = (a: number, b: number, c: string, side = 0) => {
+    const [x0, y0] = at(a, side), [x1, y1] = at(b, side);
+    p.line(x0, y0, x1, y1, c);
+  };
   switch (w) {
     case 'sword':
     case 'holysword': {
       const blade = w === 'holysword' ? '#eaf6ff' : '#c8d0dc';
-      p.rect(x - S(1), y - S(1), S(1), S(4), '#e0b850');
-      p.line(x + S(1), y, x + S(13), y - S(12), blade);
-      p.line(x + S(1), y + 1, x + S(13), y - S(11), darken(blade, 0.2));
-      if (w === 'holysword') p.px(x + S(1), y, '#7ad0ff');
+      seg(-3, -1, '#5a3a22'); // 손잡이
+      p.px(...at(-4), '#e0b850'); // 폼멜
+      seg(1, 1, '#e0b850', -2);
+      seg(1, 1, '#e0b850', 2);
+      seg(0, 0, '#e0b850', 1);
+      seg(0, 0, '#e0b850', -1);
+      seg(2, 16, blade);
+      seg(2, 15, darken(blade, 0.25), 1);
+      seg(3, 12, '#ffffff', -1);
+      if (w === 'holysword') p.px(...at(0), '#7ad0ff');
       break;
     }
-    case 'staff':
-      p.line(x - S(2), y + S(10), x + S(3), y - S(14), '#6a4a2a');
-      p.ellipse(x + S(3), y - S(16), S(2.5), S(2.5), '#7ad0ff');
-      p.px(x + S(2), y - S(17), '#ffffff');
+    case 'staff': {
+      const sa = angle - 0.55;
+      const sdx = Math.cos(sa), sdy = Math.sin(sa);
+      p.line(x - sdx * S(10), y - sdy * S(10), x + sdx * S(14), y + sdy * S(14), '#6a4a2a');
+      p.line(x - sdx * S(9) + 1, y - sdy * S(9), x + sdx * S(13) + 1, y + sdy * S(13), '#8a6a3e');
+      const gx = x + sdx * S(16), gy = y + sdy * S(16);
+      p.ellipse(gx, gy, S(2.5), S(2.5), '#7ad0ff');
+      p.px(gx - 1, gy - 1, '#ffffff');
       break;
-    case 'axe':
-      p.line(x - S(1), y + S(6), x + S(4), y - S(10), '#5a3a22');
-      p.poly([[x + S(3), y - S(10)], [x + S(10), y - S(13)], [x + S(10), y - S(4)], [x + S(4), y - S(6)]], '#9aa0aa');
+    }
+    case 'axe': {
+      seg(-6, 12, '#5a3a22');
+      const [hx, hy] = at(12);
+      p.poly([[hx - dy * S(1), hy], [hx - dy * S(1) + dx * S(3) + dy * S(-7) * -1, hy + dy * S(3) - dx * S(7) * -1], [hx + dx * S(4) + dy * S(5), hy + dy * S(4) - dx * S(5)], [hx + dx * S(-2), hy + dy * S(-2)]], '#9aa0aa');
+      p.ellipse(hx + dy * S(3), hy - dx * S(3), S(3), S(3), '#9aa0aa');
+      p.px(hx + dy * S(4), hy - dx * S(4), '#d8dce4');
       break;
+    }
     case 'spear':
-    case 'pitchfork':
-      p.line(x - S(8), y + S(4), x + S(16), y - S(4), '#6a4a2a');
-      if (w === 'spear') p.poly([[x + S(15), y - S(6)], [x + S(21), y - S(6)], [x + S(16), y - S(2)]], '#c8d0dc');
-      else for (let i = -1; i <= 1; i++) p.line(x + S(16), y - S(4) + i * S(2), x + S(21), y - S(5) + i * S(2), '#9aa0aa');
+    case 'pitchfork': {
+      const fa = angle * 0.4 + 0.1;
+      const fdx = Math.cos(fa), fdy = Math.sin(fa);
+      p.line(x - fdx * S(10), y - fdy * S(10), x + fdx * S(18), y + fdy * S(18), '#6a4a2a');
+      const tx = x + fdx * S(18), ty = y + fdy * S(18);
+      if (w === 'spear') {
+        p.poly([[tx, ty - S(2)], [tx + fdx * S(6), ty + fdy * S(6)], [tx, ty + S(2)]], '#c8d0dc');
+        p.px(tx + 1, ty - 1, '#ffffff');
+      } else for (let i = -1; i <= 1; i++) p.line(tx, ty + i * S(2), tx + fdx * S(5), ty + fdy * S(5) + i * S(2), '#9aa0aa');
       break;
+    }
     case 'knife':
-      p.line(x + S(1), y, x + S(6), y - S(3), '#d0d8e0');
+      seg(-2, 0, '#3a2a20');
+      seg(1, 6, '#d0d8e0');
+      seg(2, 5, '#ffffff', -1);
       break;
     case 'fist':
       break;
@@ -128,7 +236,7 @@ function drawWeapon(p: Painter, w: Weapon, x: number, y: number, k: number) {
 
 // ───────────────────────── 플레이어 ─────────────────────────
 
-export function playerSprite(spec: PortraitSpec, magic: boolean): Painter {
+export function playerSprite(spec: PortraitSpec, magic: boolean): SpriteSet {
   const look = lookOf(spec);
   const o = look.outfit;
   const job = look.job;
@@ -138,7 +246,7 @@ export function playerSprite(spec: PortraitSpec, magic: boolean): Painter {
       : job === 'farmer' ? 'pitchfork'
         : job === 'adventurer' ? 'sword'
           : spec.stage === 'child' ? 'fist' : 'sword';
-  return drawHumanoid({
+  return humanoidSet({
     skin: look.skin,
     hair: look.hair,
     eye: look.eye,
@@ -164,32 +272,32 @@ export type EnemyKind =
 const SKIN_MID: Ramp = ['#f0c49c', '#d89a72', '#a86c54'];
 const HAIR_DARK: Ramp = ['#56506a', '#302a3e', '#1a1624'];
 
-export function enemySprite(kind: EnemyKind): Painter {
+export function enemySprite(kind: EnemyKind): SpriteSet {
   switch (kind) {
     case 'bandit':
-      return drawHumanoid({ skin: SKIN_MID, hair: HAIR_DARK, eye: '#2a1a1a', body: '#5a4430', bodyShadow: '#3a2a1e', trim: '#2a1e14', legs: '#3a3028', weapon: 'axe', hood: '#4a3a2a' });
+      return humanoidSet({ skin: SKIN_MID, hair: HAIR_DARK, eye: '#2a1a1a', body: '#5a4430', bodyShadow: '#3a2a1e', trim: '#2a1e14', legs: '#3a3028', weapon: 'axe', hood: '#4a3a2a' });
     case 'soldier':
-      return drawHumanoid({ skin: SKIN_MID, hair: HAIR_DARK, eye: '#2a1a1a', body: '#6a2a2a', bodyShadow: '#4a1a1a', trim: '#9aa0aa', legs: '#3a3a44', weapon: 'spear', helmet: '#8a929e' });
+      return humanoidSet({ skin: SKIN_MID, hair: HAIR_DARK, eye: '#2a1a1a', body: '#6a2a2a', bodyShadow: '#4a1a1a', trim: '#9aa0aa', legs: '#3a3a44', weapon: 'spear', helmet: '#8a929e' });
     case 'rival':
-      return drawHumanoid({ skin: SKIN_MID, hair: ['#e0e0f0', '#9a9ab8', '#5e5e7a'], eye: '#6a3aa0', body: '#2a2a3e', bodyShadow: '#1a1a28', trim: '#a8303a', legs: '#1e1e2a', weapon: 'sword', cape: '#3a1a2a' });
+      return humanoidSet({ skin: SKIN_MID, hair: ['#e0e0f0', '#9a9ab8', '#5e5e7a'], eye: '#6a3aa0', body: '#2a2a3e', bodyShadow: '#1a1a28', trim: '#a8303a', legs: '#1e1e2a', weapon: 'sword', cape: '#3a1a2a' });
     case 'bully':
-      return drawHumanoid({ skin: SKIN_MID, hair: ['#e0b860', '#b08a3a', '#7a5a22'], eye: '#3a3a6a', body: '#3a5a9a', bodyShadow: '#2a3e6a', trim: '#e0c060', legs: '#4a3a2a', weapon: 'fist', size: 0.8 });
+      return humanoidSet({ skin: SKIN_MID, hair: ['#e0b860', '#b08a3a', '#7a5a22'], eye: '#3a3a6a', body: '#3a5a9a', bodyShadow: '#2a3e6a', trim: '#e0c060', legs: '#4a3a2a', weapon: 'fist', size: 0.8 });
     case 'stalker':
-      return drawHumanoid({ skin: ['#f4dcd0', '#dcbcb0', '#a88a84'], hair: ['#4a3a5a', '#2a1e36', '#140e1e'], eye: '#c8304a', body: '#2a1e2e', bodyShadow: '#18101c', trim: '#6a2a3a', legs: '#1e1622', weapon: 'knife' });
+      return humanoidSet({ skin: ['#f4dcd0', '#dcbcb0', '#a88a84'], hair: ['#4a3a5a', '#2a1e36', '#140e1e'], eye: '#c8304a', body: '#2a1e2e', bodyShadow: '#18101c', trim: '#6a2a3a', legs: '#1e1622', weapon: 'knife' });
     case 'hero':
-      return drawHumanoid({ skin: SKIN_MID, hair: ['#f4d878', '#c8a040', '#8a6626'], eye: '#3e8ae0', body: '#b8c4d4', bodyShadow: '#76829a', trim: '#e0b850', legs: '#4a5a7a', weapon: 'holysword', cape: '#2e5aa8' });
+      return humanoidSet({ skin: SKIN_MID, hair: ['#f4d878', '#c8a040', '#8a6626'], eye: '#3e8ae0', body: '#b8c4d4', bodyShadow: '#76829a', trim: '#e0b850', legs: '#4a5a7a', weapon: 'holysword', cape: '#2e5aa8' });
     case 'demon_lord':
-      return drawHumanoid({ skin: ['#e0d4e4', '#b8a6c4', '#7e6a90'], hair: HAIR_DARK, eye: '#ff3040', body: '#1e1a26', bodyShadow: '#100c16', trim: '#b8283a', legs: '#140e1a', weapon: 'sword', horns: true, crown: true, cape: '#6a0c18', size: 1.3 });
+      return humanoidSet({ skin: ['#e0d4e4', '#b8a6c4', '#7e6a90'], hair: HAIR_DARK, eye: '#ff3040', body: '#1e1a26', bodyShadow: '#100c16', trim: '#b8283a', legs: '#140e1a', weapon: 'sword', horns: true, crown: true, cape: '#6a0c18', size: 1.3 });
     case 'traitor':
-      return drawHumanoid({ skin: SKIN_MID, hair: ['#b07c44', '#7a4e2a', '#4a2e1a'], eye: '#3a3a2a', body: '#4e5a3a', bodyShadow: '#323a24', trim: '#7a5232', legs: '#3a3428', weapon: 'knife', hood: '#3e4a2e' });
+      return humanoidSet({ skin: SKIN_MID, hair: ['#b07c44', '#7a4e2a', '#4a2e1a'], eye: '#3a3a2a', body: '#4e5a3a', bodyShadow: '#323a24', trim: '#7a5232', legs: '#3a3428', weapon: 'knife', hood: '#3e4a2e' });
     case 'wolf':
-      return drawWolf();
+      return singleSet(drawWolf());
     case 'shadow':
-      return drawShadow();
+      return singleSet(drawShadow());
     case 'dragon':
-      return drawDragon('#5a1a1e', '#8a2a24', '#e0602a', 1);
+      return singleSet(drawDragon('#5a1a1e', '#8a2a24', '#e0602a', 1));
     case 'wyvern':
-      return drawDragon('#2a4a2e', '#4a6a3a', '#c8d040', 0.6);
+      return singleSet(drawDragon('#2a4a2e', '#4a6a3a', '#c8d040', 0.6));
   }
 }
 

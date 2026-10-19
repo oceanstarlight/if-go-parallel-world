@@ -84,3 +84,9 @@ export function graveWeather(causeId: string): 'embers' | 'snow' | 'ash' | 'rain
       return 'fireflies';
   }
 }
+
+/** 데미지 숫자 크기를 정하는 적 최대 HP */
+export const ENEMY_HP: Record<EnemyKind, number> = {
+  bully: 30, bandit: 120, soldier: 150, rival: 160, stalker: 140, traitor: 130, wolf: 110,
+  shadow: 260, wyvern: 380, hero: 720, demon_lord: 880, dragon: 999,
+};

@@ -12,7 +12,7 @@ import type { StoneLine } from '../engine/score';
 import { buy, isUnlocked, loadMeta, loadRun, saveRun, settleLife } from '../meta';
 import { GfxStage } from '../gfx/stage';
 import { specFromLife } from '../gfx/portrait';
-import { battleFor, graveWeather, sceneFor } from '../gfx/mapping';
+import { ENEMY_HP, battleFor, graveWeather, sceneFor } from '../gfx/mapping';
 import { enemySprite, playerSprite } from '../gfx/sprites';
 import { hashStr } from '../gfx/painter';
 
@@ -159,6 +159,8 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
             player: playerSprite(specFromLife(s), battle.magic),
             enemy: enemySprite(battle.enemy),
             magic: battle.magic,
+            glow: battle.magic ? 0x7ad0ff : s.jobId === 'hero' ? 0xfff0a0 : undefined,
+            enemyHp: ENEMY_HP[battle.enemy],
             win: res.passed,
             died: !!s.death,
             groundY: app.gfx.groundY,
