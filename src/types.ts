@@ -64,6 +64,8 @@ export interface LifeState {
   mood?: MoodKey;
   /** 의지력 0~100. 숙명을 거스르는 선택에 쓴다 */
   will?: number;
+  /** 방침 고정: 켜면 매년 방침을 묻지 않고 같은 방침으로 넘어간다 */
+  focusLocked?: boolean;
   /** 직전 해의 방침 (같은 방침을 반복하면 스트레스가 더 쌓인다) */
   prevFocus?: Focus;
   /** 전설이 된 전생들 (생성 시 메타에서 복사) */

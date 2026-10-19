@@ -277,6 +277,7 @@ h4 { font-size: 13px; color: var(--muted); margin: 20px 0 6px; letter-spacing: 0
 .lives td { padding: 8px; border-bottom: 1px solid var(--line); }
 
 .toast {
+  pointer-events: none;
   position: fixed;
   bottom: 24px;
   left: 50%;
@@ -476,6 +477,33 @@ h4 { font-size: 13px; color: var(--muted); margin: 20px 0 6px; letter-spacing: 0
 .oracle .link { align-self: center; }
 .grave-deed { margin: 16px 0 0; padding: 10px; border-radius: 10px; background: #fff8ea; color: #b07400; }
 .life-list li .deed { grid-column: 1 / 3; grid-row: 3; color: #b07400; }
+
+/* ───── 2지선다: 왼쪽(파랑) · 오른쪽(주황) 좌우 배치 ───── */
+.choices.duo { flex-direction: row; align-items: stretch; }
+.choices.duo .choice { flex: 1; min-width: 0; grid-template-columns: 1fr; text-align: center; justify-items: center; gap: 4px; padding: 14px 10px; }
+.choices.duo .choice em { grid-column: 1; }
+.choice.left { border: 2px solid #8aa4ff; background: linear-gradient(90deg, #e8eeff, #f6f8ff); }
+.choice.left kbd { background: #5a7aff; color: #fff; border-color: #5a7aff; }
+.choice.right { border: 2px solid #ffc66a; background: linear-gradient(270deg, #fff1d8, #fffaf2); }
+.choice.right kbd { background: var(--accent); color: #fff; border-color: var(--accent); }
+.choice.left:hover:not(:disabled) { border-color: #5a7aff; background: #e2e9ff; }
+.choice.right:hover:not(:disabled) { border-color: var(--accent); background: #ffeccc; }
+/* 스와이프 카드 양옆 색 띠: 왼쪽으로 밀면 파랑, 오른쪽으로 밀면 주황 */
+.event-card.swipeable { box-shadow: inset 5px 0 0 #8aa4ff, inset -5px 0 0 #ffc66a; border-radius: 12px; padding-left: 14px; padding-right: 14px; }
+.swipe-guide b { font-weight: 700; }
+.swipe-guide .l { color: #5a7aff; }
+.swipe-guide .r { color: var(--accent); }
+
+/* ───── 방침: 매년 고르기 + 고정 ───── */
+.focus-hint { margin: -2px 0 6px; }
+.focus-card.nudge .focus-grid { animation: nudge 0.5s ease-in-out 2; }
+.focus-card.nudge .focus-hint { color: var(--gold); font-weight: 700; }
+@keyframes nudge { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.focus.last { border-style: dashed; border-color: var(--gold-dim); }
+.focus.last strong::after { content: ' · 작년'; font-size: 11px; font-weight: 400; color: var(--muted); }
+.focus-lock { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; font-size: 14px; cursor: pointer; user-select: none; }
+.advance kbd { color: #fff; background: rgba(255, 255, 255, 0.18); border-color: rgba(255, 255, 255, 0.6); }
+.focus-lock input { width: 18px; height: 18px; accent-color: #5a7aff; margin: 0; }
 
 /* 모바일 전용 요소는 데스크톱에서 숨긴다 */
 .underbar, .m-panel, .sheet-handle { display: none; }
