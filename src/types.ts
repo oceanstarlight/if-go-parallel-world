@@ -9,6 +9,8 @@ export type RelKey = 'friend' | 'rival' | 'mentor' | 'spouse';
 export interface Relation {
   name: string;
   affection: number;
+  /** 'm' | 'f' (예전 저장 데이터에는 없을 수 있다) */
+  gender?: 'm' | 'f';
 }
 
 export type Tone = 'normal' | 'good' | 'bad' | 'milestone' | 'death';
@@ -27,6 +29,8 @@ export interface Death {
 /** 한 번의 삶. 순수 JSON 이어야 한다 (localStorage 저장). */
 export interface LifeState {
   name: string;
+  /** 성별 'm' | 'f' (예전 저장 데이터에는 없을 수 있다 → 이름으로 짐작) */
+  gender?: 'm' | 'f';
   age: number;
   houseId: string;
   cheatId: string;

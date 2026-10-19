@@ -1,3 +1,4 @@
+import titleUrl from '../assets/title.png';
 import { Application, Container, Graphics, Sprite, Texture, TextureStyle, TilingSprite } from 'pixi.js';
 import { Painter, bayer, hashStr } from './painter';
 import { drawPortrait, specKey, type PortraitSpec } from './portrait';
@@ -197,6 +198,7 @@ export class GfxStage {
     const old = this.bgSprite.texture;
     this.bgSprite.texture = texOf(scene.p);
     if (!first) this.ditherOut(old);
+    if (kind === 'title') this.loadTitleArt(key);
     this.applyGodray(kind);
     for (const c of this.fxLayer.removeChildren()) c.destroy({ children: true });
     for (const t of this.sceneTex) t.destroy(true);
@@ -206,6 +208,28 @@ export class GfxStage {
     const fx = [...scene.fx];
     if (extraWeather) fx.push({ kind: 'particles', type: extraWeather, count: extraWeather === 'rain' ? 70 : 40, area: [0, -10, SCENE_W, SCENE_H + 10] });
     for (const f of fx) this.buildFx(f, hashStr(key));
+  }
+
+  /** 타이틀은 그려 둔 원화(240×135)로 바꿔 끼운다. 불러오기 전/실패 시엔 코드로 그린 장면이 남는다 */
+  private titleArt: Texture | null = null;
+  private loadTitleArt(key: string) {
+    const apply = () => {
+      if (this.sceneKey !== key || !this.titleArt) return;
+      const old = this.bgSprite.texture;
+      this.bgSprite.texture = this.titleArt;
+      if (old !== this.titleArt) old.destroy(true);
+    };
+    if (this.titleArt) return apply();
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = SCENE_W;
+      c.height = SCENE_H;
+      c.getContext('2d')!.drawImage(img, 0, 0, SCENE_W, SCENE_H);
+      this.titleArt = Texture.from(c);
+      apply();
+    };
+    img.src = titleUrl;
   }
 
   groundY = 120;
@@ -247,7 +271,7 @@ export class GfxStage {
       onComplete: () => {
         sprite.destroy();
         mask.destroy();
-        old.destroy(true);
+        if (old !== this.titleArt) old.destroy(true);
         this.transition = null;
       },
     });

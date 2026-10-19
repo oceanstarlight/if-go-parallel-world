@@ -1,5 +1,7 @@
 import type { Focus, LifeState } from '../types';
-import { NPC_NAMES, PLAYER_NAMES } from '../data/names';
+import { FEMALE_NAMES, PLAYER_NAMES, namesOf, type Gender } from '../data/names';
+
+const FEMALE = new Set(FEMALE_NAMES);
 import { STRESS_HIGH, advanceYear, choiceLocked, choose, createLife, currentEvent, rollFate, visibleChoices, type Rng } from './life';
 import { beginDive, canEnterDungeon, descend, endDiveOnDeath, preview, retreat, startFloors } from './dungeon';
 import { buy, equip, maxHp, sellAllLoot } from './economy';
@@ -22,11 +24,14 @@ const FOCI: Focus[] = ['train', 'study', 'social', 'explore'];
  * 한 생을 끝까지 자동으로 살아본다. 선택은 무작위.
  * houseId/cheatId 를 주지 않으면 운명 모드처럼 뽑는다.
  */
-export function simulateLife(seed: number, opt: { name?: string; houseId?: string; cheatId?: string } = {}): LifeState {
+export function simulateLife(seed: number, opt: { name?: string; houseId?: string; cheatId?: string; gender?: Gender } = {}): LifeState {
   const rng = seededRng(seed);
   const fate = rollFate(rng);
+  const gender: Gender = opt.gender ?? (rng() < 0.5 ? 'm' : 'f');
+  const pool = namesOf(gender);
   const s = createLife({
-    name: opt.name ?? PLAYER_NAMES[Math.floor(rng() * PLAYER_NAMES.length)],
+    gender,
+    name: opt.name ?? pool[Math.floor(rng() * pool.length)],
     houseId: opt.houseId ?? fate.houseId,
     cheatId: opt.cheatId ?? fate.cheatId,
     upgrades: {},
@@ -60,11 +65,12 @@ export function autoStep(s: LifeState, rng: Rng) {
 /** 같은 해에 함께 환생한 네 사람 */
 export function contemporaries(seed: number, exclude: string): LifeState[] {
   const rng = seededRng(seed ^ 0x9e3779b9);
-  const names = [...PLAYER_NAMES, ...NPC_NAMES].filter((n) => n !== exclude);
+  const names = PLAYER_NAMES.filter((n) => n !== exclude);
   const out: LifeState[] = [];
   for (let i = 0; i < 4; i++) {
     const name = names.splice(Math.floor(rng() * names.length), 1)[0];
-    out.push(simulateLife(Math.floor(rng() * 2 ** 31), { name }));
+    // 이름이 성별을 정한다 (이름 목록이 성별로 나뉘어 있다)
+    out.push(simulateLife(Math.floor(rng() * 2 ** 31), { name, gender: FEMALE.has(name) ? 'f' : 'm' }));
   }
   return out;
 }

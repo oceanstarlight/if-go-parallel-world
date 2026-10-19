@@ -3,7 +3,7 @@ import { HOUSES, houseById } from '../data/houses';
 import { CHEATS, cheatById } from '../data/cheats';
 import { jobById, jobTitle } from '../data/jobs';
 import { DEATHS, deathById } from '../data/deaths';
-import { PLAYER_NAMES, pick } from '../data/names';
+import { type Gender, genderOfName, namesOf, pick } from '../data/names';
 import { SHOP, itemCost } from '../data/shop';
 import { goalById } from '../data/goals';
 import { FOCUS_DESC, FOCUS_NAMES, MOOD_HINT, MOOD_NAMES, REL_NAMES, STAT_KEYS, STAT_NAMES, affectionWord } from '../data/stats';
@@ -56,7 +56,7 @@ interface App {
   screen: Screen;
   meta: MetaSave;
   life: LifeState | null;
-  setup: { name: string; cheatId: string; fated: boolean };
+  setup: { name: string; gender: Gender; cheatId: string; fated: boolean };
   settlement: Settlement | null;
   notice: string;
   gfx: GfxStage | null;
@@ -82,7 +82,10 @@ export async function mount(root: HTMLElement) {
     screen: 'title',
     meta: loadMeta(),
     life: loadRun(),
-    setup: { name: pick(PLAYER_NAMES, Math.random), cheatId: 'growth', fated: true },
+    setup: (() => {
+      const gender: Gender = Math.random() < 0.5 ? 'm' : 'f';
+      return { name: pick(namesOf(gender), Math.random), gender, cheatId: 'growth', fated: true };
+    })(),
     settlement: null,
     notice: '',
     gfx: await GfxStage.create(),
@@ -188,8 +191,16 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
     case 'cheat':
       if (arg && isUnlocked(app.meta, arg)) app.setup.cheatId = arg;
       break;
+    case 'gender': {
+      const g = arg === 'f' ? 'f' : 'm';
+      // 기본 이름 목록에서 고른 이름이면 성별에 맞는 이름으로 바꿔 준다 (직접 입력한 이름은 그대로)
+      const listed = genderOfName(app.setup.name) !== g && namesOf(app.setup.gender).includes(app.setup.name);
+      app.setup.gender = g;
+      if (listed) app.setup.name = pick(namesOf(g), Math.random);
+      break;
+    }
     case 'reroll-name':
-      app.setup.name = pick(PLAYER_NAMES, Math.random);
+      app.setup.name = pick(namesOf(app.setup.gender), Math.random);
       break;
     case 'begin':
       // 태어나기 전에 여신의 문답 3개
@@ -395,7 +406,7 @@ const needsFocus = (s: LifeState) => s.age >= 2 && !s.focusLocked;
 
 /** 문답을 마치고 태어난다 */
 function birth(app: App) {
-  const name = app.setup.name.trim().slice(0, 12) || pick(PLAYER_NAMES, Math.random);
+  const name = app.setup.name.trim().slice(0, 12) || pick(namesOf(app.setup.gender), Math.random);
   const fated = app.setup.fated;
   // 출신은 해금한 것 중 운명이 정하고, 권능은 직접 고르거나 운명에 맡긴다
   const origin = {
@@ -405,6 +416,7 @@ function birth(app: App) {
   app.life = createLife({
     ...origin,
     name,
+    gender: app.setup.gender,
     upgrades: app.meta.upgrades,
     npcPast: app.meta.npcMet ?? {},
     lifeNo: app.meta.totalLives + 1,
@@ -560,6 +572,12 @@ function viewSetup(app: App): string {
       <label for="name-input">이름</label>
       <input id="name-input" maxlength="12" value="${esc(setup.name)}" autocomplete="off" />
       <button class="btn small" data-act="reroll-name">무작위</button>
+    </div>
+    <div class="gender-row">
+      <span>성별</span>
+      <button class="chip ${setup.gender === 'f' ? 'on' : ''}" data-act="gender" data-arg="f">여성</button>
+      <button class="chip ${setup.gender === 'm' ? 'on' : ''}" data-act="gender" data-arg="m">남성</button>
+      <span class="muted small">연인은 이성으로 태어난다</span>
     </div>
     <h3>태어날 곳 <span class="muted small">— 운명이 정한다</span></h3>
     <div class="fate-card">
@@ -719,10 +737,10 @@ function viewLife(app: App): string {
     const duo = choices.length === 2;
     const swipe = duo && !choices.some((c) => choiceLocked(s, c));
     panel = `
-      <div class="event-card ${swipe ? 'swipeable' : ''}" ${swipe ? `data-swipe="choose" data-left="${esc(choices[0].label)}" data-right="${esc(choices[1].label)}"` : ''}>
+      <div class="event-card ${swipe ? 'swipeable' : ''}" ${swipe ? `data-swipe="choose" data-left="${esc(fill(choices[0].label, s))}" data-right="${esc(fill(choices[1].label, s))}"` : ''}>
         ${swipe ? '<div class="swipe-label"></div>' : ''}
         <p class="eyebrow">${s.age}세의 사건</p>
-        <h3>${esc(ev.title)}</h3>
+        <h3>${esc(fill(ev.title, s))}</h3>
         <p class="event-text">${esc(fill(ev.text, s))}</p>
         ${swipe ? '<p class="swipe-guide"><b class="l">← 왼쪽</b> · 카드를 밀어서 선택 · <b class="r">오른쪽 →</b></p>' : ''}
         <div class="choices ${duo ? 'duo' : ''}">
@@ -736,7 +754,7 @@ function viewLife(app: App): string {
             return `
             <button class="choice ${duo ? (i === 0 ? 'left' : 'right') : ''} ${c.will ? 'defy' : ''}" data-act="choose" data-arg="${i}" ${locked ? 'disabled' : ''}>
               <kbd>${duo ? (i === 0 ? '←' : '→') : i + 1}</kbd>
-              <span>${esc(c.label)}</span>
+              <span>${esc(fill(c.label, s))}</span>
               ${odds ? `<em class="odds-line">${icon('sword')}전투력 <b>${odds.cp}</b> vs 적 <b>${odds.ep}</b> · <span class="winp ${odds.p >= 60 ? 'good' : odds.p >= 35 ? 'mid' : 'bad'}">승률 ${odds.p}%</span></em>` : ''}
               ${notes ? `<em>${notes}</em>` : ''}
             </button>`;

@@ -124,7 +124,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   {
     id: 'sword_new_bearer', title: '새 용사', once: true, weight: 6,
     cond: { flags: ['sword_given'] },
-    text: '성검을 손에 넣은 옆집 소년이 찾아왔다. "아저씨… 아니, 선배! 검 쓰는 법 좀 알려주세요!"',
+    text: '성검을 손에 넣은 옆집 소년이 찾아왔다. "{elder}… 아니, 선배! 검 쓰는 법 좀 알려주세요!"',
     choices: [
       { label: '가르친다', success: { text: '매일 아침 소년과 검을 맞댔다. 소년의 눈이 반짝인다.', effect: { flags: ['mentor_of_hero'], stats: { fame: 4, vit: 2 } }, tone: 'good' } },
       { label: '문을 닫는다', success: { text: '"내 일 아니야." 소년은 혼자 떠났다.', effect: { mood: 'gloom' } } },
@@ -153,7 +153,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   {
     id: 'arranged_child', title: '작은 기적', once: true, weight: 5,
     cond: { flags: ['arranged_love'], hasRel: ['spouse'], maxAge: 45 },
-    text: '정략으로 시작한 결혼에, 어느새 진짜 사랑이 피었다. 그리고 오늘, {spouse}가 수줍게 배를 쓰다듬는다.',
+    text: '정략으로 시작한 결혼에, 어느새 진짜 사랑이 피었다. 그리고 오늘, 둘에게 반가운 소식이 찾아왔다.',
     auto: { success: { text: '아기가 태어났다! 대공가 전체가 축제 분위기다.', effect: { flags: ['has_child'], rel: { spouse: 15 }, mood: 'joy', stats: { fame: 3 } }, tone: 'milestone' } },
   },
   {
@@ -286,20 +286,20 @@ export const CHAIN_EVENTS: GameEvent[] = [
     ],
   },
   {
-    id: 'royal_princess', title: '공주의 부탁', once: true, weight: 5,
+    id: 'royal_princess', title: '{royal}의 부탁', once: true, weight: 5,
     cond: { flags: ['royal_heist'], notRel: ['spouse'] },
-    text: '한밤중 은신처에 공주가 나타났다. "당신이 그 괴도죠? 나도 이 답답한 성에서 훔쳐가 줘요!"',
+    text: '한밤중 은신처에 {royal:이} 나타났다. "당신이 그 괴도죠? 나도 이 답답한 성에서 훔쳐가 줘요!"',
     choices: [
-      { label: '공주를 훔쳐 간다', success: { text: '왕국 최고의 보물을 훔쳤다. 이번엔 마음까지.', effect: { addRel: 'spouse', stats: { fame: 10 }, flags: ['stole_princess'] }, tone: 'milestone' } },
-      { label: '정중히 돌려보낸다', success: { text: '"언젠가 당신 스스로 걸어 나오세요." 공주가 눈을 반짝였다.', effect: { karma: 5 } } },
+      { label: '{royal:을} 훔쳐 간다', success: { text: '왕국 최고의 보물을 훔쳤다. 이번엔 마음까지.', effect: { addRel: 'spouse', stats: { fame: 10 }, flags: ['stole_princess'] }, tone: 'milestone' } },
+      { label: '정중히 돌려보낸다', success: { text: '"언젠가 당신 스스로 걸어 나오세요." {royal:이} 눈을 반짝였다.', effect: { karma: 5 } } },
     ],
   },
   {
     id: 'princess_ransom', title: '국왕의 편지', once: true, weight: 5,
     cond: { flags: ['stole_princess'], hasRel: ['spouse'] },
-    text: '국왕에게서 편지가 왔다. "딸이 행복하다면… 돌아오라. 사위로 맞겠다."',
+    text: '국왕에게서 편지가 왔다. "{royalChild:이} 행복하다면… 돌아오라. {inlaw:으로} 맞겠다."',
     choices: [
-      { label: '왕궁으로 돌아간다', success: { text: '괴도가 왕실의 사위가 되었다! 이세계 역사상 가장 이상한 결혼식이었다.', effect: { flags: ['noble_title'], gold: 10000, stats: { fame: 15 } }, tone: 'milestone' } },
+      { label: '왕궁으로 돌아간다', success: { text: '괴도가 왕실의 {inlaw:이} 되었다! 이세계 역사상 가장 이상한 결혼식이었다.', effect: { flags: ['noble_title'], gold: 10000, stats: { fame: 15 } }, tone: 'milestone' } },
       { label: '자유롭게 산다', success: { text: '"우린 이대로가 좋아요." {spouse}가 편지를 접어 비행기를 날렸다.', effect: { mood: 'joy', will: 15 } } },
     ],
   },
