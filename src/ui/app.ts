@@ -1,3 +1,5 @@
+import { Music } from '../audio/music';
+import { moodFor } from '../audio/compose';
 import type { Focus, LifeState, MetaSave, RelKey } from '../types';
 import { HOUSES, houseById } from '../data/houses';
 import { CHEATS, cheatById } from '../data/cheats';
@@ -71,6 +73,7 @@ interface App {
   focusNudge: boolean;
   townTab: 'shop' | 'bag';
   townCat: MarketCat;
+  music: Music;
 }
 
 const esc = (v: string | number) =>
@@ -94,6 +97,7 @@ export async function mount(root: HTMLElement) {
     focusNudge: false,
     townTab: 'shop',
     townCat: 'weapon',
+    music: new Music(),
   };
   if (app.life) repairItems(app.life);
   // 사망 상태로 저장된 삶이 있으면 (정산 직전 새로고침) 바로 정산
@@ -102,6 +106,7 @@ export async function mount(root: HTMLElement) {
   const render = () => {
     root.innerHTML = view(app);
     syncGfx(app, root); // 캔버스가 붙어 높이가 정해진 뒤에 스크롤
+    app.music.setMood(moodFor(app.screen));
     const log = root.querySelector('.chronicle');
     if (log) log.scrollTop = log.scrollHeight;
     bindSwipe(root, (act, i) => run(act, String(i)));
@@ -165,6 +170,9 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
   app.notice = '';
   app.focusNudge = false;
   switch (action) {
+    case 'music':
+      app.music.toggle();
+      break;
     case 'go':
       if (arg === 'life' && !app.life) break;
       app.screen = arg as Screen;
@@ -436,7 +444,10 @@ function view(app: App): string {
   return `
     <header class="topbar">
       <button class="brand" data-act="go" data-arg="title">환생록</button>
-      <div class="stones" title="환생석">${icon('diamond-gem')} ${app.meta.soulStones}</div>
+      <div class="top-right">
+        <button class="music-btn ${app.music.on ? 'on' : ''}" data-act="music" title="배경 음악 ${app.music.on ? '끄기' : '켜기'}" aria-label="배경 음악">${icon(app.music.on ? 'volume-2' : 'volume-x')}</button>
+        <div class="stones" title="환생석">${icon('diamond-gem')} ${app.meta.soulStones}</div>
+      </div>
     </header>
     <main class="screen view-${app.screen}">${body}</main>
     ${underbar(app)}
