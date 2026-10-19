@@ -54,6 +54,8 @@ interface App {
   /** 사용자가 접어둔 사건 (같은 사건이면 다시 자동으로 올리지 않는다) */
   dismissedEvent: string | null;
   oracle: Oracle | null;
+  /** 방침을 고르지 않고 한 해를 넘기려 했다 (방침 카드를 강조) */
+  focusNudge: boolean;
 }
 
 const esc = (v: string | number) =>
@@ -74,6 +76,7 @@ export async function mount(root: HTMLElement) {
     tab: 'none',
     dismissedEvent: null,
     oracle: null,
+    focusNudge: false,
   };
   // 사망 상태로 저장된 삶이 있으면 (정산 직전 새로고침) 바로 정산
   if (app.life?.death) settle(app);
@@ -116,11 +119,16 @@ export async function mount(root: HTMLElement) {
       return;
     }
     if (app.screen !== 'life' || !app.life) return;
+    const ev2 = currentEvent(app.life);
     if (ev.code === 'Space') {
       ev.preventDefault();
       run('advance');
-    } else if (/^Digit[1-9]$/.test(ev.code) && currentEvent(app.life)) {
-      run('choose', String(Number(ev.code.slice(5)) - 1));
+    } else if (/^Digit[1-9]$/.test(ev.code)) {
+      const i = Number(ev.code.slice(5)) - 1;
+      if (ev2) run('choose', String(i));
+      else if (FOCI[i]) run('focus', FOCI[i]);
+    } else if (ev2 && (ev.code === 'ArrowLeft' || ev.code === 'ArrowRight') && visibleChoices(app.life, ev2).length === 2) {
+      run('choose', ev.code === 'ArrowLeft' ? '0' : '1');
     }
   });
   render();
@@ -137,6 +145,7 @@ function settle(app: App) {
 /** 비동기 연출(전투·공유)이 있으면 끝날 때 resolve 되는 Promise 를 돌려준다 */
 function act(app: App, action: string, arg?: string): Promise<void> | void {
   app.notice = '';
+  app.focusNudge = false;
   switch (action) {
     case 'go':
       app.screen = arg as Screen;
@@ -187,15 +196,34 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
       if (o.answers.length >= o.ids.length) birth(app);
       break;
     }
-    case 'focus':
-      if (app.life) app.life.focus = arg as Focus;
-      saveRun(app.life);
+    case 'focus': {
+      // 방침을 고르면 그 방침으로 바로 한 해를 보낸다 (고정 중이면 바꾸기만 한다)
+      const s = app.life;
+      if (!s) break;
+      s.focus = arg as Focus;
+      if (!s.focusLocked && canAdvance(s)) advanceYear(s);
+      app.tab = 'none';
+      afterStep(app);
       break;
-    case 'advance':
-      if (app.life && canAdvance(app.life)) advanceYear(app.life);
+    }
+    case 'lock':
+      if (app.life) app.life.focusLocked = !app.life.focusLocked;
+      afterStep(app);
+      break;
+    case 'advance': {
+      const s = app.life;
+      if (!s || !canAdvance(s)) break;
+      if (needsFocus(s)) {
+        // 매년 방침을 직접 고른다: 방침 시트를 띄운다
+        app.tab = 'action';
+        app.focusNudge = true;
+        break;
+      }
+      advanceYear(s);
       if (app.tab === 'action') app.tab = 'none';
       afterStep(app);
       break;
+    }
     case 'choose': {
       const s = app.life;
       const ev = s && currentEvent(s);
@@ -258,6 +286,9 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
   }
 }
 
+/** 한 해를 보내기 전에 방침을 물어야 하는가 (세 살부터, 고정하지 않았을 때) */
+const needsFocus = (s: LifeState) => s.age >= 2 && !s.focusLocked;
+
 /** 문답을 마치고 태어난다 */
 function birth(app: App) {
   const name = app.setup.name.trim().slice(0, 12) || pick(PLAYER_NAMES, Math.random);
@@ -313,6 +344,7 @@ function underbar(app: App): string {
     let center: string;
     if (s.death) center = `<button class="ub-main danger" data-act="see-grave"><span>묘비로</span></button>`;
     else if (ev) center = `<button class="ub-main pulse" data-act="tab" data-arg="action"><span>선택!</span></button>`;
+    else if (needsFocus(s)) center = `<button class="ub-main" data-act="advance"><span>한 해</span><small>방침?</small></button>`;
     else center = `<button class="ub-main" data-act="advance"><span>한 해</span><small>▶</small></button>`;
     return `
       <nav class="underbar">
@@ -478,10 +510,10 @@ function viewOracle(app: App): string {
       </div>
       <div class="event-card swipeable" data-swipe="oracle" data-left="${esc(q.answers[0].label)}" data-right="${esc(q.answers[1].label)}">
         <div class="swipe-label"></div>
-        <p class="swipe-guide">← 카드를 좌우로 밀어서 대답 →</p>
-        <div class="choices">
+        <p class="swipe-guide"><b class="l">← 왼쪽</b> · 카드를 밀어서 대답 · <b class="r">오른쪽 →</b></p>
+        <div class="choices duo">
           ${q.answers.map((a, i) => `
-            <button class="choice" data-act="oracle" data-arg="${i}"><kbd>${i === 0 ? '←' : '→'}</kbd><span>${esc(a.label)}</span></button>`).join('')}
+            <button class="choice ${i === 0 ? 'left' : 'right'}" data-act="oracle" data-arg="${i}"><kbd>${i === 0 ? '←' : '→'}</kbd><span>${esc(a.label)}</span></button>`).join('')}
         </div>
       </div>
       <button class="link" data-act="oracle" data-arg="skip">건너뛰고 바로 태어난다</button>
@@ -541,24 +573,25 @@ function viewLife(app: App): string {
       </div>`;
   } else if (ev) {
     const choices = visibleChoices(s, ev);
-    const swipe = choices.length === 2 && !choices.some((c) => choiceLocked(s, c));
+    const duo = choices.length === 2;
+    const swipe = duo && !choices.some((c) => choiceLocked(s, c));
     panel = `
       <div class="event-card ${swipe ? 'swipeable' : ''}" ${swipe ? `data-swipe="choose" data-left="${esc(choices[0].label)}" data-right="${esc(choices[1].label)}"` : ''}>
         ${swipe ? '<div class="swipe-label"></div>' : ''}
         <p class="eyebrow">${s.age}세의 사건</p>
         <h3>${esc(ev.title)}</h3>
         <p class="event-text">${esc(fill(ev.text, s))}</p>
-        ${swipe ? '<p class="swipe-guide">← 카드를 좌우로 밀어서 선택 →</p>' : ''}
-        <div class="choices">
+        ${swipe ? '<p class="swipe-guide"><b class="l">← 왼쪽</b> · 카드를 밀어서 선택 · <b class="r">오른쪽 →</b></p>' : ''}
+        <div class="choices ${duo ? 'duo' : ''}">
           ${choices.map((c, i) => {
             const locked = choiceLocked(s, c);
             const notes = [
-              c.check ? `${STAT_NAMES[c.check.stat]} 판정${cheat.showChance ? ` · 성공률 ${successChance(s, c.check)}%` : ''}` : '',
+              c.check && cheat.showChance ? `🔍 성공률 ${successChance(s, c.check)}%` : '',
               c.will ? `💪 의지력 ${c.will}${locked ? ` (부족: ${s.will ?? 0})` : ''}` : '',
             ].filter(Boolean).join(' · ');
             return `
-            <button class="choice ${c.will ? 'defy' : ''}" data-act="choose" data-arg="${i}" ${locked ? 'disabled' : ''}>
-              <kbd>${swipe ? (i === 0 ? '←' : '→') : i + 1}</kbd>
+            <button class="choice ${duo ? (i === 0 ? 'left' : 'right') : ''} ${c.will ? 'defy' : ''}" data-act="choose" data-arg="${i}" ${locked ? 'disabled' : ''}>
+              <kbd>${duo ? (i === 0 ? '←' : '→') : i + 1}</kbd>
               <span>${esc(c.label)}</span>
               ${notes ? `<em>${esc(notes)}</em>` : ''}
             </button>`;
@@ -568,14 +601,17 @@ function viewLife(app: App): string {
   } else {
     const young = s.age < 2;
     panel = `
-      <div class="focus-card">
+      <div class="focus-card ${app.focusNudge ? 'nudge' : ''}">
         <p class="eyebrow">올해의 방침</p>
+        ${young ? '' : s.focusLocked
+          ? '<p class="muted small focus-hint">방침이 고정되어 있다. 누르면 방침만 바뀐다.</p>'
+          : '<p class="muted small focus-hint">방침을 누르면 그 방침으로 한 해가 지나간다. <kbd>1</kbd>~<kbd>5</kbd></p>'}
         <div class="focus-grid">
           ${FOCI.map((f) => {
             const mul = f === 'rest' ? 1 : focusMul(s, f);
-            const tag = Math.abs(mul - 1) < 0.01 ? '' : `<em class="${mul > 1 ? 'up' : 'down'}">×${mul.toFixed(1)}</em>`;
+            const tag = Math.abs(mul - 1) < 0.05 ? '' : `<em class="${mul > 1 ? 'up' : 'down'}">×${mul.toFixed(1)}</em>`;
             return `
-            <button class="focus focus-${f} ${s.focus === f ? 'selected' : ''}" data-act="focus" data-arg="${f}" ${young ? 'disabled' : ''}>
+            <button class="focus focus-${f} ${s.focus === f && (s.focusLocked || young) ? 'selected' : ''} ${s.focus === f && !s.focusLocked && !young ? 'last' : ''}" data-act="focus" data-arg="${f}" ${young ? 'disabled' : ''}>
               <strong>${FOCUS_NAMES[f]} ${tag}</strong>
               <span>${FOCUS_DESC[f]}</span>
             </button>`;
@@ -583,7 +619,8 @@ function viewLife(app: App): string {
         </div>
         ${!young && (s.stress ?? 0) >= STRESS_HIGH && s.focus !== 'rest' ? '<p class="warn small">스트레스가 높아 성장이 떨어지고 있다. 한 해 쉬어 가자!</p>' : ''}
         ${young ? '<p class="muted small">아직 너무 어리다. 세 살이 되면 방침을 정할 수 있다.</p>' : ''}
-        <button class="btn primary wide advance" data-act="advance">한 해를 보낸다 <kbd>Space</kbd></button>
+        ${young ? '' : `<label class="focus-lock"><input type="checkbox" data-act="lock" ${s.focusLocked ? 'checked' : ''} /> 이 방침으로 계속 (매년 묻지 않기)</label>`}
+        ${young || s.focusLocked ? '<button class="btn primary wide advance" data-act="advance">한 해를 보낸다 <kbd>Space</kbd></button>' : ''}
       </div>`;
   }
 
