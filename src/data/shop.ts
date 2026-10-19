@@ -36,6 +36,10 @@ export const SHOP: ShopItem[] = [
     cost: (lv) => 20 * (lv + 1), maxLevel: 5 },
   { id: 'fortune', kind: 'upgrade', name: '행운의 각인', desc: '시작 행운 +5',
     cost: (lv) => 25 * (lv + 1), maxLevel: 3 },
+  { id: 'deep_start', kind: 'upgrade', name: '심층의 각인', desc: '던전을 5층 더 깊은 곳에서 시작할 수 있다',
+    cost: (lv) => 30 * (lv + 1), maxLevel: 6 },
+  { id: 'heirloom', kind: 'upgrade', name: '전생의 비상금', desc: '시작 골드 +100',
+    cost: (lv) => 15 * (lv + 1), maxLevel: 5 },
 ];
 
 export const itemCost = (item: ShopItem, level: number) =>
