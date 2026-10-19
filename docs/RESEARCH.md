@@ -56,7 +56,31 @@
 - **공유용 결과 카드**: 초상화, 묘비명, 생애 요약을 PNG 한 장으로 만든다.
 - **운명에 맡기기**: 가문과 권능을 무작위로 정하고, 대신 환생석 보너스를 준다.
 
-## 출처
+## 3. 추가 레퍼런스 (2차 조사)
+
+| 게임 | 핵심 장치 | 우리 게임에 옮기면 |
+|---|---|---|
+| **Hades** (Supergiant, 2020) | 죽으면 거점으로 돌아가고, NPC가 **방금 죽은 방식**에 반응한다(히프노스 혼자 사인별 대사 75종). 죽음이 곧 이야기 진행이다 | **여신의 사망 리액션**: 윤회의 문에서 환생의 여신이 사인, 나이, 전생 횟수에 맞는 한마디를 한다. 여신 호감도(공물)에 따라 대사와 보상이 열린다 |
+| **Rogue Legacy** (2013) | 후계자마다 0~2개의 유전 특성(근시, 거인증, 색맹 등 약 40종). 희귀도는 3단계(50/36/14%)고, 서로 모순되는 특성은 다시 뽑는다. 코믹하고 장단점이 있다 | **타고난 특성**: 태어날 때 0~2개(길치, 대식가, 고양이 알레르기, 절대음감, 고소공포증 등). 판정 보정이나 전용 사건을 붙인다 |
+| **BitLife** | 죽을 때 그 삶을 요약한 **리본**을 묘비에 단다(부자, 장수, 스캔들, 평범 등 약 40종). 리본 컬렉션 | **묘비 리본**: 인생의 패턴(최고 능력치, 업보, 사인)으로 리본 1개를 단다. 도감에서 수집한다 |
+| **Alter Ego** (1986) | 일곱 생애 단계. 시작 전에 26문항 O/X 질문으로 성격 초기값을 정한다 | **환생 전 여신의 문답**: 3~5문항에 답하면 시작 능력치와 성향이 정해진다(운명 모드에도 어울린다) |
+| **Wildermyth** (2021) | 영웅이 늙고 은퇴하면 **레거시 풀**에 들어가 다른 캠페인에 전설로 재등장한다. 날개가 돋거나 늑대가 되는 점진적 **변이**가 있다 | **전생의 전설화**: 내 전생이 다음 생에서 동상, 노래, 위인전, 유령으로 등장한다. **변이** 사건 체인(드래곤 피, 저주로 서서히 변하고 초상화도 변한다) |
+| **The Life and Suffering of Sir Brante** (2021) | 작은 죽음 3번, 4번째가 진짜 죽음이다. **의지력**: 운명(신분)을 거스르는 선택은 의지력을 깎고, 다 떨어지면 선택지가 잠긴다. 남을 위해 내 목숨을 바치는 선택이 있다 | **의지력 자원**: 출신 숙명을 거스르는 선택에 소모되고 쉬는 해에 회복된다. **대신 죽어주기**: 동료가 죽을 때 불굴 목숨으로 대신 받는다 |
+| **Princess Maker 2** (1993) | 월간 스케줄, **스트레스**(과로하면 병남), 생일과 혈액형 성향, 엔딩 70여 종 | **피로·스트레스**: 같은 방침을 연속하면 효율이 떨어지고 병에 걸린다. **휴식** 방침을 추가한다. 노년 **인생 엔딩 칭호** |
+| **Long Live the Queen** (2012) | 주간 수업 + **기분**이 학습 배수로 작용한다(공포면 민첩·신앙이 빨리 오르는 식). 사인 수집 업적 | **기분**: 사건 결과로 기분이 바뀌고, 방침 성장 배수가 달라진다. 초상화 표정과 연동한다 |
+
+### 출처 (2차)
+- [Hades 작가 인터뷰 (Inlander)](https://inlander.com/culture/hades-writer-greg-kasavin-on-how-he-made-video-game-deaths-drive-a-feel-good-story-22725237)
+- [Hades 대사량 분석 (Nintendo Wire)](https://nintendowire.com/news/2020/12/30/hades-has-over-300000-words-of-voiced-dialogue-heres-a-handy-breakdown-of-who-speaks-most-and-least/)
+- [Rogue Legacy 특성 (Fandom 위키)](https://rogue-legacy.fandom.com/wiki/Traits_Breakdown?oldid=4654)
+- [BitLife 리본 목록 (Prima Games)](https://primagames.com/tips/bitlife-ribbons-list-how-to-get-all-ribbons-in-bitlife)
+- [Alter Ego (Wikipedia)](https://en.wikipedia.org/wiki/Alter_Ego_(1986_video_game))
+- [Wildermyth 리뷰 (RPGamer)](https://rpgamer.com/review/wildermyth-review/)
+- [Sir Brante 리뷰 (FingerGuns)](https://fingerguns.net/games/2021/03/06/the-life-and-suffering-of-sir-brante-review-defining-destiny/)
+- [Princess Maker 2 (Hardcore Gaming 101)](https://www.hardcoregaming101.net/princess-maker-2/)
+- [Long Live the Queen 리뷰 (RPG Codex)](https://rpgcodex.net/content.php?id=9532)
+
+## 출처 (1차)
 - [Birth.Movies.Death — Reigns 리뷰](https://birthmoviesdeath.com/2016/09/02/reigns-review-swipe-right-to-fight-the-devil.html)
 - [Steam 가이드 — Reigns Memento mori 29종](https://steamcommunity.com/sharedfiles/filedetails/?id=858655393)
 - [Reigns 위키 — Deaths](https://reigns.fandom.com/wiki/Deaths)
