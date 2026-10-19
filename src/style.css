@@ -1,0 +1,283 @@
+:root {
+  --bg: #0e0c0a;
+  --panel: #171410;
+  --panel-2: #1f1b16;
+  --line: #352d24;
+  --line-2: #4a3f32;
+  --text: #e6ddcc;
+  --muted: #8f8573;
+  --gold: #c9a45c;
+  --gold-dim: #7d6638;
+  --good: #8fb07a;
+  --bad: #c0675a;
+  --milestone: #9fb4d1;
+  --death: #d8574a;
+  --serif: 'Noto Serif KR', 'Nanum Myeongjo', serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+body {
+  background:
+    radial-gradient(ellipse at 50% -20%, #2a2016 0%, transparent 60%),
+    var(--bg);
+}
+
+#app { min-height: 100%; display: flex; flex-direction: column; }
+
+button { font-family: inherit; color: inherit; cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.45; }
+kbd {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 3px;
+  padding: 0 5px;
+  color: var(--muted);
+}
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+
+/* ───── 상단 ───── */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(14, 12, 10, 0.85);
+}
+.brand {
+  background: none;
+  border: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+}
+.stones { color: var(--gold); font-weight: 600; }
+
+.screen { flex: 1; width: 100%; max-width: 1100px; margin: 0 auto; padding: 28px 24px 48px; }
+.screen-title { font-size: 24px; margin: 0 0 8px; color: var(--gold); }
+h3 { font-size: 16px; color: var(--gold); margin: 28px 0 10px; letter-spacing: 0.05em; }
+h4 { font-size: 13px; color: var(--muted); margin: 20px 0 6px; letter-spacing: 0.1em; }
+.eyebrow { font-size: 12px; letter-spacing: 0.3em; color: var(--muted); margin: 0 0 4px; }
+
+/* ───── 버튼 ───── */
+.btn {
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-size: 15px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.btn:hover:not(:disabled) { border-color: var(--gold-dim); }
+.btn.primary { background: #3a2d18; border-color: var(--gold-dim); color: #f3e2bb; }
+.btn.primary:hover:not(:disabled) { background: #4a3a1e; border-color: var(--gold); }
+.btn.small { padding: 4px 12px; font-size: 13px; }
+.btn.wide { width: 100%; }
+.link { background: none; border: 0; color: var(--muted); font-size: 12px; margin-top: 24px; padding: 0; text-decoration: underline; }
+
+/* ───── 메인 ───── */
+.screen-title + .muted { margin-top: 0; }
+.title-card { text-align: center; padding: 10vh 0 0; }
+.title-card h1 { font-size: 64px; margin: 0; letter-spacing: 0.3em; color: var(--gold); font-weight: 700; }
+.lede { color: var(--muted); margin: 16px auto 40px; max-width: 520px; }
+.menu { display: flex; flex-direction: column; gap: 10px; width: 320px; margin: 0 auto; }
+
+/* ───── 환생 설정 ───── */
+.setup-name { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+.setup-name label { color: var(--gold); }
+.setup-name input {
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 16px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  width: 200px;
+}
+.pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.pick {
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pick strong { color: var(--text); font-size: 15px; }
+.pick span { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.pick em { font-style: normal; font-size: 12px; color: var(--gold-dim); }
+.pick:hover:not(:disabled) { border-color: var(--line-2); }
+.pick.selected { border-color: var(--gold); background: #231c12; }
+.pick.selected strong { color: var(--gold); }
+.pick.locked { opacity: 0.55; }
+.setup-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 32px; }
+
+/* ───── 인생 화면 ───── */
+.screen-life {
+  max-width: 1280px;
+  display: grid;
+  grid-template-columns: 260px 1fr 340px;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 20px;
+  flex: none;
+  height: calc(100vh - 53px);
+  padding-bottom: 24px;
+}
+.sheet, .chronicle, .action {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 18px;
+  overflow-y: auto;
+}
+.sheet-head h2 { margin: 0; font-size: 22px; color: var(--gold); }
+.sheet-head .age { margin: 2px 0 0; }
+.sheet-head p { margin: 0; }
+.stats { margin-top: 18px; display: flex; flex-direction: column; gap: 6px; }
+.stat { display: grid; grid-template-columns: 36px 1fr 28px; align-items: center; gap: 8px; font-size: 13px; }
+.stat-name { color: var(--muted); }
+.stat-val { text-align: right; font-variant-numeric: tabular-nums; }
+.bar { height: 6px; background: #0b0a08; border-radius: 3px; overflow: hidden; }
+.fill { height: 100%; transition: width 0.3s; }
+.fill-vit { background: #b05a4a; }
+.fill-mana { background: #5a7cb0; }
+.fill-int { background: #8a6fb0; }
+.fill-cha { background: #b07a9a; }
+.fill-fame { background: var(--gold); }
+.fill-luck { background: #6fa07a; }
+.rels { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.rels li { display: grid; grid-template-columns: 52px 1fr auto; gap: 6px; font-size: 13px; }
+.rels li.muted { display: block; }
+.rel-role { color: var(--muted); }
+.rel-aff { color: var(--muted); }
+.rel-aff.danger { color: var(--death); }
+
+.chronicle { padding: 20px 24px; }
+.year { display: grid; grid-template-columns: 52px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px dashed #2a241d; }
+.year:last-child { border-bottom: 0; }
+.year-age { color: var(--gold-dim); font-weight: 600; font-variant-numeric: tabular-nums; }
+.year-body p { margin: 0 0 4px; }
+.year:last-child .year-body p { animation: appear 0.4s ease-out both; }
+@keyframes appear { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.tone-good { color: var(--good); }
+.tone-bad { color: var(--bad); }
+.tone-milestone { color: var(--milestone); }
+.tone-death { color: var(--death); font-weight: 600; }
+
+.action { display: flex; flex-direction: column; }
+.focus-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 12px; }
+.focus {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 10px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+}
+.focus strong { font-size: 15px; }
+.focus span { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.focus.selected { border-color: var(--gold); }
+.focus.selected strong { color: var(--gold); }
+.advance { margin-top: auto; padding: 14px; font-size: 16px; }
+.advance kbd { margin-left: 8px; }
+
+.event-card h3 { margin: 0 0 10px; font-size: 20px; }
+.event-text { margin: 0 0 18px; }
+.choices { display: flex; flex-direction: column; gap: 8px; }
+.choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 4px 10px;
+  text-align: left;
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  border-radius: 5px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+.choice:hover { border-color: var(--gold); }
+.choice em { grid-column: 2; font-style: normal; font-size: 12px; color: var(--gold-dim); }
+
+.death-call { text-align: center; margin: auto 0; }
+.death-cause { font-size: 26px; color: var(--death); margin: 0 0 6px; }
+
+/* ───── 묘비 ───── */
+.grave-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; padding-top: 4vh; }
+.tombstone {
+  background: linear-gradient(#3a3631, #24211d);
+  border: 1px solid #4d4840;
+  border-radius: 140px 140px 8px 8px;
+  padding: 70px 30px 50px;
+  text-align: center;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6), 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+.tombstone h2 { font-size: 34px; margin: 4px 0; letter-spacing: 0.15em; color: #ece4d4; }
+.grave-title { color: var(--muted); margin: 0; }
+.grave-years { margin: 0 0 24px; color: var(--muted); letter-spacing: 0.2em; }
+.grave-cause { font-size: 18px; color: var(--death); margin: 0 0 8px; }
+.grave-epitaph { font-style: italic; color: #cfc6b4; margin: 0; }
+.settle ul { list-style: none; padding: 0; margin: 0; }
+.settle li { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.settle-total { text-align: right; font-size: 20px; margin: 14px 0 0; }
+.settle-total strong { color: var(--gold); }
+.new-death { color: var(--gold); }
+
+/* ───── 제단 / 도감 / 생애 ───── */
+.altar { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.altar-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px 16px;
+}
+.altar-item p { margin: 2px 0 0; }
+.codex { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-top: 20px; }
+.codex-item { background: var(--panel); border: 1px solid var(--line-2); border-radius: 6px; padding: 14px; }
+.codex-item strong { color: var(--death); }
+.codex-item p { margin: 6px 0; font-size: 13px; }
+.codex-item.locked { border-style: dashed; border-color: var(--line); }
+.codex-item.locked strong { color: var(--muted); }
+.lives { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+.lives th { text-align: left; color: var(--muted); font-weight: 400; border-bottom: 1px solid var(--line-2); padding: 8px; }
+.lives td { padding: 8px; border-bottom: 1px solid var(--line); }
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel-2);
+  border: 1px solid var(--gold-dim);
+  padding: 8px 20px;
+  border-radius: 4px;
+}
+
+/* 좁은 화면 대비 (PC 우선이지만 깨지지 않게) */
+@media (max-width: 960px) {
+  .screen-life { grid-template-columns: 1fr; grid-template-rows: none; height: auto; }
+  .chronicle { max-height: 50vh; }
+  .grave-wrap { grid-template-columns: 1fr; }
+}
