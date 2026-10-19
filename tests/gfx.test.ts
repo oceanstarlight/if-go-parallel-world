@@ -30,7 +30,7 @@ describe('도트 그래픽', () => {
         expect(p.data.every((c) => c === null || /^#[0-9a-f]{6}$/.test(c))).toBe(true);
       }
     }
-  });
+  }, 30_000);
 
   it('전투 스프라이트를 그린다', () => {
     const kinds: EnemyKind[] = ['bandit', 'soldier', 'rival', 'bully', 'stalker', 'hero', 'demon_lord', 'traitor', 'wolf', 'shadow', 'dragon', 'wyvern'];

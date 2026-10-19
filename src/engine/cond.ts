@@ -35,6 +35,8 @@ export function matches(c: Cond | undefined, s: LifeState): boolean {
   }
   if (c.minJobRank !== undefined && s.jobRank < c.minJobRank) return false;
   if (c.maxJobRank !== undefined && s.jobRank > c.maxJobRank) return false;
+  if (c.traits && !c.traits.every((t) => (s.traits ?? []).includes(t))) return false;
+  if (c.notTraits && c.notTraits.some((t) => (s.traits ?? []).includes(t))) return false;
   if (c.test && !c.test(s)) return false;
   return true;
 }

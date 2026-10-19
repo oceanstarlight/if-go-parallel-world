@@ -1,6 +1,6 @@
 import type { Focus, LifeState } from '../types';
 import { NPC_NAMES, PLAYER_NAMES } from '../data/names';
-import { advanceYear, choose, createLife, currentEvent, rollFate, visibleChoices, type Rng } from './life';
+import { STRESS_HIGH, advanceYear, choiceLocked, choose, createLife, currentEvent, rollFate, visibleChoices, type Rng } from './life';
 
 /** 재현 가능한 난수 (mulberry32) */
 export function seededRng(seed: number): Rng {
@@ -28,13 +28,24 @@ export function simulateLife(seed: number, opt: { name?: string; houseId?: strin
     cheatId: opt.cheatId ?? fate.cheatId,
     upgrades: {},
   }, rng);
-  for (let guard = 0; guard < 600 && !s.death; guard++) {
-    if (rng() < 0.15) s.focus = FOCI[Math.floor(rng() * 4)];
-    const ev = currentEvent(s);
-    if (ev) choose(s, Math.floor(rng() * visibleChoices(s, ev).length), rng);
-    else advanceYear(s, rng);
-  }
+  for (let guard = 0; guard < 600 && !s.death; guard++) autoStep(s, rng);
   return s;
+}
+
+/**
+ * 자동 플레이 한 걸음: 사건이 있으면 고를 수 있는 선택지 중 무작위, 없으면 한 해를 보낸다.
+ * 가끔 방침을 바꾸고, 스트레스가 높으면 쉰다.
+ */
+export function autoStep(s: LifeState, rng: Rng) {
+  const ev = currentEvent(s);
+  if (ev) {
+    const open = visibleChoices(s, ev).map((c, i) => [c, i] as const).filter(([c]) => !choiceLocked(s, c));
+    choose(s, open[Math.floor(rng() * open.length)][1], rng);
+    return;
+  }
+  if ((s.stress ?? 0) >= STRESS_HIGH && rng() < 0.7) s.focus = 'rest';
+  else if (s.focus === 'rest' || rng() < 0.15) s.focus = FOCI[Math.floor(rng() * 4)];
+  advanceYear(s, rng);
 }
 
 /** 같은 해에 함께 환생한 네 사람 */

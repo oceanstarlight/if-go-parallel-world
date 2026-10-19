@@ -6,11 +6,15 @@ import { DEATHS, deathById } from '../data/deaths';
 import { PLAYER_NAMES, pick } from '../data/names';
 import { SHOP, itemCost } from '../data/shop';
 import { goalById } from '../data/goals';
-import { FOCUS_DESC, FOCUS_NAMES, REL_NAMES, STAT_KEYS, STAT_NAMES, affectionWord } from '../data/stats';
-import { advanceYear, canAdvance, choose, createLife, currentEvent, rollFate, successChance, visibleChoices } from '../engine/life';
+import { FOCUS_DESC, FOCUS_NAMES, MOOD_HINT, MOOD_ICON, MOOD_NAMES, REL_NAMES, STAT_KEYS, STAT_NAMES, affectionWord } from '../data/stats';
+import {
+  STRESS_HIGH, advanceYear, applyOracle, canAdvance, choiceLocked, choose, createLife, currentEvent, focusMul, rollFate,
+  successChance, traitsOf, visibleChoices,
+} from '../engine/life';
+import { RARITY_NAME } from '../data/traits';
+import { type OracleAnswer, oracleById, pickOracle } from '../data/oracle';
 import { fill } from '../engine/text';
-import type { StoneLine } from '../engine/score';
-import { buy, isUnlocked, loadMeta, loadRun, saveRun, settleLife } from '../meta';
+import { buy, isUnlocked, loadMeta, loadRun, saveRun, settleLife, type SettleResult } from '../meta';
 import { GfxStage } from '../gfx/stage';
 import { drawPortrait, specFromLife } from '../gfx/portrait';
 import { ENEMY_HP, battleFor, graveWeather, sceneFor, timeFor } from '../gfx/mapping';
@@ -18,18 +22,22 @@ import { enemySprite, playerSprite } from '../gfx/sprites';
 import { hashStr } from '../gfx/painter';
 import { lifeTitle, makeShareCard, shareOrDownload } from './sharecard';
 
-type Screen = 'title' | 'setup' | 'life' | 'death' | 'altar' | 'codex' | 'lives';
+type Screen = 'title' | 'setup' | 'oracle' | 'life' | 'death' | 'altar' | 'codex' | 'lives';
 /** 모바일 바텀시트 탭 */
 type Tab = 'none' | 'action' | 'info' | 'menu';
 
-interface Settlement {
+interface Settlement extends SettleResult {
   life: LifeState;
-  lines: StoneLine[];
-  total: number;
-  firstDeath: boolean;
-  peers: LifeState[];
   /** 동시대 환생자 초상화 (data URL) */
   peerImgs: string[];
+}
+
+/** 환생 전 여신의 문답 진행 상태 */
+interface Oracle {
+  ids: string[];
+  answers: OracleAnswer[];
+  /** 직전 답에 대한 여신의 반응 */
+  reply: string;
 }
 
 interface App {
@@ -45,12 +53,13 @@ interface App {
   tab: Tab;
   /** 사용자가 접어둔 사건 (같은 사건이면 다시 자동으로 올리지 않는다) */
   dismissedEvent: string | null;
+  oracle: Oracle | null;
 }
 
 const esc = (v: string | number) =>
   String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-const FOCI: Focus[] = ['train', 'study', 'social', 'explore'];
+const FOCI: Focus[] = ['train', 'study', 'social', 'explore', 'rest'];
 
 export async function mount(root: HTMLElement) {
   const app: App = {
@@ -64,6 +73,7 @@ export async function mount(root: HTMLElement) {
     battleLogFrom: null,
     tab: 'none',
     dismissedEvent: null,
+    oracle: null,
   };
   // 사망 상태로 저장된 삶이 있으면 (정산 직전 새로고침) 바로 정산
   if (app.life?.death) settle(app);
@@ -73,7 +83,7 @@ export async function mount(root: HTMLElement) {
     syncGfx(app, root); // 캔버스가 붙어 높이가 정해진 뒤에 스크롤
     const log = root.querySelector('.chronicle');
     if (log) log.scrollTop = log.scrollHeight;
-    bindSwipe(root, (i) => run('choose', String(i)));
+    bindSwipe(root, (act, i) => run(act, String(i)));
   };
   const run = (action: string, arg?: string) => {
     if (app.battleLogFrom !== null) {
@@ -99,8 +109,13 @@ export async function mount(root: HTMLElement) {
     if (el.id === 'name-input') app.setup.name = el.value;
   });
   window.addEventListener('keydown', (ev) => {
-    if (app.screen !== 'life' || !app.life) return;
     if ((ev.target as HTMLElement).tagName === 'INPUT') return;
+    if (app.screen === 'oracle') {
+      if (ev.code === 'Digit1' || ev.code === 'ArrowLeft') run('oracle', '0');
+      else if (ev.code === 'Digit2' || ev.code === 'ArrowRight') run('oracle', '1');
+      return;
+    }
+    if (app.screen !== 'life' || !app.life) return;
     if (ev.code === 'Space') {
       ev.preventDefault();
       run('advance');
@@ -153,22 +168,23 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
     case 'reroll-name':
       app.setup.name = pick(PLAYER_NAMES, Math.random);
       break;
-    case 'begin': {
-      const name = app.setup.name.trim().slice(0, 12) || pick(PLAYER_NAMES, Math.random);
-      const fated = app.setup.fated;
-      const origin = fated ? rollFate() : { houseId: app.setup.houseId, cheatId: app.setup.cheatId };
-      app.life = createLife({
-        ...origin,
-        name,
-        upgrades: app.meta.upgrades,
-        npcPast: app.meta.npcMet ?? {},
-        lifeNo: app.meta.totalLives + 1,
-        fated,
-      });
-      saveRun(app.life);
-      app.screen = 'life';
-      app.tab = 'none';
-      app.dismissedEvent = null;
+    case 'begin':
+      // 태어나기 전에 여신의 문답 3개
+      app.oracle = { ids: pickOracle(Math.random), answers: [], reply: '' };
+      app.screen = 'oracle';
+      break;
+    case 'oracle': {
+      const o = app.oracle;
+      if (!o) break;
+      if (arg === 'skip') {
+        birth(app);
+        break;
+      }
+      const a = oracleById(o.ids[o.answers.length]).answers[Number(arg)];
+      if (!a) break;
+      o.answers.push(a);
+      o.reply = a.reply;
+      if (o.answers.length >= o.ids.length) birth(app);
       break;
     }
     case 'focus':
@@ -242,6 +258,28 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
   }
 }
 
+/** 문답을 마치고 태어난다 */
+function birth(app: App) {
+  const name = app.setup.name.trim().slice(0, 12) || pick(PLAYER_NAMES, Math.random);
+  const fated = app.setup.fated;
+  const origin = fated ? rollFate() : { houseId: app.setup.houseId, cheatId: app.setup.cheatId };
+  app.life = createLife({
+    ...origin,
+    name,
+    upgrades: app.meta.upgrades,
+    npcPast: app.meta.npcMet ?? {},
+    lifeNo: app.meta.totalLives + 1,
+    fated,
+    legends: app.meta.legends ?? [],
+  });
+  applyOracle(app.life, app.oracle?.answers ?? []);
+  app.oracle = null;
+  saveRun(app.life);
+  app.screen = 'life';
+  app.tab = 'none';
+  app.dismissedEvent = null;
+}
+
 function afterStep(app: App) {
   if (app.life) saveRun(app.life);
 }
@@ -250,7 +288,7 @@ function afterStep(app: App) {
 
 function view(app: App): string {
   const body = {
-    title: viewTitle, setup: viewSetup, life: viewLife, death: viewDeath,
+    title: viewTitle, setup: viewSetup, oracle: viewOracle, life: viewLife, death: viewDeath,
     altar: viewAltar, codex: viewCodex, lives: viewLives,
   }[app.screen](app);
   return `
@@ -281,7 +319,7 @@ function underbar(app: App): string {
         ${item('tab', 'none', '📜', '연대기', tab === 'none')}
         ${item('tab', 'action', ev ? '❗' : '🎯', ev ? '사건' : '방침', tab === 'action')}
         ${center}
-        ${item('tab', 'info', '🎀', '목표·인연', tab === 'info')}
+        ${item('tab', 'info', '🎀', '정보', tab === 'info')}
         ${item('tab', 'menu', '☰', '메뉴', tab === 'menu')}
       </nav>`;
   }
@@ -400,6 +438,56 @@ function goalList(s: LifeState): string {
   }).join('')}</ul>`;
 }
 
+/** 기분 · 스트레스 · 의지력 한 줄 */
+function mindRow(s: LifeState): string {
+  const mood = s.mood ?? 'calm';
+  const stress = s.stress ?? 0;
+  const will = s.will ?? 0;
+  return `
+    <div class="mind">
+      <span class="mood-chip" title="${esc(MOOD_HINT[mood])}">${MOOD_ICON[mood]} ${MOOD_NAMES[mood]}</span>
+      <span class="meter ${stress >= STRESS_HIGH ? 'hot' : ''}" title="스트레스: 높으면 성장이 떨어지고 과로로 쓰러진다">
+        <b><span class="lbl">스트레스</span><span class="ico">🔥</span></b><i><u style="width:${stress}%"></u></i><small>${stress}</small>
+      </span>
+      <span class="meter will" title="의지력: 숙명을 거스르는 선택에 쓴다. 휴식으로 회복">
+        <b><span class="lbl">의지력</span><span class="ico">💪</span></b><i><u style="width:${will}%"></u></i><small>${will}</small>
+      </span>
+    </div>`;
+}
+
+function traitList(s: LifeState): string {
+  const ts = traitsOf(s);
+  if (!ts.length) return '<p class="muted small">평범하게 태어났다. 평범한 게 최고!</p>';
+  return `<ul class="traits">${ts.map((t) => `
+    <li class="r${t.rarity}"><strong>${esc(t.name)}</strong><em>${RARITY_NAME[t.rarity]}</em><span>${esc(t.desc)}</span></li>`).join('')}</ul>`;
+}
+
+function viewOracle(app: App): string {
+  const o = app.oracle;
+  if (!o) return viewTitle(app);
+  const q = oracleById(o.ids[Math.min(o.answers.length, o.ids.length - 1)]);
+  return `
+    <section class="oracle">
+      <p class="eyebrow">환생 전 · 여신의 문답 ${o.answers.length + 1}/${o.ids.length}</p>
+      <div class="goddess-bubble">
+        <span class="goddess-icon">✨</span>
+        <div>
+          ${o.reply ? `<p class="muted small">"${esc(o.reply)}"</p>` : '<p class="muted small">"잠깐! 태어나기 전에 몇 가지만 물어볼게♪"</p>'}
+          <p class="goddess-q">"${esc(q.text)}"</p>
+        </div>
+      </div>
+      <div class="event-card swipeable" data-swipe="oracle" data-left="${esc(q.answers[0].label)}" data-right="${esc(q.answers[1].label)}">
+        <div class="swipe-label"></div>
+        <p class="swipe-guide">← 카드를 좌우로 밀어서 대답 →</p>
+        <div class="choices">
+          ${q.answers.map((a, i) => `
+            <button class="choice" data-act="oracle" data-arg="${i}"><kbd>${i === 0 ? '←' : '→'}</kbd><span>${esc(a.label)}</span></button>`).join('')}
+        </div>
+      </div>
+      <button class="link" data-act="oracle" data-arg="skip">건너뛰고 바로 태어난다</button>
+    </section>`;
+}
+
 function viewLife(app: App): string {
   const s = app.life;
   if (!s) return viewTitle(app);
@@ -453,21 +541,28 @@ function viewLife(app: App): string {
       </div>`;
   } else if (ev) {
     const choices = visibleChoices(s, ev);
-    const swipe = choices.length === 2;
+    const swipe = choices.length === 2 && !choices.some((c) => choiceLocked(s, c));
     panel = `
-      <div class="event-card ${swipe ? 'swipeable' : ''}" ${swipe ? `data-left="${esc(choices[0].label)}" data-right="${esc(choices[1].label)}"` : ''}>
+      <div class="event-card ${swipe ? 'swipeable' : ''}" ${swipe ? `data-swipe="choose" data-left="${esc(choices[0].label)}" data-right="${esc(choices[1].label)}"` : ''}>
         ${swipe ? '<div class="swipe-label"></div>' : ''}
         <p class="eyebrow">${s.age}세의 사건</p>
         <h3>${esc(ev.title)}</h3>
         <p class="event-text">${esc(fill(ev.text, s))}</p>
         ${swipe ? '<p class="swipe-guide">← 카드를 좌우로 밀어서 선택 →</p>' : ''}
         <div class="choices">
-          ${choices.map((c, i) => `
-            <button class="choice" data-act="choose" data-arg="${i}">
+          ${choices.map((c, i) => {
+            const locked = choiceLocked(s, c);
+            const notes = [
+              c.check ? `${STAT_NAMES[c.check.stat]} 판정${cheat.showChance ? ` · 성공률 ${successChance(s, c.check)}%` : ''}` : '',
+              c.will ? `💪 의지력 ${c.will}${locked ? ` (부족: ${s.will ?? 0})` : ''}` : '',
+            ].filter(Boolean).join(' · ');
+            return `
+            <button class="choice ${c.will ? 'defy' : ''}" data-act="choose" data-arg="${i}" ${locked ? 'disabled' : ''}>
               <kbd>${swipe ? (i === 0 ? '←' : '→') : i + 1}</kbd>
               <span>${esc(c.label)}</span>
-              ${c.check ? `<em>${STAT_NAMES[c.check.stat]} 판정${cheat.showChance ? ` · 성공률 ${successChance(s, c.check)}%` : ''}</em>` : ''}
-            </button>`).join('')}
+              ${notes ? `<em>${esc(notes)}</em>` : ''}
+            </button>`;
+          }).join('')}
         </div>
       </div>`;
   } else {
@@ -476,12 +571,17 @@ function viewLife(app: App): string {
       <div class="focus-card">
         <p class="eyebrow">올해의 방침</p>
         <div class="focus-grid">
-          ${FOCI.map((f) => `
-            <button class="focus ${s.focus === f ? 'selected' : ''}" data-act="focus" data-arg="${f}" ${young ? 'disabled' : ''}>
-              <strong>${FOCUS_NAMES[f]}</strong>
+          ${FOCI.map((f) => {
+            const mul = f === 'rest' ? 1 : focusMul(s, f);
+            const tag = Math.abs(mul - 1) < 0.01 ? '' : `<em class="${mul > 1 ? 'up' : 'down'}">×${mul.toFixed(1)}</em>`;
+            return `
+            <button class="focus focus-${f} ${s.focus === f ? 'selected' : ''}" data-act="focus" data-arg="${f}" ${young ? 'disabled' : ''}>
+              <strong>${FOCUS_NAMES[f]} ${tag}</strong>
               <span>${FOCUS_DESC[f]}</span>
-            </button>`).join('')}
+            </button>`;
+          }).join('')}
         </div>
+        ${!young && (s.stress ?? 0) >= STRESS_HIGH && s.focus !== 'rest' ? '<p class="warn small">스트레스가 높아 성장이 떨어지고 있다. 한 해 쉬어 가자!</p>' : ''}
         ${young ? '<p class="muted small">아직 너무 어리다. 세 살이 되면 방침을 정할 수 있다.</p>' : ''}
         <button class="btn primary wide advance" data-act="advance">한 해를 보낸다 <kbd>Space</kbd></button>
       </div>`;
@@ -498,9 +598,12 @@ function viewLife(app: App): string {
             <p class="muted small">${esc(houseById(s.houseId).name)} · ${esc(cheat.name)}${badges ? ` · ${badges}` : ''}</p>
           </div>
           <div class="stats">${stats}</div>
+          ${mindRow(s)}
         </div>
       </div>
       <div class="sheet-extra">
+        <h4>타고난 특성</h4>
+        ${traitList(s)}
         <h4>이번 생의 목표</h4>
         ${goalList(s)}
         <h4>인연</h4>
@@ -518,6 +621,10 @@ function viewLife(app: App): string {
     </section>
     <section class="m-panel ${tab === 'info' ? 'open' : ''}">
       <button class="sheet-handle" data-act="tab" data-arg="none" aria-label="접기"></button>
+      <h4>기분</h4>
+      <p class="small">${MOOD_ICON[s.mood ?? 'calm']} ${MOOD_NAMES[s.mood ?? 'calm']} — <span class="muted">${MOOD_HINT[s.mood ?? 'calm']}</span></p>
+      <h4>타고난 특성</h4>
+      ${traitList(s)}
       <h4>이번 생의 목표</h4>
       ${goalList(s)}
       <h4>인연</h4>
@@ -561,10 +668,15 @@ function viewDeath(app: App): string {
           <p class="grave-years">0 — ${s.age} · ${esc(houseById(s.houseId).name)}</p>
           <p class="grave-cause">${esc(d.name)}</p>
           <p class="grave-epitaph">${esc(d.epitaph)}</p>
+          ${st.deed ? `<p class="grave-deed">🏛 전설이 되었다 — 「${esc(st.deed)} ${esc(s.name)}」<br><span class="muted small">다음 생에서 다시 만나게 될지도?</span></p>` : ''}
           ${goalList(s)}
         </div>
       </div>
       <div class="settle">
+        <div class="goddess-bubble">
+          <span class="goddess-icon">✨</span>
+          <div><p class="eyebrow">환생의 여신</p>${st.goddess.map((l) => `<p>"${esc(l)}"</p>`).join('')}</div>
+        </div>
         ${st.firstDeath ? '<p class="new-death">새로운 죽음이 도감에 기록되었다!</p>' : ''}
         <h3>환생석 정산</h3>
         <ul>${st.lines.map((l) => `<li><span>${esc(l.label)}</span><span>+${l.value}</span></li>`).join('')}</ul>
@@ -652,6 +764,7 @@ function viewLives(app: App): string {
         <strong>${esc(l.name)}</strong>
         <span class="muted small">${esc(houseById(l.houseId).name)} · ${esc(l.title)}</span>
         <span class="small">향년 ${l.age}세 · <b class="tone-death">${esc(deathById(l.causeId).name)}</b>${l.goalsDone !== undefined ? ` · 목표 ${l.goalsDone}/3` : ''}</span>
+        ${l.deed ? `<span class="small deed">🏛 ${esc(l.deed)} 전설</span>` : ''}
         <em>◆ ${l.stones}</em>
       </li>`).join('')}
     </ul>`}
@@ -661,7 +774,7 @@ function viewLives(app: App): string {
 
 // ───────────────────────── 스와이프 (2지선다) ─────────────────────────
 
-function bindSwipe(root: HTMLElement, pickChoice: (i: number) => void) {
+function bindSwipe(root: HTMLElement, pickChoice: (act: string, i: number) => void) {
   const card = root.querySelector<HTMLElement>('.event-card.swipeable');
   if (!card) return;
   let startX = 0, dx = 0, dragging = false;
@@ -693,7 +806,7 @@ function bindSwipe(root: HTMLElement, pickChoice: (i: number) => void) {
     dragging = false;
     if (Math.abs(dx) > 90) {
       card.style.transform = `translateX(${Math.sign(dx) * 500}px) rotate(${Math.sign(dx) * 20}deg)`;
-      setTimeout(() => pickChoice(dx < 0 ? 0 : 1), 160);
+      setTimeout(() => pickChoice(card.dataset.swipe ?? 'choose', dx < 0 ? 0 : 1), 160);
     } else reset();
   };
   card.addEventListener('pointerup', end);

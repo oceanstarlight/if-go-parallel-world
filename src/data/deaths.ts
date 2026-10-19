@@ -41,6 +41,10 @@ export const DEATHS: DeathDef[] = [
     epitaph: '좋은 마족도 있다는 걸, 세상은 아직 몰랐다.' },
   { id: 'demon_lord_slain', name: '용사에게 토벌됨', hint: '마왕의 왕좌에 오른다. 그리고 그가 온다.',
     epitaph: '마왕다운 최후였다. 다음 생엔 용사 쪽으로 태어나 볼까?' },
+  { id: 'overwork', name: '과로사', hint: '쉬지 않고 달린다.',
+    epitaph: '이세계에서도 야근을 했다. 다음 생엔 꼭 휴가를 쓰자.' },
+  { id: 'sacrifice', name: '대신 받은 칼날', hint: '소중한 사람 앞을 막아선다.',
+    epitaph: '"괜찮아, 넌 살아." 그 한마디를 남기고 웃으며 떠났다.' },
   { id: 'hero_sacrifice', name: '세계를 구한 희생', hint: '용사로서 마지막 전장에 선다.',
     epitaph: '마왕과 함께 빛 속으로. 세계는 그 이름을 영원히 노래했다.' },
 ];

@@ -4,6 +4,8 @@ import { computeStones, goalsDone, sumStones, type StoneLine } from './engine/sc
 import { contemporaries } from './engine/sim';
 import { hashStr } from './gfx/painter';
 import { jobTitle } from './data/jobs';
+import { legendOf } from './data/legends';
+import { goddessLines } from './data/goddess';
 
 const META_KEY = 'igpw-meta-v1';
 const RUN_KEY = 'igpw-run-v1';
@@ -65,8 +67,20 @@ export function buy(m: MetaSave, itemId: string): boolean {
 }
 
 /** 죽은 삶을 정산하고 기록한다 */
-export function settleLife(m: MetaSave, s: LifeState): { lines: StoneLine[]; total: number; firstDeath: boolean; peers: LifeState[] } {
+export interface SettleResult {
+  lines: StoneLine[];
+  total: number;
+  firstDeath: boolean;
+  peers: LifeState[];
+  /** 환생의 여신의 한마디 */
+  goddess: string[];
+  /** 이번 생이 전설로 남았다면 그 업적 */
+  deed?: string;
+}
+
+export function settleLife(m: MetaSave, s: LifeState): SettleResult {
   const causeId = s.death!.causeId;
+  const prevCause = m.lives[0]?.causeId;
   const lines = computeStones(s, m);
   const total = sumStones(lines);
   const firstDeath = !m.codex[causeId];
@@ -75,6 +89,7 @@ export function settleLife(m: MetaSave, s: LifeState): { lines: StoneLine[]; tot
   for (const id of s.npcMet ?? []) m.npcMet[id] = (m.npcMet[id] ?? 0) + 1;
   m.soulStones += total;
   m.totalLives++;
+  const legend = legendOf(s);
   m.lives.unshift({
     name: s.name,
     age: s.age,
@@ -83,11 +98,14 @@ export function settleLife(m: MetaSave, s: LifeState): { lines: StoneLine[]; tot
     causeId,
     stones: total,
     goalsDone: goalsDone(s),
+    deed: legend?.deed,
   });
+  if (legend) m.legends = [legend, ...(m.legends ?? [])].slice(0, 10);
   m.lives = m.lives.slice(0, 30);
   saveMeta(m);
   saveRun(null);
   // 같은 해에 환생한 네 사람 (이름과 나이로 시드를 고정해 새로고침해도 같다)
   const peers = contemporaries(hashStr(`${s.name}|${s.houseId}|${s.age}|${m.totalLives}`), s.name);
-  return { lines, total, firstDeath, peers };
+  const goddess = goddessLines(s, { lifeNo: s.lifeNo ?? m.totalLives, prevCause, causeCount: m.codex[causeId] });
+  return { lines, total, firstDeath, peers, goddess, deed: legend?.deed };
 }

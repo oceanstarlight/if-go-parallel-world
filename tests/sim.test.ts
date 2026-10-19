@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { advanceYear, choose, createLife, currentEvent, visibleChoices } from '../src/engine/life';
+import { STRESS_HIGH, advanceYear, createLife } from '../src/engine/life';
 import { HOUSES } from '../src/data/houses';
 import { CHEATS } from '../src/data/cheats';
 import { DEATHS } from '../src/data/deaths';
 import { ALL_EVENTS } from '../src/data/events';
 import { josa } from '../src/engine/text';
-import type { Focus, LifeState } from '../src/types';
+import type { Legend, LifeState } from '../src/types';
+import { autoStep } from '../src/engine/sim';
 
 /** 재현 가능한 난수 (mulberry32) */
 function seeded(seed: number) {
@@ -18,21 +19,17 @@ function seeded(seed: number) {
   };
 }
 
-const FOCI: Focus[] = ['train', 'study', 'social', 'explore'];
+const LEGENDS: Legend[] = [
+  { name: '아르테', deed: '드래곤을 쓰러뜨린', kind: 'hero', houseId: 'hero', age: 61, lifeNo: 1 },
+  { name: '벨', deed: '악명 높은', kind: 'villain', houseId: 'demon', age: 40, lifeNo: 2 },
+  { name: '미오', deed: '어린 나이에 떠난', kind: 'ghost', houseId: 'farm', age: 9, lifeNo: 3 },
+  { name: '세라', deed: '대현자라 불린', kind: 'sage', houseId: 'elf', age: 120, lifeNo: 4 },
+];
 
 function simulate(seed: number, houseId: string, cheatId: string): LifeState {
   const rng = seeded(seed);
-  const s = createLife({ name: '테스트', houseId, cheatId, upgrades: {}, npcPast: seed % 3 === 0 ? { lulu: 3, grim: 2, momo: 2 } : {}, lifeNo: 1 + (seed % 5) }, rng);
-  for (let guard = 0; guard < 500 && !s.death; guard++) {
-    if (rng() < 0.15) s.focus = FOCI[Math.floor(rng() * 4)];
-    const ev = currentEvent(s);
-    if (ev) {
-      const n = visibleChoices(s, ev).length;
-      choose(s, Math.floor(rng() * n), rng);
-    } else {
-      advanceYear(s, rng);
-    }
-  }
+  const s = createLife({ name: '테스트', houseId, cheatId, upgrades: {}, npcPast: seed % 3 === 0 ? { lulu: 3, grim: 2, momo: 2 } : {}, lifeNo: 1 + (seed % 5), legends: seed % 4 === 0 ? LEGENDS : [] }, rng);
+  for (let guard = 0; guard < 500 && !s.death; guard++) autoStep(s, rng);
   return s;
 }
 
@@ -117,10 +114,12 @@ describe('성장 곡선', () => {
     const vals: number[] = [];
     for (let i = 0; i < 300; i++) {
       const rng = seeded(10_000 + i);
-      const s = createLife({ name: 't', houseId: 'farm', cheatId: 'growth', upgrades: {} });
+      const s = createLife({ name: 't', houseId: 'farm', cheatId: 'growth', upgrades: {}, traits: [] }, rng);
       while (s.age < 30) {
         s.pendingEventId = null; // 사건 무시, 순수 성장만
         s.death = null;
+        // 스트레스가 쌓이면 한 해 쉬는 평범한 플레이어
+        s.focus = (s.stress ?? 0) >= STRESS_HIGH ? 'rest' : 'train';
         advanceYear(s, rng);
       }
       vals.push(s.stats.vit);

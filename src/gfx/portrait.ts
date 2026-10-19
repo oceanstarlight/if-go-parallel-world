@@ -1,7 +1,7 @@
 import type { LifeState } from '../types';
 import { Painter, bayer, darken, grayscale, hashStr, lighten, mix, seeded } from './painter';
 
-export type Mood = 'neutral' | 'happy' | 'sad';
+export type Mood = 'neutral' | 'happy' | 'sad' | 'angry' | 'afraid';
 
 export type Stage = 'baby' | 'child' | 'teen' | 'adult' | 'elder';
 
@@ -42,9 +42,12 @@ export function specFromLife(s: LifeState): PortraitSpec {
 export const specKey = (p: PortraitSpec) =>
   `${p.seed}|${p.stage}|${p.houseId}|${p.jobId}|${p.jobRank}|${p.dead}|${p.mood ?? ''}|${p.injured ?? ''}`;
 
-/** 올해 기록의 마지막 결과로 표정을 정한다 */
+const MOOD_FACE: Record<string, Mood> = { joy: 'happy', gloom: 'sad', anger: 'angry', fear: 'afraid' };
+
+/** 기분이 있으면 그 표정, 없으면 올해 기록의 마지막 결과로 표정을 정한다 */
 function moodOf(s: LifeState): Mood {
   if (s.death || s.pendingEventId) return 'neutral';
+  if (s.mood && MOOD_FACE[s.mood]) return MOOD_FACE[s.mood];
   for (let i = s.log.length - 1; i >= 0 && s.log[i].age === s.age; i--) {
     const t = s.log[i].tone;
     if (t === 'good') return 'happy';
@@ -368,8 +371,12 @@ export function drawPortrait(spec: PortraitSpec, blink = false, sway = 0): Paint
     // 눈썹
     if (spec.stage !== 'baby') {
       const by = ey - 5;
-      if (spec.mood === 'sad') {
+      if (spec.mood === 'sad' || spec.mood === 'afraid') {
+        // 안쪽 끝이 올라간 눈썹
         fig.line(ex - side, by - 1, ex + side, by, hair[2]);
+      } else if (spec.mood === 'angry') {
+        // 안쪽 끝이 내려간 눈썹
+        fig.line(ex - side, by + 1, ex + side, by - 1, hair[2]);
       } else {
         fig.rect(ex - 1, by, 3, 1, hair[2]);
       }
@@ -384,6 +391,15 @@ export function drawPortrait(spec: PortraitSpec, blink = false, sway = 0): Paint
     // 활짝 웃는 입 (작은 반원)
     fig.rect(g.cx - 2, my, 4, 1, lip);
     fig.rect(g.cx - 1, my + 1, 2, 1, '#ff8aa0');
+  } else if (!spec.dead && spec.mood === 'angry') {
+    // 꾹 다문 입
+    fig.rect(g.cx - 2, my, 4, 1, darken(lip, 0.2));
+  } else if (!spec.dead && spec.mood === 'afraid') {
+    // 작게 벌린 입 + 식은땀
+    fig.rect(g.cx - 1, my, 2, 2, darken(lip, 0.3));
+    fig.px(g.cx + g.rx - 1, g.eyeY - 2, '#9ad8ff');
+    fig.px(g.cx + g.rx - 1, g.eyeY - 1, '#9ad8ff');
+    fig.px(g.cx + g.rx - 2, g.eyeY - 1, '#d8f0ff');
   } else if (!spec.dead && spec.mood === 'sad') {
     fig.rect(g.cx - 1, my, 2, 1, lip);
     fig.px(g.cx - 2, my + 1, lip);
