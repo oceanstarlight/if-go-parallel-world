@@ -52,6 +52,7 @@ export function createLife(opt: NewLifeOptions): LifeState {
     focus: 'train',
     log: [],
     pendingEventId: null,
+    lastEventId: null,
     extraLives: cheat.extraLives ?? 0,
     death: null,
   };
@@ -228,6 +229,7 @@ function pickEvent(s: LifeState, rng: Rng): GameEvent | null {
 
 function startEvent(s: LifeState, ev: GameEvent, rng: Rng) {
   s.seen.push(ev.id);
+  s.lastEventId = ev.id;
   log(s, `「${ev.title}」 ${fill(ev.text, s)}`, ev.milestone ? 'milestone' : 'normal');
   if (ev.auto) {
     const { outcome, passed } = resolve(s, ev.auto, rng);
@@ -250,6 +252,7 @@ export function canAdvance(s: LifeState) {
 export function advanceYear(s: LifeState, rng: Rng = Math.random) {
   if (!canAdvance(s)) return;
   s.age++;
+  s.lastEventId = null;
   grow(s, rng);
 
   if (rng() < naturalDeathChance(s)) {
@@ -267,13 +270,20 @@ export function advanceYear(s: LifeState, rng: Rng = Math.random) {
   }
 }
 
-export function choose(s: LifeState, index: number, rng: Rng = Math.random) {
+export interface ChoiceResult {
+  choice: Choice;
+  /** 판정 결과. 판정이 없는 선택지는 null */
+  passed: boolean | null;
+}
+
+export function choose(s: LifeState, index: number, rng: Rng = Math.random): ChoiceResult | null {
   const ev = currentEvent(s);
-  if (!ev || s.death) return;
+  if (!ev || s.death) return null;
   const choice = visibleChoices(s, ev)[index];
-  if (!choice) return;
+  if (!choice) return null;
   s.pendingEventId = null;
   log(s, `▸ ${choice.label}`);
   const { outcome, passed } = resolve(s, choice, rng);
   applyOutcome(s, outcome, passed, rng);
+  return { choice, passed };
 }

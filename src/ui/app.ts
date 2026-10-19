@@ -10,6 +10,11 @@ import { advanceYear, canAdvance, choose, createLife, currentEvent, visibleChoic
 import { fill } from '../engine/text';
 import type { StoneLine } from '../engine/score';
 import { buy, isUnlocked, loadMeta, loadRun, saveRun, settleLife } from '../meta';
+import { GfxStage } from '../gfx/stage';
+import { specFromLife } from '../gfx/portrait';
+import { battleFor, graveWeather, sceneFor } from '../gfx/mapping';
+import { enemySprite, playerSprite } from '../gfx/sprites';
+import { hashStr } from '../gfx/painter';
 
 type Screen = 'title' | 'setup' | 'life' | 'death' | 'altar' | 'codex' | 'lives';
 
@@ -27,6 +32,9 @@ interface App {
   setup: { name: string; houseId: string; cheatId: string };
   settlement: Settlement | null;
   notice: string;
+  gfx: GfxStage | null;
+  /** 전투 연출 중: 이 인덱스부터의 연대기는 아직 숨긴다 */
+  battleLogFrom: number | null;
 }
 
 const esc = (v: string | number) =>
@@ -34,7 +42,7 @@ const esc = (v: string | number) =>
 
 const FOCI: Focus[] = ['train', 'study', 'social', 'explore'];
 
-export function mount(root: HTMLElement) {
+export async function mount(root: HTMLElement) {
   const app: App = {
     screen: 'title',
     meta: loadMeta(),
@@ -42,21 +50,36 @@ export function mount(root: HTMLElement) {
     setup: { name: pick(PLAYER_NAMES, Math.random), houseId: 'farm', cheatId: 'growth' },
     settlement: null,
     notice: '',
+    gfx: await GfxStage.create(),
+    battleLogFrom: null,
   };
   // 사망 상태로 저장된 삶이 있으면 (정산 직전 새로고침) 바로 정산
   if (app.life?.death) settle(app);
 
   const render = () => {
     root.innerHTML = view(app);
+    syncGfx(app, root); // 캔버스가 붙어 높이가 정해진 뒤에 스크롤
     const log = root.querySelector('.chronicle');
     if (log) log.scrollTop = log.scrollHeight;
   };
+  const run = (action: string, arg?: string) => {
+    if (app.battleLogFrom !== null) {
+      app.gfx?.skipBattle();
+      return;
+    }
+    const pending = act(app, action, arg);
+    render();
+    pending?.then(render);
+  };
 
   root.addEventListener('click', (ev) => {
+    if (app.battleLogFrom !== null && (ev.target as HTMLElement).closest('.scene-host, .action')) {
+      app.gfx?.skipBattle();
+      return;
+    }
     const el = (ev.target as HTMLElement).closest<HTMLElement>('[data-act]');
     if (!el || el.hasAttribute('disabled')) return;
-    act(app, el.dataset.act!, el.dataset.arg);
-    render();
+    run(el.dataset.act!, el.dataset.arg);
   });
   root.addEventListener('input', (ev) => {
     const el = ev.target as HTMLInputElement;
@@ -67,11 +90,9 @@ export function mount(root: HTMLElement) {
     if ((ev.target as HTMLElement).tagName === 'INPUT') return;
     if (ev.code === 'Space') {
       ev.preventDefault();
-      act(app, 'advance');
-      render();
+      run('advance');
     } else if (/^Digit[1-9]$/.test(ev.code) && currentEvent(app.life)) {
-      act(app, 'choose', String(Number(ev.code.slice(5)) - 1));
-      render();
+      run('choose', String(Number(ev.code.slice(5)) - 1));
     }
   });
   render();
@@ -84,7 +105,8 @@ function settle(app: App) {
   app.life = null;
 }
 
-function act(app: App, action: string, arg?: string) {
+/** 비동기 연출(전투)이 있으면 끝날 때 resolve 되는 Promise 를 돌려준다 */
+function act(app: App, action: string, arg?: string): Promise<void> | void {
   app.notice = '';
   switch (action) {
     case 'go':
@@ -121,10 +143,32 @@ function act(app: App, action: string, arg?: string) {
       if (app.life && canAdvance(app.life)) advanceYear(app.life);
       afterStep(app);
       break;
-    case 'choose':
-      if (app.life) choose(app.life, Number(arg));
+    case 'choose': {
+      const s = app.life;
+      const ev = s && currentEvent(s);
+      if (!s || !ev) break;
+      const picked = visibleChoices(s, ev)[Number(arg)];
+      const battle = picked && app.gfx ? battleFor(ev.id, picked) : null;
+      const logFrom = s.log.length;
+      const res = choose(s, Number(arg));
       afterStep(app);
+      if (battle && res && res.passed !== null && app.gfx) {
+        app.battleLogFrom = logFrom;
+        return app.gfx
+          .playBattle({
+            player: playerSprite(specFromLife(s), battle.magic),
+            enemy: enemySprite(battle.enemy),
+            magic: battle.magic,
+            win: res.passed,
+            died: !!s.death,
+            groundY: app.gfx.groundY,
+          })
+          .then(() => {
+            app.battleLogFrom = null;
+          });
+      }
       break;
+    }
     case 'see-grave':
       if (app.life?.death) {
         settle(app);
@@ -162,7 +206,7 @@ function view(app: App): string {
       <button class="brand" data-act="go" data-arg="title">환생록</button>
       <div class="stones" title="환생석">◆ ${app.meta.soulStones}</div>
     </header>
-    <main class="screen screen-${app.screen}">${body}</main>
+    <main class="screen view-${app.screen}">${body}</main>
     ${app.notice ? `<div class="toast">${esc(app.notice)}</div>` : ''}
   `;
 }
@@ -172,6 +216,7 @@ function viewTitle(app: App): string {
   const found = Object.keys(m.codex).length;
   return `
     <section class="title-card">
+      <div class="scene-host title-scene" data-gfx="scene" data-maxh="${Math.floor(window.innerHeight * 0.5)}"></div>
       <p class="eyebrow">이세계 인생 연대기</p>
       <h1>환생록</h1>
       <p class="lede">눈을 뜨면 낯선 세계. 태어날 곳도, 쥐고 갈 권능도 고를 수 있다.<br>
@@ -243,7 +288,8 @@ function viewLife(app: App): string {
 
   // 연대기: 나이별로 묶는다
   const groups: { age: number; items: LifeState['log'] }[] = [];
-  for (const l of s.log) {
+  const shown = app.battleLogFrom === null ? s.log : s.log.slice(0, app.battleLogFrom);
+  for (const l of shown) {
     const last = groups[groups.length - 1];
     if (last && last.age === l.age) last.items.push(l);
     else groups.push({ age: l.age, items: [l] });
@@ -264,7 +310,13 @@ function viewLife(app: App): string {
   const rels = (['friend', 'rival', 'mentor', 'spouse'] as RelKey[]).map((k) => relLine(s, k)).join('');
 
   let panel: string;
-  if (s.death) {
+  if (app.battleLogFrom !== null) {
+    panel = `
+      <div class="death-call">
+        <p class="eyebrow">전투</p>
+        <p class="muted small">클릭하거나 Space 를 누르면 건너뛴다.</p>
+      </div>`;
+  } else if (s.death) {
     panel = `
       <div class="death-call">
         <p class="death-cause">${esc(deathById(s.death.causeId).name)}</p>
@@ -306,6 +358,7 @@ function viewLife(app: App): string {
 
   return `
     <aside class="sheet">
+      <div class="portrait-host" data-gfx="portrait"></div>
       <div class="sheet-head">
         <h2>${esc(s.name)}</h2>
         <p class="age">${s.age}세 · ${esc(job ? jobTitle(s.jobId, s.jobRank) : s.age < 18 ? '미성년' : '무직')}</p>
@@ -316,7 +369,10 @@ function viewLife(app: App): string {
       <ul class="rels">${rels || '<li class="muted small">아직 아무도 없다.</li>'}</ul>
       <button class="link" data-act="abandon">이 삶을 포기한다</button>
     </aside>
-    <section class="chronicle">${chronicle}</section>
+    <section class="center">
+      <div class="scene-host" data-gfx="scene" data-maxh="${Math.floor(window.innerHeight * 0.45)}"></div>
+      <div class="chronicle">${chronicle}</div>
+    </section>
     <section class="action">${panel}</section>
   `;
 }
@@ -329,12 +385,16 @@ function viewDeath(app: App): string {
   const title = s.jobId ? jobTitle(s.jobId, s.jobRank) : s.age < 18 ? '어린 영혼' : '이름 없는 자';
   return `
     <div class="grave-wrap">
+      <div class="grave-left">
+      <div class="scene-host" data-gfx="scene"></div>
       <div class="tombstone">
+        <div class="portrait-host small" data-gfx="portrait"></div>
         <p class="grave-title">${esc(title)}</p>
         <h2>${esc(s.name)}</h2>
         <p class="grave-years">0 — ${s.age}</p>
         <p class="grave-cause">${esc(d.name)}</p>
         <p class="grave-epitaph">${esc(d.epitaph)}</p>
+      </div>
       </div>
       <div class="settle">
         ${st.firstDeath ? '<p class="new-death">새로운 죽음이 도감에 기록되었다.</p>' : ''}
@@ -421,4 +481,27 @@ function viewLives(app: App): string {
     </table>`}
     <div class="setup-actions"><button class="btn" data-act="go" data-arg="title">돌아간다</button></div>
   `;
+}
+
+// ───────────────────────── 도트 그래픽 동기화 ─────────────────────────
+
+function syncGfx(app: App, root: HTMLElement) {
+  const g = app.gfx;
+  if (!g) return;
+  const sceneHost = root.querySelector<HTMLElement>('[data-gfx="scene"]');
+  const portraitHost = root.querySelector<HTMLElement>('[data-gfx="portrait"]');
+  if (app.screen === 'life' && app.life) {
+    const s = app.life;
+    g.setPortrait(specFromLife(s));
+    // 전투 중에는 장면을 바꾸지 않는다
+    if (app.battleLogFrom === null) g.setScene(sceneFor(s), hashStr(s.name) % 97);
+  } else if (app.screen === 'death' && app.settlement) {
+    const s = app.settlement.life;
+    g.setPortrait(specFromLife(s));
+    g.setScene('grave', hashStr(s.name) % 97, graveWeather(s.death!.causeId));
+  } else if (app.screen === 'title') {
+    g.setScene('title', 3);
+  }
+  g.mountScene(sceneHost);
+  g.mountPortrait(portraitHost);
 }

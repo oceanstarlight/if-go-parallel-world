@@ -38,6 +38,8 @@ export interface LifeState {
   focus: Focus;
   log: LogEntry[];
   pendingEventId: string | null;
+  /** 올해 일어난 사건 (장면 연출용). 예전 저장 데이터에는 없을 수 있다 */
+  lastEventId?: string | null;
   extraLives: number;
   death: Death | null;
 }

@@ -1,3 +1,9 @@
+@font-face {
+  font-family: 'Galmuri11';
+  src: url('../node_modules/galmuri/dist/Galmuri11.woff2') format('woff2');
+  font-display: swap;
+}
+
 :root {
   --bg: #0e0c0a;
   --panel: #171410;
@@ -13,6 +19,7 @@
   --milestone: #9fb4d1;
   --death: #d8574a;
   --serif: 'Noto Serif KR', 'Nanum Myeongjo', serif;
+  --pixel: 'Galmuri11', ui-monospace, monospace;
 }
 
 * { box-sizing: border-box; }
@@ -130,7 +137,7 @@ h4 { font-size: 13px; color: var(--muted); margin: 20px 0 6px; letter-spacing: 0
 .setup-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 32px; }
 
 /* ───── 인생 화면 ───── */
-.screen-life {
+.view-life {
   max-width: 1280px;
   display: grid;
   grid-template-columns: 260px 1fr 340px;
@@ -277,7 +284,67 @@ h4 { font-size: 13px; color: var(--muted); margin: 20px 0 6px; letter-spacing: 0
 
 /* 좁은 화면 대비 (PC 우선이지만 깨지지 않게) */
 @media (max-width: 960px) {
-  .screen-life { grid-template-columns: 1fr; grid-template-rows: none; height: auto; }
+  .view-life { grid-template-columns: 1fr; grid-template-rows: none; height: auto; }
   .chronicle { max-height: 50vh; }
   .grave-wrap { grid-template-columns: 1fr; }
 }
+
+/* ───── 도트 그래픽 ───── */
+.pixel-canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.scene-host {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  background: #07060a;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  flex: none;
+}
+.scene-host:empty, .portrait-host:empty { display: none; }
+.portrait-host {
+  display: flex;
+  justify-content: center;
+  margin: -4px 0 14px;
+}
+.portrait-host canvas { border: 2px solid var(--line-2); border-radius: 4px; }
+.portrait-host.small { width: 128px; margin: 0 auto 12px; }
+
+.center { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.center .chronicle { flex: 1; min-height: 0; }
+
+.battle-caption {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--pixel);
+  font-weight: 400;
+  font-size: 40px;
+  letter-spacing: 0.15em;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(1.3);
+  transition: opacity 0.2s, transform 0.25s;
+  text-shadow: 3px 3px 0 #120c10, -1px -1px 0 #120c10;
+}
+.battle-caption.show { opacity: 1; transform: scale(1); }
+.battle-caption.win { color: #f0d070; }
+.battle-caption.lose { color: #e05a4a; }
+
+.title-scene { margin: 0 auto 20px; width: min(960px, 100%); background: transparent; border: 0; }
+.title-card { padding-top: 3vh; }
+.title-card h1 { font-family: var(--pixel); font-weight: 400; letter-spacing: 0.25em; }
+
+.grave-left { display: flex; flex-direction: column; gap: 16px; }
+.grave-left .tombstone { border-radius: 8px; padding: 20px 24px; }
+
+.year-age, .stat-name, .stat-val, .eyebrow, .stones, .brand, kbd, .rel-role, .age {
+  font-family: var(--pixel);
+}
+.year-age { font-size: 13px; padding-top: 2px; }
