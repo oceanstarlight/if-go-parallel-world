@@ -22,10 +22,6 @@ export const MOOD_NAMES: Record<MoodKey, string> = {
   calm: '평온', joy: '기쁨', gloom: '우울', anger: '분노', fear: '불안',
 };
 
-export const MOOD_ICON: Record<MoodKey, string> = {
-  calm: '😌', joy: '😊', gloom: '😢', anger: '😠', fear: '😰',
-};
-
 /** 기분이 어떤 방침에 유리한지 (UI 안내) */
 export const MOOD_HINT: Record<MoodKey, string> = {
   calm: '특별한 보정 없음',

@@ -40,7 +40,10 @@ export function autoStep(s: LifeState, rng: Rng) {
   const ev = currentEvent(s);
   if (ev) {
     const open = visibleChoices(s, ev).map((c, i) => [c, i] as const).filter(([c]) => !choiceLocked(s, c));
-    choose(s, open[Math.floor(rng() * open.length)][1], rng);
+    // 확정 사망 선택지(대신 죽기 등)는 사람도 잘 고르지 않는다
+    const safe = open.filter(([c]) => !c.success.effect?.death);
+    const pool = safe.length && rng() < 0.9 ? safe : open;
+    choose(s, pool[Math.floor(rng() * pool.length)][1], rng);
     return;
   }
   if ((s.stress ?? 0) >= STRESS_HIGH && rng() < 0.7) s.focus = 'rest';

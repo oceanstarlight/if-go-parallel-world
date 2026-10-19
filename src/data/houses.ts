@@ -10,6 +10,7 @@ export const HOUSES: House[] = [
     flags: ['commoner'],
     growth: { vit: 1 },
     weight: 26,
+    gold: 30,
   },
   {
     id: 'merchant',
@@ -19,6 +20,7 @@ export const HOUSES: House[] = [
     flags: ['commoner'],
     growth: { int: 1 },
     weight: 14,
+    gold: 200,
   },
   {
     id: 'noble',
@@ -28,6 +30,7 @@ export const HOUSES: House[] = [
     flags: ['noble'],
     growth: { cha: 1, fame: 1 },
     weight: 4,
+    gold: 1000,
   },
   {
     id: 'demon',
@@ -38,6 +41,7 @@ export const HOUSES: House[] = [
     flags: ['demonblood'],
     growth: { mana: 1 },
     weight: 3,
+    gold: 300,
   },
   {
     id: 'hero',
@@ -48,6 +52,7 @@ export const HOUSES: House[] = [
     flags: ['heroblood'],
     growth: { vit: 1, mana: 1 },
     weight: 1.5,
+    gold: 120,
   },
   {
     id: 'elf',
@@ -58,6 +63,7 @@ export const HOUSES: House[] = [
     flags: ['elf'],
     growth: { mana: 1, cha: 1 },
     weight: 6,
+    gold: 100,
     agingMul: 0.5,
   },
   {
@@ -68,6 +74,7 @@ export const HOUSES: House[] = [
     flags: ['dwarf', 'commoner'],
     growth: { vit: 1, int: 1 },
     weight: 7,
+    gold: 180,
   },
   {
     id: 'beastkin',
@@ -77,6 +84,7 @@ export const HOUSES: House[] = [
     flags: ['beastkin', 'commoner'],
     growth: { vit: 1, luck: 1 },
     weight: 9,
+    gold: 40,
   },
   {
     id: 'eastern',
@@ -86,6 +94,7 @@ export const HOUSES: House[] = [
     flags: ['eastern'],
     growth: { vit: 1, cha: 1 },
     weight: 10,
+    gold: 120,
   },
   {
     id: 'mermaid',
@@ -96,6 +105,7 @@ export const HOUSES: House[] = [
     flags: ['mermaid'],
     growth: { cha: 1, mana: 1 },
     weight: 4,
+    gold: 80,
   },
   {
     id: 'sky',
@@ -106,6 +116,7 @@ export const HOUSES: House[] = [
     flags: ['sky'],
     growth: { luck: 1, mana: 1 },
     weight: 3,
+    gold: 250,
   },
   {
     id: 'witch',
@@ -116,6 +127,7 @@ export const HOUSES: House[] = [
     flags: ['witchblood'],
     growth: { mana: 1, int: 1 },
     weight: 4,
+    gold: 90,
   },
   {
     id: 'slime',
@@ -125,6 +137,7 @@ export const HOUSES: House[] = [
     flags: ['slime'],
     growth: { luck: 1 },
     weight: 1.5,
+    gold: 5,
   },
 ];
 

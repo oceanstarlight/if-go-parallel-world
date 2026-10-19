@@ -70,6 +70,58 @@ export interface LifeState {
   prevFocus?: Focus;
   /** 전설이 된 전생들 (생성 시 메타에서 복사) */
   legends?: Legend[];
+
+  // ── 경제 · 던전 (v0.7) ──
+  /** 골드. 마이너스면 빚 */
+  gold?: number;
+  /** 작년 순수입 (UI 표시용) */
+  lastIncome?: number;
+  /** 가방 */
+  bag?: Item[];
+  /** 장착 중인 장비 */
+  equip?: { weapon?: Item | null; armor?: Item | null };
+  /** 상점에서 산 영구 소유물 (집, 농지, 말 …) */
+  owned?: string[];
+  /** 던전 HP (한 해가 지나면 가득 찬다) */
+  hp?: number;
+  /** 이번 생에 클리어한 가장 깊은 5층 단위 지점 */
+  dgBest?: number;
+  /** 진행 중인 던전 원정 (던전 화면에서만) */
+  dive?: Dive | null;
+  /** 도둑질로 붙잡힌 횟수 */
+  caught?: number;
+}
+
+export type ItemKind = 'weapon' | 'armor' | 'loot' | 'potion';
+export type Rarity = 'common' | 'rare' | 'epic' | 'legend';
+
+/** 가방에 들어가는 물건. 순수 JSON */
+export interface Item {
+  /** 고유 번호 (같은 물건 여러 개 구분) */
+  uid: number;
+  /** 원형 id (상점 품목 또는 루트 테이블) */
+  base: string;
+  name: string;
+  kind: ItemKind;
+  rarity: Rarity;
+  /** 무기 공격력 / 방어구 방어력 / 회복량 */
+  power: number;
+  /** 상점에 팔 때 받는 값 */
+  value: number;
+}
+
+/** 던전 원정 한 번의 상태 */
+export interface Dive {
+  /** 지금 서 있는 계층 (5의 배수 지점) */
+  floor: number;
+  /** 이번 원정에서 주운 것 (귀환해야 가방에 들어간다) */
+  loot: Item[];
+  /** 이번 원정 기록 */
+  log: { text: string; tone: Tone }[];
+  /** 이번 원정에서 얻은 골드 */
+  gold: number;
+  /** 방금 끝난 구간 결과 */
+  last?: 'cleared' | 'fled' | null;
 }
 
 /** 다음 생에 전해지는 전생의 이야기 */
@@ -108,6 +160,10 @@ export interface Cond {
   test?: (s: LifeState) => boolean;
   traits?: string[];
   notTraits?: string[];
+  goldMin?: number;
+  goldMax?: number;
+  /** 상점 소유물 */
+  owns?: string[];
 }
 
 export interface Effect {
@@ -134,6 +190,16 @@ export interface Effect {
   will?: number;
   /** 불굴 목숨 증감 */
   extraLives?: number;
+  /** 골드 증감 */
+  gold?: number;
+  /** 가진 골드(양수일 때)의 비율만큼 증감. 0.5 = +50%, -1 = 전부 잃음 */
+  goldPct?: number;
+  /** 골드를 이 값으로 (파산 등) */
+  goldSet?: number;
+  /** 도둑질로 붙잡힘: 재산 몰수, 세 번째면 교수대 */
+  caught?: boolean;
+  /** 상점 소유물을 얻는다 */
+  own?: string;
 }
 
 export interface Outcome {
@@ -176,6 +242,8 @@ export interface GameEvent {
   weight?: number;
   /** 해당 방침일 때 가중치 ×3 */
   focus?: Focus;
+  /** 인생 트리의 가지 노드. 그 가지에 있을 때만 일어난다 */
+  branch?: string;
   choices?: Choice[];
   /** 선택지 없는 자동 사건 */
   auto?: Resolution;
@@ -194,6 +262,8 @@ export interface House {
   weight: number;
   /** 노화 속도 배율 (엘프는 느리다) */
   agingMul?: number;
+  /** 시작 골드 */
+  gold?: number;
 }
 
 export interface Cheat {
@@ -227,6 +297,10 @@ export interface Job {
   primary: StatKey;
   passive: Partial<Stats>;
   desc: string;
+  /** 직급별 연간 수입 (index 1~5) */
+  income: number[];
+  /** 전투력 보너스 (직급당) */
+  combat?: number;
 }
 
 export interface DeathDef {

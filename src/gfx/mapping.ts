@@ -1,6 +1,7 @@
 import type { Choice, LifeState } from '../types';
 import { DEFAULT_TIME, type ParticleKind, type SceneKind, type TimeOfDay } from './scenes';
 import type { EnemyKind } from './sprites';
+import { BATTLE_ENEMY } from '../engine/combat';
 
 /** 사건 → 장면. 'home' 은 가문의 고향 장면으로 바뀐다 */
 const EVENT_SCENE: Record<string, SceneKind | 'home'> = {
@@ -26,7 +27,10 @@ const EVENT_SCENE: Record<string, SceneKind | 'home'> = {
   d_elf: 'forest', d_dwarf: 'dungeon', d_beastkin: 'forest', d_eastern: 'temple', d_mermaid: 'port',
   d_sky: 'castle', d_witch: 'forest', d_slime: 'forest',
   x_blow_spouse: 'road', x_blow_friend: 'road', x_blow_mentor: 'road',
-  lg_statue: 'village', lg_bard: 'tavern', lg_book: 'library', lg_villain: 'village', lg_ghost: 'graveyard',
+  b_invest: 'port', b_debt_collector: 'village', b_debt_doom: 'village', b_heist: 'castle', b_jail: 'dungeon',
+  b_thief_recruit: 'tavern', b_court_exam: 'library', b_court_intrigue: 'castle', b_farm_land: 'village',
+  b_career_change: 'village', b_rich_scam: 'tavern',
+    lg_statue: 'village', lg_bard: 'tavern', lg_book: 'library', lg_villain: 'village', lg_ghost: 'graveyard',
 };
 
 const HOME: Record<string, SceneKind> = {
@@ -60,12 +64,7 @@ export function sceneFor(s: LifeState): SceneKind {
 }
 
 /** 전투 연출이 붙는 사건과 그 적 */
-const BATTLE_ENEMY: Record<string, EnemyKind> = {
-  c_bully: 'bully', m_rival10: 'bully', y_academy_rival: 'rival', a_rival_duel: 'rival',
-  a_rival_deathmatch: 'rival', a_bandits: 'bandit', a_dungeon: 'shadow', a_dragon: 'dragon',
-  a_monster_hunt: 'wolf', e_knight_war: 'soldier', a_war: 'soldier', e_adv_quest: 'wyvern',
-  e_adv_betrayal: 'traitor', a_yandere: 'stalker', e_demon_lord_hero: 'hero', e_hero_final: 'demon_lord',
-};
+
 
 /** 이 선택이 전투인가: 전투 사건 + 체력/마력 판정 */
 export function battleFor(eventId: string, choice: Choice): { enemy: EnemyKind; magic: boolean } | null {
@@ -100,7 +99,7 @@ export const ENEMY_HP: Record<EnemyKind, number> = {
 };
 
 /** 밤에 일어나는 사건 */
-const NIGHT_EVENTS = new Set(['m_awaken3', 'c_fever', 'a_yandere', 'a_dark_pact', 'a_pact_due', 'a_illness', 'e_adv_betrayal', 'a_inquisition', 'd_demon', 'd_witch', 'd_hero', 'x_blow_spouse', 'x_blow_friend', 'x_blow_mentor']);
+const NIGHT_EVENTS = new Set(['m_awaken3', 'c_fever', 'a_yandere', 'a_dark_pact', 'a_pact_due', 'a_illness', 'e_adv_betrayal', 'a_inquisition', 'd_demon', 'd_witch', 'd_hero', 'x_blow_spouse', 'x_blow_friend', 'x_blow_mentor', 'b_heist', 'b_court_intrigue']);
 /** 노을 무렵의 사건 */
 const DUSK_EVENTS = new Set(['npc_grim', 'a_spouse_death', 'a_mentor_death', 'a_reflection', 'a_friend_confess', 'a_rival_reconcile', 'e_hero_final', 'e_demon_lord_hero', 'lg_ghost', 'd_mermaid']);
 
@@ -112,4 +111,14 @@ export function timeFor(s: LifeState, kind: SceneKind): TimeOfDay {
   const base = DEFAULT_TIME[kind];
   if (base === 'day' && s.age >= 55) return 'dusk';
   return base;
+}
+
+/** 던전 보스의 전투 스프라이트 */
+export function bossEnemy(floor: number): EnemyKind {
+  if (floor >= 100) return 'demon_lord';
+  if (floor === 60 || floor === 75) return 'dragon';
+  if (floor >= 65 && floor <= 80) return 'wyvern';
+  if (floor >= 85) return 'hero';
+  if (floor <= 15) return 'wolf';
+  return 'shadow';
 }

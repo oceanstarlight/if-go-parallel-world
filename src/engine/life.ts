@@ -2,6 +2,10 @@ import type {
   Check, Choice, Effect, Focus, GameEvent, Legend, LifeState, MoodKey, Outcome, RelKey, Resolution, StatKey, Trait,
 } from '../types';
 import { rollTraits, traitById } from '../data/traits';
+import { battleOdds, isCombat } from './combat';
+import { maxHp, starterKit, yearlyEconomy } from './economy';
+import { OWNED_FOCUS } from '../data/market';
+import { inBranch } from '../data/branches';
 import { HOUSES, houseById } from '../data/houses';
 import { GOALS } from '../data/goals';
 import { CHEATS, cheatById } from '../data/cheats';
@@ -131,7 +135,16 @@ export function createLife(opt: NewLifeOptions, rng: Rng = Math.random): LifeSta
     mood: 'calm',
     will: clamp(30 + traits.reduce((a, t) => a + (t.will ?? 0), 0), 0, 100),
     legends: (opt.legends ?? []).slice(0, 5),
+    gold: (house.gold ?? 30) + 100 * (opt.upgrades.heirloom ?? 0),
+    lastIncome: 0,
+    bag: [],
+    equip: { weapon: null, armor: starterKit().armor },
+    owned: [],
+    // 심층의 각인: 이 계층부터 시작할 수 있다
+    dgBest: 5 * (opt.upgrades.deep_start ?? 0),
+    caught: 0,
   };
+  s.hp = maxHp(s);
   s.goals = pickGoals(s, rng);
   if ((opt.lifeNo ?? 1) > 1) {
     // 매 생마다 다시 만나는 환생의 여신
@@ -213,6 +226,7 @@ export function focusMul(s: LifeState, f: Focus): number {
   let mul = 1;
   for (const t of traitsOf(s)) mul *= t.focusMul?.[f] ?? 1;
   mul *= MOOD_MUL[s.mood ?? 'calm'][f] ?? 1;
+  for (const o of s.owned ?? []) mul *= OWNED_FOCUS[o]?.[f] ?? 1;
   if ((s.stress ?? 0) >= STRESS_HIGH) mul *= 0.6;
   return mul;
 }
@@ -257,7 +271,8 @@ function overwork(s: LifeState, rng: Rng): boolean {
 /** 노화 속도 배율 */
 function agingMul(s: LifeState): number {
   const t = traitsOf(s).reduce((a, x) => a * (x.agingMul ?? 1), 1);
-  return (houseById(s.houseId).agingMul ?? 1) * (cheatById(s.cheatId).agingMul ?? 1) * t;
+  const youth = (s.owned ?? []).includes('youth') ? 0.7 : 1;
+  return (houseById(s.houseId).agingMul ?? 1) * (cheatById(s.cheatId).agingMul ?? 1) * t * youth;
 }
 
 export function naturalDeathChance(s: LifeState): number {
@@ -341,18 +356,36 @@ export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
   if (e.stress) s.stress = clamp((s.stress ?? 0) + e.stress, 0, 100);
   if (e.will) s.will = clamp((s.will ?? 50) + e.will, 0, 100);
   if (e.extraLives) s.extraLives = Math.max(0, s.extraLives + e.extraLives);
+  if (e.gold) s.gold = (s.gold ?? 0) + e.gold;
+  if (e.goldPct && (s.gold ?? 0) > 0) s.gold = Math.round((s.gold ?? 0) * (1 + e.goldPct));
+  if (e.goldSet !== undefined) s.gold = e.goldSet;
+  if (e.own && !(s.owned ?? []).includes(e.own)) s.owned = [...(s.owned ?? []), e.own];
+  if (e.caught) {
+    s.caught = (s.caught ?? 0) + 1;
+    if ((s.gold ?? 0) > 0) s.gold = 0;
+    s.stress = clamp((s.stress ?? 0) + 30, 0, 100);
+    if (!s.flags.includes('jailed')) s.flags.push('jailed');
+    if (s.caught >= 3) kill(s, 'gallows');
+  }
   if (e.death) kill(s, e.death);
   else if (s.stats.vit <= 0) kill(s, e.zeroCause ?? 'illness');
 }
 
-function resolve(s: LifeState, r: Resolution, rng: Rng): { outcome: Outcome; passed: boolean | null } {
+/** 판정 성공 확률. 전투 사건이면 전투력 승부 */
+export function choiceChance(s: LifeState, eventId: string | null | undefined, c: Resolution & { label?: string }): number {
+  if (!c.check) return 100;
+  return isCombat(eventId, c as Choice) ? battleOdds(s, c as Choice).p : successChance(s, c.check);
+}
+
+function resolve(s: LifeState, r: Resolution, rng: Rng, eventId?: string): { outcome: Outcome; passed: boolean | null } {
   if (!r.check) return { outcome: r.success, passed: null };
-  let passed = rng() * 100 < successChance(s, r.check);
+  const chance = choiceChance(s, eventId, r);
+  let passed = rng() * 100 < chance;
   if (!passed && (s.rerolls ?? 0) > 0) {
     // 세이브 & 로드: 실패를 한 번 되돌린다
     s.rerolls = (s.rerolls ?? 0) - 1;
     log(s, `⟲ 세이브 포인트에서 다시 시작! (남은 횟수 ${s.rerolls})`, 'milestone');
-    passed = rng() * 100 < successChance(s, r.check);
+    passed = rng() * 100 < chance;
   }
   return { outcome: passed ? r.success : r.fail ?? r.success, passed };
 }
@@ -373,6 +406,7 @@ function applyOutcome(s: LifeState, o: Outcome, passed: boolean | null, rng: Rng
 
 export function eligible(s: LifeState, ev: GameEvent): boolean {
   if ((ev.once || ev.milestone) && s.seen.includes(ev.id)) return false;
+  if (ev.branch && !inBranch(s, ev.branch)) return false;
   return matches(ev.cond, s);
 }
 
@@ -402,7 +436,7 @@ function startEvent(s: LifeState, ev: GameEvent, rng: Rng) {
   s.lastEventId = ev.id;
   log(s, `「${ev.title}」 ${fill(ev.text, s)}`, ev.milestone ? 'milestone' : 'normal');
   if (ev.auto) {
-    const { outcome, passed } = resolve(s, ev.auto, rng);
+    const { outcome, passed } = resolve(s, ev.auto, rng, ev.id);
     applyOutcome(s, outcome, passed, rng);
   } else if (visibleChoices(s, ev).length > 0) {
     s.pendingEventId = ev.id;
@@ -425,6 +459,9 @@ export function advanceYear(s: LifeState, rng: Rng = Math.random) {
   s.lastEventId = null;
   grow(s, rng);
   updateMind(s, rng);
+  const money = yearlyEconomy(s, rng);
+  if (money) log(s, money, (s.gold ?? 0) < 0 ? 'bad' : 'normal');
+  s.hp = maxHp(s);
   if (overwork(s, rng) && s.death) return;
 
   if (rng() < naturalDeathChance(s)) {
@@ -470,7 +507,7 @@ export function choose(s: LifeState, index: number, rng: Rng = Math.random): Cho
   s.pendingEventId = null;
   if (choice.will) s.will = clamp((s.will ?? 50) - choice.will, 0, 100);
   log(s, `▸ ${choice.label}`);
-  const { outcome, passed } = resolve(s, choice, rng);
+  const { outcome, passed } = resolve(s, choice, rng, ev.id);
   applyOutcome(s, outcome, passed, rng);
   return { choice, passed };
 }

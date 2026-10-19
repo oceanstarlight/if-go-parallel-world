@@ -6,7 +6,7 @@ import { DEATHS, deathById } from '../data/deaths';
 import { PLAYER_NAMES, pick } from '../data/names';
 import { SHOP, itemCost } from '../data/shop';
 import { goalById } from '../data/goals';
-import { FOCUS_DESC, FOCUS_NAMES, MOOD_HINT, MOOD_ICON, MOOD_NAMES, REL_NAMES, STAT_KEYS, STAT_NAMES, affectionWord } from '../data/stats';
+import { FOCUS_DESC, FOCUS_NAMES, MOOD_HINT, MOOD_NAMES, REL_NAMES, STAT_KEYS, STAT_NAMES, affectionWord } from '../data/stats';
 import {
   STRESS_HIGH, advanceYear, applyOracle, canAdvance, choiceLocked, choose, createLife, currentEvent, focusMul, rollFate,
   successChance, traitsOf, visibleChoices,
@@ -21,10 +21,22 @@ import { ENEMY_HP, battleFor, graveWeather, sceneFor, timeFor } from '../gfx/map
 import { enemySprite, playerSprite } from '../gfx/sprites';
 import { hashStr } from '../gfx/painter';
 import { lifeTitle, makeShareCard, shareOrDownload } from './sharecard';
+import { icon, type IconName } from './icons';
+import { econRow, viewDungeon, viewTown } from './world';
+import type { MarketCat } from '../data/market';
+import { branchPaths } from '../data/branches';
+import { battleOdds, isCombat } from '../engine/combat';
+import { beginDive, canEnterDungeon, descend, endDiveOnDeath, retreat } from '../engine/dungeon';
+import { buy as marketBuy, drink, drinkBest, equip, innRest, sell, sellAllLoot } from '../engine/economy';
+import { bossEnemy } from '../gfx/mapping';
+import { biomeOf } from '../data/items';
+import { ENEMY_HP as BOSS_HP } from '../gfx/mapping';
 
-type Screen = 'title' | 'setup' | 'oracle' | 'life' | 'death' | 'altar' | 'codex' | 'lives';
+type Screen = 'title' | 'setup' | 'oracle' | 'life' | 'dungeon' | 'town' | 'death' | 'altar' | 'codex' | 'lives';
 /** 모바일 바텀시트 탭 */
-type Tab = 'none' | 'action' | 'info' | 'menu';
+type Tab = 'none' | 'action' | 'menu';
+
+const MOOD_ICON: Record<string, IconName> = { calm: 'leaf', joy: 'smile', gloom: 'frown', anger: 'angry', fear: 'annoyed' };
 
 interface Settlement extends SettleResult {
   life: LifeState;
@@ -56,6 +68,8 @@ interface App {
   oracle: Oracle | null;
   /** 방침을 고르지 않고 한 해를 넘기려 했다 (방침 카드를 강조) */
   focusNudge: boolean;
+  townTab: 'shop' | 'bag';
+  townCat: MarketCat;
 }
 
 const esc = (v: string | number) =>
@@ -77,6 +91,8 @@ export async function mount(root: HTMLElement) {
     dismissedEvent: null,
     oracle: null,
     focusNudge: false,
+    townTab: 'shop',
+    townCat: 'weapon',
   };
   // 사망 상태로 저장된 삶이 있으면 (정산 직전 새로고침) 바로 정산
   if (app.life?.death) settle(app);
@@ -148,6 +164,7 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
   app.focusNudge = false;
   switch (action) {
     case 'go':
+      if (arg === 'life' && !app.life) break;
       app.screen = arg as Screen;
       app.tab = 'none';
       if (arg === 'setup') {
@@ -275,6 +292,96 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
       app.notice = ok ? '해금되었다!' : '환생석이 부족하다.';
       break;
     }
+    // ───── 던전 (시간이 흐르지 않는다) ─────
+    case 'dungeon':
+      if (app.life && (app.life.dive || canEnterDungeon(app.life))) {
+        app.screen = 'dungeon';
+        app.tab = 'none';
+      }
+      break;
+    case 'dive':
+      if (app.life && canEnterDungeon(app.life) && !app.life.dive) beginDive(app.life, Number(arg));
+      afterStep(app);
+      break;
+    case 'descend': {
+      const s = app.life;
+      if (!s?.dive) break;
+      const bossFloor = s.dive.floor + 5;
+      const res = descend(s);
+      if (res === 'dead') endDiveOnDeath(s);
+      afterStep(app);
+      // 보스전 연출
+      if (app.gfx) {
+        const kind = bossEnemy(bossFloor);
+        const magic = s.stats.mana > s.stats.vit;
+        app.battleLogFrom = s.log.length;
+        return app.gfx
+          .playBattle({
+            player: playerSprite(specFromLife(s), magic),
+            enemy: enemySprite(kind),
+            magic,
+            glow: magic ? 0x7ad0ff : undefined,
+            enemyHp: BOSS_HP[kind],
+            win: res === 'cleared' || res === 'conquered',
+            died: res === 'dead',
+            groundY: app.gfx.groundY,
+          })
+          .then(() => {
+            app.battleLogFrom = null;
+          });
+      }
+      break;
+    }
+    case 'retreat':
+      if (app.life?.dive) {
+        app.notice = retreat(app.life);
+        app.screen = 'life';
+      }
+      afterStep(app);
+      break;
+    case 'drink':
+      if (app.life) app.notice = drinkBest(app.life).msg;
+      afterStep(app);
+      break;
+
+    // ───── 마을 (상점 · 가방 · 여관) ─────
+    case 'town':
+      if (app.life && !app.life.dive && !app.life.death) {
+        app.screen = 'town';
+        app.tab = 'none';
+      }
+      break;
+    case 'town-tab':
+      app.townTab = arg as 'shop' | 'bag';
+      break;
+    case 'town-cat':
+      app.townCat = arg as MarketCat;
+      break;
+    case 'mbuy':
+      if (app.life) app.notice = marketBuy(app.life, arg!).msg;
+      afterStep(app);
+      break;
+    case 'sell':
+      if (app.life) app.notice = sell(app.life, Number(arg)).msg;
+      afterStep(app);
+      break;
+    case 'sell-loot':
+      if (app.life) app.notice = sellAllLoot(app.life).msg;
+      afterStep(app);
+      break;
+    case 'equip':
+      if (app.life) app.notice = equip(app.life, Number(arg)).msg;
+      afterStep(app);
+      break;
+    case 'drink-item':
+      if (app.life) app.notice = drink(app.life, Number(arg)).msg;
+      afterStep(app);
+      break;
+    case 'inn':
+      if (app.life) app.notice = innRest(app.life).msg;
+      afterStep(app);
+      break;
+
     case 'abandon':
       if (app.life && confirm('이 삶을 포기하고 윤회의 문으로 돌아갈까? (기록과 환생석은 남지 않는다)')) {
         app.life = null;
@@ -320,12 +427,14 @@ function afterStep(app: App) {
 function view(app: App): string {
   const body = {
     title: viewTitle, setup: viewSetup, oracle: viewOracle, life: viewLife, death: viewDeath,
+    dungeon: (a: App) => (a.life ? viewDungeon(a.life) : viewTitle(a)),
+    town: (a: App) => (a.life ? viewTown(a.life, a.townTab, a.townCat) : viewTitle(a)),
     altar: viewAltar, codex: viewCodex, lives: viewLives,
   }[app.screen](app);
   return `
     <header class="topbar">
       <button class="brand" data-act="go" data-arg="title">환생록</button>
-      <div class="stones" title="환생석">◆ ${app.meta.soulStones}</div>
+      <div class="stones" title="환생석">${icon('diamond-gem')} ${app.meta.soulStones}</div>
     </header>
     <main class="screen view-${app.screen}">${body}</main>
     ${underbar(app)}
@@ -335,8 +444,23 @@ function view(app: App): string {
 
 /** 모바일 하단 고정 바 (데스크톱에서는 CSS 로 숨긴다) */
 function underbar(app: App): string {
-  const item = (act: string, arg: string, icon: string, label: string, on = false, extra = '') =>
-    `<button class="ub-item ${on ? 'on' : ''}" data-act="${act}" data-arg="${arg}" ${extra}><span class="ub-icon">${icon}</span><span class="ub-label">${label}</span></button>`;
+  const item = (act: string, arg: string, ic: IconName, label: string, on = false, extra = '') =>
+    `<button class="ub-item ${on ? 'on' : ''}" data-act="${act}" data-arg="${arg}" ${extra}><span class="ub-icon">${icon(ic)}</span><span class="ub-label">${label}</span></button>`;
+  if ((app.screen === 'dungeon' || app.screen === 'town') && app.life) {
+    const s = app.life;
+    let center = `<button class="ub-main" data-act="go" data-arg="life"><span>인생</span></button>`;
+    if (s.death) center = `<button class="ub-main danger" data-act="see-grave"><span>묘비로</span></button>`;
+    else if (app.screen === 'dungeon' && s.dive && s.dive.floor < 100) center = `<button class="ub-main pulse" data-act="descend"><span>하강</span><small>5층</small></button>`;
+    const inDive = !!s.dive;
+    return `
+      <nav class="underbar">
+        ${inDive ? item('drink', '', 'potion', '회복약') : item('go', 'life', 'user', '인생')}
+        ${item('dungeon', '', 'sword', '던전', app.screen === 'dungeon')}
+        ${center}
+        ${inDive ? item('retreat', '', 'door-closed', '귀환') : item('town', '', 'store', '마을', app.screen === 'town')}
+        ${inDive ? item('go', 'life', 'user', '인생', false, 'disabled') : item('town-tab', 'bag', 'backpack', '가방', app.screen === 'town' && app.townTab === 'bag')}
+      </nav>`;
+  }
   if (app.screen === 'life' && app.life) {
     const s = app.life;
     const ev = currentEvent(s);
@@ -346,23 +470,24 @@ function underbar(app: App): string {
     else if (ev) center = `<button class="ub-main pulse" data-act="tab" data-arg="action"><span>선택!</span></button>`;
     else if (needsFocus(s)) center = `<button class="ub-main" data-act="advance"><span>한 해</span><small>방침?</small></button>`;
     else center = `<button class="ub-main" data-act="advance"><span>한 해</span><small>▶</small></button>`;
+    const busy = !!(ev || s.death);
     return `
       <nav class="underbar">
-        ${item('tab', 'none', '📜', '연대기', tab === 'none')}
-        ${item('tab', 'action', ev ? '❗' : '🎯', ev ? '사건' : '방침', tab === 'action')}
+        ${item('dungeon', '', 'sword', '던전', false, busy || s.age < 12 ? 'disabled' : '')}
+        ${item('tab', 'action', ev ? 'warning-diamond' : 'target', ev ? '사건' : '방침', tab === 'action')}
         ${center}
-        ${item('tab', 'info', '🎀', '정보', tab === 'info')}
-        ${item('tab', 'menu', '☰', '메뉴', tab === 'menu')}
+        ${item('town', '', 'store', '마을', false, busy ? 'disabled' : '')}
+        ${item('tab', 'menu', 'menu', '정보', tab === 'menu')}
       </nav>`;
   }
   const scr = app.screen;
   return `
     <nav class="underbar">
-      ${item('go', 'title', '🏠', '홈', scr === 'title')}
-      ${app.life ? item('continue', '', '▶', '이어하기') : item('go', 'setup', '✨', '새 삶', scr === 'setup')}
-      ${item('go', 'altar', '◆', '제단', scr === 'altar')}
-      ${item('go', 'codex', '📖', '도감', scr === 'codex')}
-      ${item('go', 'lives', '🕰', '생애', scr === 'lives')}
+      ${item('go', 'title', 'home', '홈', scr === 'title')}
+      ${app.life ? item('continue', '', 'arrow-right', '이어하기') : item('go', 'setup', 'sparkles', '새 삶', scr === 'setup')}
+      ${item('go', 'altar', 'diamond-gem', '제단', scr === 'altar')}
+      ${item('go', 'codex', 'book-open', '도감', scr === 'codex')}
+      ${item('go', 'lives', 'hourglass', '생애', scr === 'lives')}
     </nav>`;
 }
 
@@ -407,7 +532,7 @@ function viewSetup(app: App): string {
         data-act="${kind}" data-arg="${id}" ${unlocked ? '' : 'disabled'}>
         <strong>${esc(name)}</strong>
         <span>${esc(desc)}</span>
-        ${unlocked ? '' : `<em>🔒 윤회의 제단 · ◆ ${cost ? itemCost(cost, 0) : '?'}</em>`}
+        ${unlocked ? '' : `<em>${icon('lock')} 윤회의 제단 · ${cost ? itemCost(cost, 0) : '?'}</em>`}
       </button>`;
   };
   const echo = meta.upgrades.echo ?? 0;
@@ -425,10 +550,10 @@ function viewSetup(app: App): string {
     </div>
     <div class="fate-toggle">
       <button class="fate-opt ${setup.fated ? 'selected' : ''}" data-act="fate" data-arg="on">
-        <strong>🎲 운명에 맡기기</strong><span>출신 ${HOUSES.length}종 · 권능 ${CHEATS.length}종 중 무작위 · 환생석 +20%</span>
+        <strong>${icon('sparkles')} 운명에 맡기기</strong><span>출신 ${HOUSES.length}종 · 권능 ${CHEATS.length}종 중 무작위 · 환생석 +20%</span>
       </button>
       <button class="fate-opt ${setup.fated ? '' : 'selected'}" data-act="fate" data-arg="off">
-        <strong>✍ 직접 고르기</strong><span>해금한 출신과 권능만 고를 수 있다</span>
+        <strong>${icon('target')} 직접 고르기</strong><span>해금한 출신과 권능만 고를 수 있다</span>
       </button>
     </div>
     ${setup.fated ? `
@@ -443,7 +568,7 @@ function viewSetup(app: App): string {
     ${echo || fortune ? `<p class="muted">전생의 잔향: 시작 능력치 +${echo * 2}${fortune ? ` · 행운 +${fortune * 5}` : ''}</p>` : ''}
     <div class="setup-actions">
       <button class="btn" data-act="go" data-arg="title">돌아간다</button>
-      <button class="btn primary" data-act="begin">${setup.fated ? '🎲 운명의 주사위를 굴린다' : '환생한다'}</button>
+      <button class="btn primary" data-act="begin">${setup.fated ? `${icon('sparkles')} 운명의 주사위를 굴린다` : '환생한다'}</button>
     </div>
   `;
 }
@@ -466,8 +591,15 @@ function goalList(s: LifeState): string {
   if (!goals.length) return '';
   return `<ul class="goals">${goals.map((g) => {
     const ok = g.done(s);
-    return `<li class="${ok ? 'done' : ''}"><span>${ok ? '✔' : '○'}</span>${esc(g.name)}<em>◆${g.reward}</em></li>`;
+    return `<li class="${ok ? 'done' : ''}"><span>${ok ? icon('check') : '○'}</span>${esc(g.name)}<em>${icon('diamond-gem')}${g.reward}</em></li>`;
   }).join('')}</ul>`;
+}
+
+/** 인생 트리에서 지금 서 있는 가지 */
+function branchLine(s: LifeState): string {
+  const paths = branchPaths(s);
+  if (!paths.length) return '';
+  return `<div class="branch-line">${icon('map')}<div>${paths.map((p) => `<span>인생 › ${p.map(esc).join(' › ')}</span>`).join('')}</div></div>`;
 }
 
 /** 기분 · 스트레스 · 의지력 한 줄 */
@@ -477,12 +609,12 @@ function mindRow(s: LifeState): string {
   const will = s.will ?? 0;
   return `
     <div class="mind">
-      <span class="mood-chip" title="${esc(MOOD_HINT[mood])}">${MOOD_ICON[mood]} ${MOOD_NAMES[mood]}</span>
+      <span class="mood-chip" title="${esc(MOOD_HINT[mood])}">${icon(MOOD_ICON[mood])} ${MOOD_NAMES[mood]}</span>
       <span class="meter ${stress >= STRESS_HIGH ? 'hot' : ''}" title="스트레스: 높으면 성장이 떨어지고 과로로 쓰러진다">
-        <b><span class="lbl">스트레스</span><span class="ico">🔥</span></b><i><u style="width:${stress}%"></u></i><small>${stress}</small>
+        <b><span class="lbl">스트레스</span><span class="ico">${icon('fire')}</span></b><i><u style="width:${stress}%"></u></i><small>${stress}</small>
       </span>
       <span class="meter will" title="의지력: 숙명을 거스르는 선택에 쓴다. 휴식으로 회복">
-        <b><span class="lbl">의지력</span><span class="ico">💪</span></b><i><u style="width:${will}%"></u></i><small>${will}</small>
+        <b><span class="lbl">의지력</span><span class="ico">${icon('zap')}</span></b><i><u style="width:${will}%"></u></i><small>${will}</small>
       </span>
     </div>`;
 }
@@ -502,7 +634,7 @@ function viewOracle(app: App): string {
     <section class="oracle">
       <p class="eyebrow">환생 전 · 여신의 문답 ${o.answers.length + 1}/${o.ids.length}</p>
       <div class="goddess-bubble">
-        <span class="goddess-icon">✨</span>
+        <span class="goddess-icon">${icon('sparkles')}</span>
         <div>
           ${o.reply ? `<p class="muted small">"${esc(o.reply)}"</p>` : '<p class="muted small">"잠깐! 태어나기 전에 몇 가지만 물어볼게♪"</p>'}
           <p class="goddess-q">"${esc(q.text)}"</p>
@@ -552,9 +684,9 @@ function viewLife(app: App): string {
   const rels = (['friend', 'rival', 'mentor', 'spouse'] as RelKey[]).map((k) => relLine(s, k)).join('');
   const relBlock = `<ul class="rels">${rels || '<li class="muted small">아직 아무도 없다. 인연을 만들어 보자!</li>'}</ul>`;
   const badges = [
-    s.extraLives ? '불굴 ♥' : '',
+    s.extraLives ? `불굴 ×${s.extraLives}` : '',
     s.rerolls ? `세이브 ⟲${s.rerolls}` : '',
-    s.fated ? '🎲 운명' : '',
+    s.fated ? '운명' : '',
   ].filter(Boolean).join(' · ');
 
   let panel: string;
@@ -586,14 +718,16 @@ function viewLife(app: App): string {
           ${choices.map((c, i) => {
             const locked = choiceLocked(s, c);
             const notes = [
-              c.check && cheat.showChance ? `🔍 성공률 ${successChance(s, c.check)}%` : '',
-              c.will ? `💪 의지력 ${c.will}${locked ? ` (부족: ${s.will ?? 0})` : ''}` : '',
+              c.check && !isCombat(ev.id, c) && cheat.showChance ? `${icon('search')}성공률 ${successChance(s, c.check)}%` : '',
+              c.will ? `${icon('zap')}의지력 ${c.will}${locked ? ` (부족: ${s.will ?? 0})` : ''}` : '',
             ].filter(Boolean).join(' · ');
+            const odds = isCombat(ev.id, c) ? battleOdds(s, c) : null;
             return `
             <button class="choice ${duo ? (i === 0 ? 'left' : 'right') : ''} ${c.will ? 'defy' : ''}" data-act="choose" data-arg="${i}" ${locked ? 'disabled' : ''}>
               <kbd>${duo ? (i === 0 ? '←' : '→') : i + 1}</kbd>
               <span>${esc(c.label)}</span>
-              ${notes ? `<em>${esc(notes)}</em>` : ''}
+              ${odds ? `<em class="odds-line">${icon('sword')}전투력 <b>${odds.cp}</b> vs 적 <b>${odds.ep}</b> · <span class="winp ${odds.p >= 60 ? 'good' : odds.p >= 35 ? 'mid' : 'bad'}">승률 ${odds.p}%</span></em>` : ''}
+              ${notes ? `<em>${notes}</em>` : ''}
             </button>`;
           }).join('')}
         </div>
@@ -636,9 +770,11 @@ function viewLife(app: App): string {
           </div>
           <div class="stats">${stats}</div>
           ${mindRow(s)}
+          ${econRow(s)}
         </div>
       </div>
       <div class="sheet-extra">
+        ${branchLine(s)}
         <h4>타고난 특성</h4>
         ${traitList(s)}
         <h4>이번 생의 목표</h4>
@@ -654,26 +790,29 @@ function viewLife(app: App): string {
     </section>
     <section class="action ${tab === 'action' ? 'open' : ''}">
       <button class="sheet-handle" data-act="tab" data-arg="none" aria-label="접기"></button>
+      <div class="quick">
+        <button class="btn" data-act="dungeon" ${ev || s.death || s.age < 12 ? 'disabled' : ''}>${icon('sword')} 던전${s.age < 12 ? ' (12세~)' : ''}</button>
+        <button class="btn" data-act="town" ${ev || s.death ? 'disabled' : ''}>${icon('store')} 마을</button>
+      </div>
       ${panel}
     </section>
-    <section class="m-panel ${tab === 'info' ? 'open' : ''}">
+    <section class="m-panel ${tab === 'menu' ? 'open' : ''}">
       <button class="sheet-handle" data-act="tab" data-arg="none" aria-label="접기"></button>
+      ${branchLine(s)}
       <h4>기분</h4>
-      <p class="small">${MOOD_ICON[s.mood ?? 'calm']} ${MOOD_NAMES[s.mood ?? 'calm']} — <span class="muted">${MOOD_HINT[s.mood ?? 'calm']}</span></p>
+      <p class="small mood-line">${icon(MOOD_ICON[s.mood ?? 'calm'])} ${MOOD_NAMES[s.mood ?? 'calm']} — <span class="muted">${MOOD_HINT[s.mood ?? 'calm']}</span></p>
       <h4>타고난 특성</h4>
       ${traitList(s)}
       <h4>이번 생의 목표</h4>
       ${goalList(s)}
       <h4>인연</h4>
       ${relBlock}
-    </section>
-    <section class="m-panel ${tab === 'menu' ? 'open' : ''}">
-      <button class="sheet-handle" data-act="tab" data-arg="none" aria-label="접기"></button>
+      <h4>메뉴</h4>
       <div class="menu">
-        <button class="btn" data-act="go" data-arg="title">🏠 윤회의 문 (삶은 저장된다)</button>
-        <button class="btn" data-act="go" data-arg="altar">◆ 윤회의 제단</button>
-        <button class="btn" data-act="go" data-arg="codex">📖 사인 도감</button>
-        <button class="btn" data-act="go" data-arg="lives">🕰 지난 생애</button>
+        <button class="btn" data-act="go" data-arg="title">${icon('home')} 윤회의 문 (삶은 저장된다)</button>
+        <button class="btn" data-act="go" data-arg="altar">${icon('diamond-gem')} 윤회의 제단</button>
+        <button class="btn" data-act="go" data-arg="codex">${icon('book-open')} 사인 도감</button>
+        <button class="btn" data-act="go" data-arg="lives">${icon('hourglass')} 지난 생애</button>
         <button class="btn danger" data-act="abandon">이 삶을 포기한다</button>
       </div>
     </section>
@@ -705,13 +844,13 @@ function viewDeath(app: App): string {
           <p class="grave-years">0 — ${s.age} · ${esc(houseById(s.houseId).name)}</p>
           <p class="grave-cause">${esc(d.name)}</p>
           <p class="grave-epitaph">${esc(d.epitaph)}</p>
-          ${st.deed ? `<p class="grave-deed">🏛 전설이 되었다 — 「${esc(st.deed)} ${esc(s.name)}」<br><span class="muted small">다음 생에서 다시 만나게 될지도?</span></p>` : ''}
+          ${st.deed ? `<p class="grave-deed">${icon('crown')} 전설이 되었다 — 「${esc(st.deed)} ${esc(s.name)}」<br><span class="muted small">다음 생에서 다시 만나게 될지도?</span></p>` : ''}
           ${goalList(s)}
         </div>
       </div>
       <div class="settle">
         <div class="goddess-bubble">
-          <span class="goddess-icon">✨</span>
+          <span class="goddess-icon">${icon('sparkles')}</span>
           <div><p class="eyebrow">환생의 여신</p>${st.goddess.map((l) => `<p>"${esc(l)}"</p>`).join('')}</div>
         </div>
         ${st.firstDeath ? '<p class="new-death">새로운 죽음이 도감에 기록되었다!</p>' : ''}
@@ -722,8 +861,8 @@ function viewDeath(app: App): string {
         <p class="muted small">당신과 같은 해, 같은 여신에게 등을 떠밀린 네 사람의 일생.</p>
         <ul class="peers">${peers}</ul>
         <div class="share-row">
-          <button class="btn" data-act="save-card">🖼 결과 카드 저장</button>
-          <button class="btn" data-act="share">📤 공유하기</button>
+          <button class="btn" data-act="save-card">${icon('download')} 결과 카드 저장</button>
+          <button class="btn" data-act="share">${icon('share')} 공유하기</button>
         </div>
         <div class="setup-actions">
           <button class="btn" data-act="go" data-arg="altar">윤회의 제단</button>
@@ -801,7 +940,7 @@ function viewLives(app: App): string {
         <strong>${esc(l.name)}</strong>
         <span class="muted small">${esc(houseById(l.houseId).name)} · ${esc(l.title)}</span>
         <span class="small">향년 ${l.age}세 · <b class="tone-death">${esc(deathById(l.causeId).name)}</b>${l.goalsDone !== undefined ? ` · 목표 ${l.goalsDone}/3` : ''}</span>
-        ${l.deed ? `<span class="small deed">🏛 ${esc(l.deed)} 전설</span>` : ''}
+        ${l.deed ? `<span class="small deed">${icon('crown')} ${esc(l.deed)} 전설</span>` : ''}
         <em>◆ ${l.stones}</em>
       </li>`).join('')}
     </ul>`}
@@ -869,6 +1008,16 @@ function syncGfx(app: App, root: HTMLElement) {
     const s = app.settlement.life;
     g.setPortrait(specFromLife(s));
     g.setScene('grave', hashStr(s.name) % 97, graveWeather(s.death!.causeId));
+  } else if (app.screen === 'dungeon' && app.life) {
+    const s = app.life;
+    if (app.battleLogFrom === null) {
+      const b = biomeOf(Math.max(1, s.dive?.floor ?? 1));
+      g.setPortrait(specFromLife(s));
+      g.setScene(b.scene, (s.dive?.floor ?? 0) + 7, b.weather, 'night');
+    }
+  } else if (app.screen === 'town' && app.life) {
+    g.setPortrait(specFromLife(app.life));
+    g.setScene('village', hashStr(app.life.name) % 97);
   } else if (app.screen === 'title') {
     g.setScene('title', 3);
   }

@@ -35,6 +35,15 @@ export const CAREER: GameEvent[] = [
         success: { text: '나무 길드 카드를 받았다. 최하위 F랭크지만, 이세계 모험가의 로망은 S급이다!', effect: { job: 'adventurer' }, tone: 'milestone' },
       },
       {
+        label: '왕궁 문관 시험에 응시한다', cond: { stats: { int: 34 } }, check: { stat: 'int', dc: 52 },
+        success: { text: '백 대 일의 경쟁을 뚫고 합격! 왕궁의 「서기관」이 되었다. 엘리트 코스다!', effect: { job: 'court', stats: { fame: 4 } }, tone: 'milestone' },
+        fail: { text: '낙방… 일단 아무 일이나 하면서 다음 기회를 노리자.', effect: { job: 'adventurer', stress: 10 } },
+      },
+      {
+        label: '뒷골목에 발을 들인다', cond: { notFlags: ['heroblood'], karmaMax: 20 },
+        success: { text: '도적 길드의 문을 두드렸다. 정직하게 벌기엔 세상이 너무 팍팍하다!', effect: { job: 'thief', karma: -8 }, tone: 'milestone' },
+      },
+      {
         label: '고향에서 농사를 짓는다', cond: { notHouses: ['noble', 'demon'] },
         success: { text: '괭이를 들었다. 슬로우 라이프, 나쁘지 않다.', effect: { job: 'farmer' }, tone: 'milestone' },
       },
