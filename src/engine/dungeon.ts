@@ -79,7 +79,11 @@ function materialDrop(rng: Rng, floor: number): Item {
  */
 function hurt(s: LifeState, dmg: number, floor: number): 'ok' | 'dead' | 'saved' | 'fallen' {
   s.hp = Math.max(0, (s.hp ?? 0) - Math.max(1, Math.round(dmg)));
-  if (s.hp > 0) return 'ok';
+  return s.hp > 0 ? 'ok' : knockout(s, floor);
+}
+
+/** HP 가 바닥났을 때 */
+function knockout(s: LifeState, floor: number): 'dead' | 'saved' | 'fallen' {
   const cause = floor > 50 ? 'abyss' : 'dungeon';
   if (!s.dgFallen && s.extraLives <= 0) {
     fall(s, floor);
@@ -126,7 +130,20 @@ function fall(s: LifeState, floor: number) {
 export type DescendResult = 'cleared' | 'fled' | 'dead' | 'conquered' | 'fallen';
 
 /** 5층을 내려간다 */
+/** 5층을 내려간다: 앞의 4층 + 보스까지 자동으로 (자동 플레이·시뮬레이션용) */
 export function descend(s: LifeState, rng: Rng = Math.random): DescendResult {
+  const r = descendPath(s, rng);
+  return r === 'boss' ? bossAuto(s, rng) : r;
+}
+
+/** 지금 구간의 보스 */
+export function bossAhead(s: LifeState) {
+  const floor = (s.dive?.floor ?? 0) + 5;
+  return { floor, name: bossOf(floor), ep: floorPower(floor, true) };
+}
+
+/** 앞의 4층을 지나 보스 앞까지 간다. 보스 앞에 서면 'boss' (턴제 전투는 UI 가 맡는다) */
+export function descendPath(s: LifeState, rng: Rng = Math.random): DescendResult | 'boss' {
   const d = s.dive;
   if (!d || s.death || d.fallen || d.floor >= DUNGEON_DEPTH) return 'fled';
   const cp = combatPower(s);
@@ -169,34 +186,68 @@ export function descend(s: LifeState, rng: Rng = Math.random): DescendResult {
       note(s, `${f}층 · 맑은 샘물을 마셨다. HP +${heal}`, 'good');
     }
   }
-  // 보스
-  const bf = d.floor + 5;
-  const boss = bossOf(bf);
-  const ep = floorPower(bf, true);
-  const p = winChance(cp, ep) / 100;
+  return 'boss';
+}
+
+/** 보스를 쓰러뜨렸다: 전리품, 귀환 포탈, 기록 */
+function winBoss(s: LifeState, rng: Rng): DescendResult {
+  const d = s.dive!;
+  const { floor: bf, name: boss } = bossAhead(s);
+  const [ln, lv] = bossLoot(bf);
+  d.loot.push(makeLoot(ln, lv, rarityRoll(rng, bf, true), rng));
+  if (rng() < 0.5) d.loot.push(gearDrop(rng, bf, true));
+  d.gold += bf * 20;
+  gainStat(s, 'vit', 1, rng);
+  gainStat(s, 'mana', 1, rng);
+  d.floor = bf;
+  s.dgBest = Math.max(s.dgBest ?? 0, bf);
+  bump(rec(s).bosses, boss);
+  rec(s).maxFloor = Math.max(rec(s).maxFloor, bf);
+  note(s, `${bf}층 보스 「${boss}」 격파! 귀환 포탈이 열렸다.`, 'milestone');
+  if (bf >= DUNGEON_DEPTH) return conquer(s);
+  d.last = 'cleared';
+  return 'cleared';
+}
+
+/** 보스전 자동 판정 (승률) */
+function bossAuto(s: LifeState, rng: Rng): DescendResult {
+  const d = s.dive!;
+  const { floor: bf, name: boss, ep } = bossAhead(s);
+  const p = winChance(combatPower(s), ep) / 100;
   if (rng() < p) {
-    const [ln, lv] = bossLoot(bf);
-    d.loot.push(makeLoot(ln, lv, rarityRoll(rng, bf, true), rng));
-    if (rng() < 0.5) d.loot.push(gearDrop(rng, bf, true));
-    d.gold += bf * 20;
-    gainStat(s, 'vit', 1, rng);
-    gainStat(s, 'mana', 1, rng);
+    const out = winBoss(s, rng);
     const res = hurt(s, ep * 0.22 * (1.1 - p), bf);
-    d.floor = bf;
-    s.dgBest = Math.max(s.dgBest ?? 0, bf);
-    bump(rec(s).bosses, boss);
-    rec(s).maxFloor = Math.max(rec(s).maxFloor, bf);
-    note(s, `${bf}층 보스 「${boss}」 격파! 귀환 포탈이 열렸다. (HP ${s.hp})`, 'milestone');
-    if (res !== 'ok') return finish(s, res);
-    if (bf >= DUNGEON_DEPTH) return conquer(s);
-    d.last = 'cleared';
-    return 'cleared';
+    return res === 'ok' ? out : finish(s, res);
   }
   const res = hurt(s, ep * 0.6, bf);
   if (res === 'dead' || res === 'fallen') return finish(s, res);
   note(s, `${bf}층 보스 「${boss}」에게 패배… 도망쳐 나왔다.`, 'bad');
   d.last = 'fled';
   return 'fled';
+}
+
+/** 턴제 보스전이 끝났다: 결과와 남은 HP 를 반영한다 */
+export function settleBoss(s: LifeState, result: 'win' | 'lose' | 'fled', hpLeft: number, rng: Rng = Math.random): DescendResult {
+  const d = s.dive;
+  if (!d) return 'fled';
+  const { floor: bf, name: boss } = bossAhead(s);
+  if (result === 'win') {
+    s.hp = Math.max(1, hpLeft);
+    return winBoss(s, rng);
+  }
+  if (result === 'fled') {
+    s.hp = Math.max(1, hpLeft);
+    note(s, `${bf}층 보스 「${boss}」에게서 간신히 도망쳤다. (HP ${s.hp})`, 'bad');
+    d.last = 'fled';
+    return 'fled';
+  }
+  s.hp = 0;
+  const res = knockout(s, bf);
+  if (res === 'saved') {
+    d.last = 'fled';
+    return 'fled';
+  }
+  return finish(s, res);
 }
 
 function finish(s: LifeState, res: 'dead' | 'saved' | 'fallen'): DescendResult {

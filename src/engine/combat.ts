@@ -24,12 +24,16 @@ export function isCombat(eventId: string | null | undefined, c: Choice): boolean
   return !!eventId && !!BATTLE_ENEMY[eventId] && (stat === 'vit' || stat === 'mana');
 }
 
+/** 전투력 계수: 체력·마력이 주력, 행운은 급소를 노리는 감, 지성은 전술 */
+export const CP_WEIGHT = { vit: 1, mana: 1, main: 0.5, luck: 0.6, int: 0.25 } as const;
+
 /** 내 전투력: 능력치 + 장비 + 직업 */
 export function combatPower(s: LifeState): number {
   const { vit, mana, int, luck } = s.stats;
   const gear = (s.equip?.weapon?.power ?? 0) + (s.equip?.armor?.power ?? 0);
   const job = (jobById(s.jobId)?.combat ?? 0) * s.jobRank;
-  return Math.round(vit + mana + 0.5 * Math.max(vit, mana) + 0.25 * (int + luck) + gear + job);
+  const w = CP_WEIGHT;
+  return Math.round(vit * w.vit + mana * w.mana + w.main * Math.max(vit, mana) + luck * w.luck + int * w.int + gear + job);
 }
 
 /** 사건 전투의 적 전투력 (판정 난이도에서) */

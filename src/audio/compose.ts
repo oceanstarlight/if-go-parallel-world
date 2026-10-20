@@ -170,7 +170,7 @@ export function moodFor(screen: string): Mood {
     case 'life': return 'life';
     case 'town': return 'town';
     case 'dungeon': return 'dungeon';
-    case 'death': return 'requiem';
+    case 'death': case 'credits': return 'requiem';
     case 'oracle': case 'altar': case 'codex': case 'lives': return 'altar';
     default: return 'title';
   }

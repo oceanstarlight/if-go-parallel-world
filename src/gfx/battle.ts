@@ -290,7 +290,7 @@ export class BattleDirector {
   }
 
   /** 공격 한 번을 타임라인에 붙인다 */
-  private attack(tl: gsap.core.Timeline, a: Actor, t: Actor, o: { home: number; targetHome: number; dmg: number; hpTo: number; crit: boolean; magic: boolean; glow?: number }) {
+  private attack(tl: gsap.core.Timeline, a: Actor, t: Actor, o: { home: number; targetHome: number; dmg: number; hpTo: number; crit: boolean; magic: boolean; glow?: number; miss?: boolean }) {
     const home = o.home;
     const dir = a.facing;
     const dist = o.magic ? 4 : Math.abs(o.targetHome - home) - (t.w + a.w) * 0.28;
@@ -319,6 +319,13 @@ export class BattleDirector {
         .to(a.root.scale, { x: 1.12, y: 0.9, duration: 0.11 }, '<');
     }
     tl.call(() => {
+      if (o.miss) {
+        // 회피: 맞을 쪽이 훌쩍 비켜선다
+        const away = a.facing * 8;
+        this.tw(gsap.fromTo(t.root, { x: t.root.x }, { x: t.root.x + away, duration: 0.12, yoyo: true, repeat: 1, ease: 'power1.out', snap: { x: 1 } }));
+        this.burst(t.mid.x, t.root.y - 2, 6, [0xd8d0c0, 0xffffff], 0.8);
+        return;
+      }
       this.impact(t, a, o.dmg, o.crit, o.magic);
       this.tw(gsap.to(this.hp, { [a === this.player ? 'e' : 'p']: o.hpTo, duration: 0.35, ease: 'power2.out' }));
     })
@@ -409,6 +416,109 @@ export class BattleDirector {
           host.caption.className = `battle-caption show ${o.win ? 'win' : 'lose'}`;
         })
         .to({}, { duration: 0.85 });
+    });
+  }
+
+  // ───────────────── 턴제 전투 (한 합씩) ─────────────────
+
+  private sess: { pHome: number; eHome: number; gy: number; shadowTick: () => void; glow?: number } | null = null;
+
+  /** 등장까지만: 두 인물을 세워 둔다 */
+  open(o: Omit<BattleOptions, 'win' | 'died'> & { hpP: number; hpE: number }): Promise<void> {
+    const host = this.host;
+    this.player = new Actor(o.player, 1, host);
+    this.enemy = new Actor(o.enemy, -1, host);
+    const gy = Math.min(o.groundY + 4, SCENE_H - 4);
+    const big = o.enemy.idle.w > 60;
+    const pHome = 64, eHome = big ? 176 : 170;
+    this.hp = { p: o.hpP, e: o.hpE };
+    if (o.glow) this.player.root.filters = [new GlowFilter({ distance: 4, outerStrength: 0.9, color: o.glow, quality: 0.2 })];
+    this.dim.rect(0, 0, SCENE_W, SCENE_H).fill({ color: 0x1a1a5a, alpha: 0.12 });
+    const shadow = new Graphics();
+    host.layer.addChild(this.dim, shadow, this.enemy.root, this.player.root, this.hpBar);
+    this.player.root.position.set(-30, gy);
+    this.enemy.root.position.set(SCENE_W + 60, gy);
+    host.caption.textContent = '';
+    host.caption.className = 'battle-caption';
+    const shadowTick = () => {
+      shadow.clear();
+      shadow.ellipse(this.player.root.x, gy, 10, 2).fill({ color: 0x000000, alpha: 0.35 * this.player.root.alpha });
+      shadow.ellipse(this.enemy.root.x, gy, big ? 30 : 10, 2).fill({ color: 0x000000, alpha: 0.35 * this.enemy.root.alpha });
+    };
+    this.sess = { pHome, eHome, gy, shadowTick, glow: o.glow };
+    return this.run((tl) => {
+      tl.to(this.player.root, { x: pHome, duration: 0.38, ease: 'power2.out', snap: { x: 1 } })
+        .to(this.enemy.root, { x: eHome, duration: 0.38, ease: 'power2.out', snap: { x: 1 } }, '<');
+    });
+  }
+
+  /** 한 턴의 타격들을 차례로 보여 준다 */
+  turn(blows: { from: 'p' | 'e'; dmg: number; crit: boolean; magic: boolean; miss: boolean; hpTo: number; guard?: boolean }[]): Promise<void> {
+    const ss = this.sess;
+    if (!ss) return Promise.resolve();
+    return this.run((tl) => {
+      for (const b of blows) {
+        if (b.guard) {
+          // 방어 태세: 푸른 빛이 감싼다
+          tl.call(() => {
+            this.burst(this.player.mid.x, this.player.mid.y, 14, [0x9ad0ff, 0xffffff, 0x7aa8ff], 0.9, -0.02);
+            this.tw(gsap.fromTo(this.player.root.scale, { x: 0.92, y: 1.08 }, { x: 1, y: 1, duration: 0.3, ease: 'back.out(2)' }));
+          }).to({}, { duration: 0.3 });
+          continue;
+        }
+        const mine = b.from === 'p';
+        this.attack(tl, mine ? this.player : this.enemy, mine ? this.enemy : this.player, {
+          home: mine ? ss.pHome : ss.eHome, targetHome: mine ? ss.eHome : ss.pHome,
+          dmg: b.dmg, hpTo: b.hpTo, crit: b.crit, magic: b.magic, miss: b.miss, glow: mine ? ss.glow : undefined,
+        });
+        tl.to({}, { duration: 0.12 });
+      }
+    });
+  }
+
+  /** 끝: 승리·패배·도주 연출 후 정리 */
+  close(result: 'win' | 'lose' | 'died' | 'fled'): Promise<void> {
+    const ss = this.sess;
+    if (!ss) return Promise.resolve();
+    const host = this.host;
+    return new Promise((resolve) => {
+      const tl = gsap.timeline({ onUpdate: ss.shadowTick, onComplete: () => this.finish(resolve) });
+      this.tl = tl;
+      tl.call(() => {
+        if (result === 'win') {
+          const e = this.enemy;
+          e.breathing = false;
+          e.setPose('hurt');
+          this.burst(e.mid.x, e.mid.y, 26, [0xffffff, 0xfff4a0, 0xffc8f0, 0xa8f0ff], 1.1, -0.02);
+          this.tw(gsap.to(e.root, { alpha: 0, y: ss.gy + 6, duration: 0.55, ease: 'steps(6)' }));
+        } else if (result === 'fled') {
+          this.player.setPose('idle');
+          this.tw(gsap.to(this.player.root, { x: -40, duration: 0.45, ease: 'power2.in', snap: { x: 1 } }));
+        } else {
+          const p = this.player;
+          p.breathing = false;
+          p.setPose('hurt');
+          if (result === 'died') {
+            this.tw(gsap.to(p.root, { rotation: -Math.PI / 2, alpha: 0.7, duration: 0.45, ease: 'bounce.out' }));
+            this.soften();
+          } else this.tw(gsap.to(p.root, { y: ss.gy + 3, duration: 0.2, ease: 'power2.out' }));
+        }
+      })
+        .to({}, { duration: 0.45 })
+        .call(() => {
+          host.caption.textContent = result === 'win' ? '승리' : result === 'fled' ? '도주' : result === 'died' ? '쓰러졌다' : '패배';
+          host.caption.className = `battle-caption show ${result === 'win' ? 'win' : 'lose'}`;
+        })
+        .to({}, { duration: 0.8 });
+      this.sess = null;
+    });
+  }
+
+  private run(build: (tl: gsap.core.Timeline) => void): Promise<void> {
+    return new Promise((resolve) => {
+      const tl = gsap.timeline({ onUpdate: this.sess?.shadowTick, onComplete: () => resolve() });
+      this.tl = tl;
+      build(tl);
     });
   }
 

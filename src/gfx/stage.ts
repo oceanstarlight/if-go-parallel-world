@@ -462,6 +462,30 @@ export class GfxStage {
     this.battle?.skip();
   }
 
+  /** 턴제 전투: 세우기 → 한 합씩 → 마무리 */
+  openBattle(o: Omit<BattleOptions, 'win' | 'died'> & { hpP: number; hpE: number }): Promise<void> {
+    this.battle?.skip();
+    const director = new BattleDirector({
+      layer: this.battleLayer,
+      sceneRoot: this.sceneRoot,
+      caption: this.caption,
+      shake: (n) => { this.shake = Math.max(this.shake, n); },
+      texOf,
+    });
+    this.battle = director;
+    return director.open(o);
+  }
+
+  battleTurn(blows: Parameters<BattleDirector['turn']>[0]): Promise<void> {
+    return this.battle?.turn(blows) ?? Promise.resolve();
+  }
+
+  closeBattle(result: 'win' | 'lose' | 'died' | 'fled'): Promise<void> {
+    const b = this.battle;
+    if (!b) return Promise.resolve();
+    return b.close(result).then(() => { if (this.battle === b) this.battle = null; });
+  }
+
   playBattle(o: BattleOptions): Promise<void> {
     const director = new BattleDirector({
       layer: this.battleLayer,

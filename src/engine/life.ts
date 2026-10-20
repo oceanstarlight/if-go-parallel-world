@@ -494,9 +494,19 @@ export function visibleChoices(s: LifeState, ev: GameEvent): Choice[] {
   return (ev.choices ?? []).filter((c) => matches(c.cond, s));
 }
 
+/** 같은 사건이 다시 일어나기까지 최소 몇 년 */
+export const REPEAT_GAP = 4;
+
+/**
+ * 이번에 일어날 사건을 고른다.
+ * 겪은 사건은 REPEAT_GAP 년 동안 다시 나오지 않고, 겪은 횟수만큼 덜 나온다 (같은 사건 도배 방지).
+ */
 function pickEvent(s: LifeState, rng: Rng): GameEvent | null {
-  const pool = ALL_EVENTS.filter((e) => !e.milestone && eligible(s, e));
-  const weights = pool.map((e) => (e.weight ?? 1) * (e.focus && e.focus === s.focus ? 3 : 1));
+  const seenAt = s.seenAt ?? {};
+  const times: Record<string, number> = {};
+  for (const id of s.seen) times[id] = (times[id] ?? 0) + 1;
+  const pool = ALL_EVENTS.filter((e) => !e.milestone && eligible(s, e) && !(s.age - (seenAt[e.id] ?? -99) < REPEAT_GAP));
+  const weights = pool.map((e) => ((e.weight ?? 1) * (e.focus && e.focus === s.focus ? 3 : 1)) / (1 + 1.5 * (times[e.id] ?? 0)));
   const total = weights.reduce((a, b) => a + b, 0);
   if (total <= 0) return null;
   let r = rng() * total;
@@ -509,6 +519,7 @@ function pickEvent(s: LifeState, rng: Rng): GameEvent | null {
 
 function startEvent(s: LifeState, ev: GameEvent, rng: Rng) {
   s.seen.push(ev.id);
+  s.seenAt = { ...(s.seenAt ?? {}), [ev.id]: s.age };
   rec(s).events++;
   s.yearEvents = (s.yearEvents ?? 0) + 1;
   s.lastEventId = ev.id;
@@ -555,7 +566,8 @@ function startYear(s: LifeState, rng: Rng) {
 function monthlyEventChance(s: LifeState): number {
   const rate = traitsOf(s).reduce((a, t) => a * (t.eventRate ?? 1), 1);
   if ((s.yearEvents ?? 0) >= MAX_YEAR_EVENTS) return 0;
-  return Math.min(0.3, (s.age < 3 ? 0.04 : 0.11) * rate);
+  // 어린 시절은 사건 풀이 작아서 조금 덜 자주
+  return Math.min(0.3, (s.age < 3 ? 0.04 : s.age < 13 ? 0.07 : 0.11) * rate);
 }
 
 /** 한 달을 보낸다. 선택이 필요한 사건이 생기면 거기서 멈춘다 (canAdvance 가 false) */
@@ -626,7 +638,10 @@ export function applyOracle(s: LifeState, answers: { label: string; effect: Effe
 /** 의지력이 모자라 고를 수 없는 선택지인가 */
 export const choiceLocked = (s: LifeState, c: Choice) => (c.will ?? 0) > (s.will ?? 50);
 
-export function choose(s: LifeState, index: number, rng: Rng = Math.random): ChoiceResult | null {
+/**
+ * 선택지를 고른다. forced 를 주면 판정 대신 그 결과를 쓴다 (턴제 전투에서 이미 승패가 났을 때).
+ */
+export function choose(s: LifeState, index: number, rng: Rng = Math.random, forced?: boolean): ChoiceResult | null {
   const ev = currentEvent(s);
   if (!ev || s.death) return null;
   const choice = visibleChoices(s, ev)[index];
@@ -634,7 +649,9 @@ export function choose(s: LifeState, index: number, rng: Rng = Math.random): Cho
   s.pendingEventId = null;
   if (choice.will) s.will = clamp((s.will ?? 50) - choice.will, 0, 100);
   log(s, `▸ ${fill(choice.label, s)}`);
-  const { outcome, passed } = resolve(s, choice, rng, ev.id);
+  const { outcome, passed } = forced !== undefined && choice.check
+    ? { outcome: forced ? choice.success : choice.fail ?? choice.success, passed: forced }
+    : resolve(s, choice, rng, ev.id);
   if (isCombat(ev.id, choice)) {
     const r = rec(s);
     r.battles++;
