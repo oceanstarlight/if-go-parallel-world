@@ -39,7 +39,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
     text: '파티가 고대 던전에 들어섰다. 최하층에 전설의 보물이 잠들어 있다고 한다.',
     choices: [
       { label: '최하층까지 밀어붙인다', check: { stat: 'vit', dc: 46 },
-        success: { text: '보물고의 문이 열렸다! 금화가 산더미다. 아르센이 당신 몫을 두둑이 챙겨주었다.', effect: { flags: ['hp_raid', 'treasure'], gold: 1500, stats: { fame: 4 } }, tone: 'good' },
+        success: { text: '보물고의 문이 열렸다! 금화가 산더미다. 아르센이 당신 몫을 두둑이 챙겨주었다.', effect: { flags: ['hp_raid', 'treasure'], gold: 1500, stats: { fame: 4 }, trinket: { rarity: 'epic' } }, tone: 'good' },
         fail: { text: '함정에 걸려 크게 다쳤다. 동료들이 당신을 업고 나왔다.', effect: { flags: ['hp_raid'], stats: { vit: -15 } } } },
       { label: '전리품을 동료에게 양보한다',
         success: { text: '"너 같은 녀석은 처음이야." 아르센이 당신을 다시 봤다.', effect: { flags: ['hp_raid', 'hp_trust'], karma: 6 } } },
@@ -268,7 +268,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
     cond: { flags: ['relic_spirit'], test: (s) => (s.dgBest ?? 0) >= 15 },
     text: '던전에서 돌아온 밤, 정령이 속삭였다. "그 던전, 내가 살던 곳이야. 숨겨진 방을 알아."',
     choices: [
-      { label: '숨겨진 방으로 간다', success: { text: '정령이 벽을 통과하자 비밀 보물고가 열렸다! 고대 금화가 가득하다.', effect: { gold: 2500, stats: { luck: 4 } }, tone: 'good' } },
+      { label: '숨겨진 방으로 간다', success: { text: '정령이 벽을 통과하자 비밀 보물고가 열렸다! 고대 금화와 반짝이는 장신구가 가득하다.', effect: { gold: 2500, stats: { luck: 4 }, trinket: { stat: 'mana', rarity: 'epic' } }, tone: 'good' } },
       { label: '정령의 고향을 지켜준다', success: { text: '"고마워." 정령이 더 밝게 빛났다. 축복이 깃든다.', effect: { stats: { mana: 6, luck: 6 }, karma: 8 }, tone: 'good' } },
     ],
   },

@@ -120,7 +120,7 @@ export const ADULT: GameEvent[] = [
     choices: [
       {
         label: '최하층까지 공략한다', check: { stat: 'luck', dc: 34 },
-        success: { text: '보스 방에서 고대 왕의 왕관을 손에 넣었다! 레어 아이템 획득!', effect: { stats: { fame: 10, luck: 3, mana: 3 }, flags: ['treasure'] } },
+        success: { text: '보스 방에서 고대 왕의 왕관을 손에 넣었다! 레어 아이템 획득!', effect: { stats: { fame: 10, luck: 3, mana: 3 }, flags: ['treasure'], trinket: { stat: 'fame', rarity: 'epic' } } },
         fail: { text: '횃불이 꺼졌다. 어둠 속에서 커다란 무언가가 "그르릉" 숨을 쉬었다.', effect: { death: 'dungeon' } },
       },
       {
@@ -192,7 +192,7 @@ export const ADULT: GameEvent[] = [
     choices: [
       {
         label: '징집에 응한다', check: { stat: 'vit', dc: 30 },
-        success: { text: '무사히 살아 돌아왔다! 훈장도 하나 받았다.', effect: { stats: { fame: 6, vit: 2 }, karma: 3 } },
+        success: { text: '무사히 살아 돌아왔다! 훈장도 하나 받았다.', effect: { stats: { fame: 6, vit: 2 }, karma: 3, trinket: { base: 't_fame1', rarity: 'rare' } } },
         fail: { text: '첫 돌격에서, 하얀 빛이 당신을 감쌌다.', effect: { death: 'war' } },
       },
       {

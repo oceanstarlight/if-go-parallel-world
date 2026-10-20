@@ -109,7 +109,7 @@ export interface LifeState {
   /** 가방 */
   bag?: Item[];
   /** 장착 중인 장비 */
-  equip?: { weapon?: Item | null; armor?: Item | null };
+  equip?: { weapon?: Item | null; armor?: Item | null; trinkets?: Item[] };
   /** 상점에서 산 영구 소유물 (집, 농지, 말 …) */
   owned?: string[];
   /** 던전 HP (한 해가 지나면 가득 찬다) */
@@ -124,6 +124,8 @@ export interface LifeState {
   // ── 시간 · 중상 · 기록 (v1.0) ──
   /** 올해 지난 달 수 (0~11). 0이면 새해를 시작할 차례 */
   month?: number;
+  /** 한 해 기록(YEAR_NOTES)별로 마지막에 남긴 나이 */
+  notesAt?: Record<string, number>;
   /** 사건별로 마지막에 겪은 나이 (반복 쿨다운) */
   seenAt?: Record<string, number>;
   /** 올해 일어난 사건 수 */
@@ -147,7 +149,7 @@ export interface LifeState {
   record?: LifeRecord;
 }
 
-export type ItemKind = 'weapon' | 'armor' | 'loot' | 'potion';
+export type ItemKind = 'weapon' | 'armor' | 'loot' | 'potion' | 'trinket';
 export type Rarity = 'common' | 'rare' | 'epic' | 'legend';
 
 /** 가방에 들어가는 물건. 순수 JSON */
@@ -163,6 +165,8 @@ export interface Item {
   power: number;
   /** 상점에 팔 때 받는 값 */
   value: number;
+  /** 장신구가 올려 주는 능력치 */
+  stats?: Partial<Stats>;
 }
 
 /** 던전 원정 한 번의 상태 */
@@ -221,6 +225,8 @@ export interface Cond {
   goldMax?: number;
   /** 상점 소유물 */
   owns?: string[];
+  /** 주인공 성별 */
+  gender?: 'm' | 'f';
 }
 
 export interface Effect {
@@ -259,6 +265,8 @@ export interface Effect {
   caught?: boolean;
   /** 상점 소유물을 얻는다 */
   own?: string;
+  /** 장신구를 얻는다: 원형 id(TRINKETS) 또는 주 능력치, 희귀도 */
+  trinket?: { base?: string; stat?: StatKey; rarity?: Rarity };
 }
 
 export interface Outcome {

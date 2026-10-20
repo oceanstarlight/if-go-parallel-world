@@ -78,6 +78,7 @@
 | `stress` / `will` | 스트레스, 의지력 증감 |
 | `job` / `jobRank` | 직업 얻기, 직급 증감 |
 | `own` | 상점 소유물 얻기 (`cat` `horse` `house` 등) |
+| `trinket` | 장신구 보상. `{ stat: 'luck', rarity: 'rare' }`(그 능력치 장신구 무작위) 또는 `{ base: 't_fairy', rarity: 'epic' }`(이야기 장신구, `src/data/trinkets.ts`). 희귀도: `common` `rare` `epic` `legend` |
 | `death` | 사인 id. 판정 실패 쪽에만 쓴다. 대부분 중상으로 바뀐다 |
 | `zeroCause` | 이 효과로 체력이 0이 될 때의 사인 |
 

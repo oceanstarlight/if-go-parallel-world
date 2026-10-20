@@ -5,6 +5,9 @@ import { rollTraits, traitById } from '../data/traits';
 import { BATTLE_ENEMY, ENEMY_NAME, battleOdds, isCombat } from './combat';
 import { maxHp, monthlyEconomy, starterKit, yearEndEconomy } from './economy';
 import { bump, rec } from './record';
+import { statOf, trinketSlots } from './trinket';
+import { pickNote } from './notes';
+import { makeTrinket, randomTrinket, trinketDef } from '../data/trinkets';
 import { deathById } from '../data/deaths';
 import { OWNED_FOCUS } from '../data/market';
 import { inBranch } from '../data/branches';
@@ -13,7 +16,7 @@ import { GOALS } from '../data/goals';
 import { CHEATS, cheatById } from '../data/cheats';
 import { jobById } from '../data/jobs';
 import { type Gender, genderOfName, namesOf, opposite, pick } from '../data/names';
-import { STAT_KEYS } from '../data/stats';
+import { STAT_KEYS, STAT_NAMES } from '../data/stats';
 import { ALL_EVENTS, eventById } from '../data/events';
 import { BIRTH_TEXT, QUIET_YEAR } from '../data/flavor';
 import { matches } from './cond';
@@ -372,7 +375,7 @@ function flushInjury(s: LifeState) {
 export function successChance(s: LifeState, check: Check): number {
   const bonus = (cheatById(s.cheatId).checkBonus?.[check.stat] ?? 0)
     + traitsOf(s).reduce((a, t) => a + (t.checkBonus?.[check.stat] ?? 0), 0);
-  const raw = 50 + (s.stats[check.stat] - check.dc) * 3 + (s.stats.luck - 20) * 0.3 + bonus;
+  const raw = 50 + (statOf(s, check.stat) - check.dc) * 3 + (statOf(s, 'luck') - 20) * 0.3 + bonus;
   return clamp(Math.round(raw), 5, 95);
 }
 
@@ -431,6 +434,7 @@ export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
   if (e.goldSet !== undefined) s.gold = e.goldSet;
   if ((s.gold ?? 0) > g0) rec(s).earned += (s.gold ?? 0) - g0;
   if (e.own && !(s.owned ?? []).includes(e.own)) s.owned = [...(s.owned ?? []), e.own];
+  if (e.trinket) gainTrinket(s, e.trinket, rng);
   if (e.caught) {
     s.caught = (s.caught ?? 0) + 1;
     if ((s.gold ?? 0) > 0) s.gold = 0;
@@ -440,6 +444,19 @@ export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
   }
   if (e.death) kill(s, e.death);
   else if (s.stats.vit <= 0) kill(s, e.zeroCause ?? 'illness');
+}
+
+/** 사건 보상 장신구: 빈 칸이 있으면 바로 차고, 없으면 가방에 넣는다 */
+function gainTrinket(s: LifeState, t: NonNullable<Effect['trinket']>, rng: Rng) {
+  const rarity = t.rarity ?? 'rare';
+  const def = t.base ? trinketDef(t.base) : undefined;
+  const it = def ? makeTrinket(def, rarity, rng) : randomTrinket(rarity, rng, t.stat);
+  const worn = s.equip?.trinkets ?? [];
+  const wear = worn.length < trinketSlots(s);
+  if (wear) s.equip = { ...(s.equip ?? {}), trinkets: [...worn, it] };
+  else s.bag = [...(s.bag ?? []), it];
+  const bonus = Object.entries(it.stats ?? {}).map(([k, v]) => `${STAT_NAMES[k as StatKey]} +${v}`).join(', ');
+  log(s, `장신구 「${it.name}」을(를) 얻었다! (${bonus})${wear ? ' 바로 찼다.' : ' 칸이 꽉 차서 가방에 넣었다.'}`, 'good');
 }
 
 /** 판정 성공 확률. 전투 사건이면 전투력 승부 */
@@ -559,7 +576,20 @@ function startYear(s: LifeState, rng: Rng) {
   s.hp = maxHp(s);
   // 던전의 악몽 중에는 스트레스가 묶여 있을 뿐, 과로로 쓰러지지는 않는다
   if (!(s.trauma ?? 0) && overwork(s, rng) && s.death) return;
-  if (rng() < naturalDeathChance(s)) kill(s, 'old_age');
+  if (rng() < naturalDeathChance(s)) {
+    kill(s, 'old_age');
+    return;
+  }
+  yearNote(s, rng);
+}
+
+/** 한 해 기록: 나이·직업에 맞는 삶의 한 장면을 연대기에 남긴다 */
+function yearNote(s: LifeState, rng: Rng) {
+  const n = pickNote(s, rng);
+  if (!n) return;
+  s.notesAt = { ...(s.notesAt ?? {}), [n.id]: s.age };
+  applyEffect(s, n.effect, rng);
+  log(s, fill(n.text, s), n.tone ?? 'normal');
 }
 
 /** 이번 달에 사건이 일어날 확률 (한 해 평균 약 1.3개) */
@@ -604,7 +634,8 @@ export function advanceMonth(s: LifeState, rng: Rng = Math.random) {
 function endYear(s: LifeState, rng: Rng) {
   const money = yearEndEconomy(s, rng);
   if (money) log(s, money, (s.gold ?? 0) < 0 ? 'bad' : 'normal');
-  if ((s.yearEvents ?? 0) > 0 || s.death) return;
+  // 사건도, 한 해 기록도 없던 해에만 방침 문장 한 줄
+  if ((s.yearEvents ?? 0) > 0 || s.death || s.notesAt && Object.values(s.notesAt).includes(s.age)) return;
   if ((s.stress ?? 0) >= STRESS_HIGH && s.focus !== 'rest' && rng() < 0.5) {
     log(s, pick(TIRED_LINES, rng), 'bad');
     return;

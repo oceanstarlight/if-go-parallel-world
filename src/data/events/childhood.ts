@@ -117,7 +117,7 @@ export const CHILDHOOD: GameEvent[] = [
     choices: [
       {
         label: '빛을 따라간다', check: { stat: 'luck', dc: 18 },
-        success: { text: '이끼 낀 제단 위에서 따끈따끈한 파란 돌을 주웠다. 요정이 준 선물일까?', effect: { stats: { mana: 4, luck: 2 }, flags: ['relic'] } },
+        success: { text: '이끼 낀 제단 위에서 따끈따끈한 파란 돌과 작은 은방울을 주웠다. 요정이 준 선물일까?', effect: { stats: { mana: 4, luck: 2 }, flags: ['relic'], trinket: { base: 't_fairy', rarity: 'rare' } } },
         fail: { text: '갑자기 나타난 늑대들에게 쫓겨 덤불 속에서 밤을 새웠다. 무릎이 다 까졌다.', effect: { stats: { vit: -8 } } },
       },
       { label: '얌전히 돌아간다', success: { text: '착한 아이는 어른 말을 듣는 법. 숲 쪽에서 아쉬운 듯한 바람이 불었다.', effect: { stats: { int: 1 } } } },

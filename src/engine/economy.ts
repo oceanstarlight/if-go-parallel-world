@@ -4,12 +4,13 @@ import { gearByBase, makeItem, nextUid, sellPrice } from '../data/items';
 import { OWNED_CALM, marketById, marketPrice, owns } from '../data/market';
 import { applyEffect, type Rng } from './life';
 import { earn } from './record';
+import { statOf, trinketSlots } from './trinket';
 
 /** 가방 크기 */
 export const bagCap = (s: LifeState) => 30 + (owns(s, 'big_bag') ? 20 : 0);
 
 /** 던전 최대 HP */
-export const maxHp = (s: LifeState) => 60 + s.stats.vit * 2 + (s.equip?.armor?.power ?? 0);
+export const maxHp = (s: LifeState) => 60 + statOf(s, 'vit') * 2 + (s.equip?.armor?.power ?? 0);
 
 export const goldOf = (s: LifeState) => s.gold ?? 0;
 
@@ -155,9 +156,17 @@ export function sellAllLoot(s: LifeState): Result {
   return { ok: true, msg: `전리품 ${loot.length}개를 ${fmtGold(total)}에 팔았다!` };
 }
 
-/** 장비를 착용한다 (끼고 있던 것은 가방으로) */
+/** 장비를 착용한다 (끼고 있던 것은 가방으로). 장신구는 빈 칸에 찬다 */
 export function equip(s: LifeState, uid: number): Result {
   const it = (s.bag ?? []).find((x) => x.uid === uid);
+  if (it?.kind === 'trinket') {
+    const worn = s.equip?.trinkets ?? [];
+    if (worn.length >= trinketSlots(s)) return { ok: false, msg: `장신구 칸이 꽉 찼다. (${trinketSlots(s)}칸 · 20세·40세에 한 칸씩 늘어난다)` };
+    takeFromBag(s, uid);
+    s.equip = { ...(s.equip ?? {}), trinkets: [...worn, it] };
+    s.hp = Math.min(s.hp ?? maxHp(s), maxHp(s));
+    return { ok: true, msg: `「${it.name}」을(를) 찼다.` };
+  }
   if (!it || (it.kind !== 'weapon' && it.kind !== 'armor')) return { ok: false, msg: '장착할 수 없다.' };
   takeFromBag(s, uid);
   const slot = it.kind;
@@ -166,6 +175,18 @@ export function equip(s: LifeState, uid: number): Result {
   if (prev) s.bag = [...(s.bag ?? []), prev];
   s.hp = Math.min(s.hp ?? maxHp(s), maxHp(s));
   return { ok: true, msg: `「${it.name}」을(를) 장착했다.` };
+}
+
+/** 장신구를 풀어 가방에 넣는다 */
+export function unequipTrinket(s: LifeState, uid: number): Result {
+  const worn = s.equip?.trinkets ?? [];
+  const it = worn.find((x) => x.uid === uid);
+  if (!it) return { ok: false, msg: '차고 있지 않다.' };
+  if ((s.bag ?? []).length >= bagCap(s)) return { ok: false, msg: '가방이 꽉 찼다.' };
+  s.equip = { ...(s.equip ?? {}), trinkets: worn.filter((x) => x.uid !== uid) };
+  s.bag = [...(s.bag ?? []), it];
+  s.hp = Math.min(s.hp ?? maxHp(s), maxHp(s));
+  return { ok: true, msg: `「${it.name}」을(를) 풀었다.` };
 }
 
 /** 회복약을 마신다 */
@@ -212,6 +233,7 @@ export function repairItems(s: LifeState) {
   };
   fix(s.equip?.weapon);
   fix(s.equip?.armor);
+  for (const it of s.equip?.trinkets ?? []) fix(it);
   for (const it of s.bag ?? []) fix(it);
   for (const it of s.dive?.loot ?? []) fix(it);
 }

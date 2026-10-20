@@ -1,4 +1,6 @@
-import type { Item, LifeState } from '../types';
+import type { Item, LifeState, StatKey } from '../types';
+import { STAT_NAMES } from '../data/stats';
+import { trinketSlots, wornTrinkets } from '../engine/trinket';
 import { MARKET, MARKET_CATS, marketPrice, owns, type MarketCat } from '../data/market';
 import { RARITY_NAME, biomeOf } from '../data/items';
 import { combatPower } from '../engine/combat';
@@ -9,7 +11,7 @@ import { icon, type IconName } from './icons';
 const esc = (v: string | number) =>
   String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-const KIND_ICON: Record<Item['kind'], IconName> = { weapon: 'sword', armor: 'shield', potion: 'potion', loot: 'diamond-gem' };
+const KIND_ICON: Record<Item['kind'], IconName> = { weapon: 'sword', armor: 'shield', potion: 'potion', loot: 'diamond-gem', trinket: 'sparkle' };
 
 /** HP 막대 */
 export function hpBar(s: LifeState): string {
@@ -157,14 +159,31 @@ function shopView(s: LifeState, cat: MarketCat): string {
     }).join('')}</ul>`;
 }
 
+/** 장신구 능력치: 「지성 +5, 행운 +3」 */
+export const trinketText = (it: Item) =>
+  Object.entries(it.stats ?? {}).map(([k, v]) => `${STAT_NAMES[k as StatKey]} +${v}`).join(', ');
+
 function bagView(s: LifeState): string {
   const bag = [...(s.bag ?? [])].sort((a, b) => (a.kind === b.kind ? b.value - a.value : a.kind.localeCompare(b.kind)));
   const loot = bag.filter((x) => x.kind === 'loot');
   const lootTotal = loot.reduce((a, x) => a + x.value, 0);
   const slot = (label: string, it: Item | null | undefined) =>
     `<div class="slot">${icon(label === '무기' ? 'sword' : 'shield')}<div><span class="muted small">${label}</span><strong class="r-${it?.rarity ?? 'common'}">${it ? esc(it.name) : '없음'}</strong>${it ? `<span class="small">${label === '무기' ? '공격력' : '방어력'} +${it.power}</span>` : ''}</div></div>`;
+  const worn = wornTrinkets(s);
+  const slots = trinketSlots(s);
+  const trinketCells = Array.from({ length: 5 }, (_, i) => {
+    const it = worn[i];
+    if (i >= slots) return `<div class="t-slot locked" title="${i === 3 ? 20 : 40}세에 열린다">${icon('lock')}<small>${i === 3 ? 20 : 40}세</small></div>`;
+    if (!it) return `<div class="t-slot empty"><small>빈 칸</small></div>`;
+    return `
+      <button class="t-slot r-${it.rarity}" data-act="unequip-trinket" data-arg="${it.uid}" title="누르면 푼다">
+        ${icon('sparkle')}<strong class="r-${it.rarity}">${esc(it.name)}</strong><small>${trinketText(it)}</small>
+      </button>`;
+  }).join('');
   return `
     <div class="slots">${slot('무기', s.equip?.weapon)}${slot('방어구', s.equip?.armor)}</div>
+    <h4 class="t-head">${icon('sparkle')} 장신구 ${worn.length}/${slots} <span class="muted small">누르면 푼다 · 20세·40세에 한 칸씩</span></h4>
+    <div class="t-slots">${trinketCells}</div>
     <div class="bag-actions">
       <button class="btn primary" data-act="sell-loot" ${loot.length ? '' : 'disabled'}>${icon('coins')} 전리품 모두 팔기 (${loot.length}개 · ${fmtGold(lootTotal)})</button>
     </div>
@@ -172,9 +191,9 @@ function bagView(s: LifeState): string {
       <li>
         <span class="m-icon r-${it.rarity}">${icon(KIND_ICON[it.kind])}</span>
         <div><strong class="r-${it.rarity}">${esc(it.name)}</strong>
-          <span class="muted small">${RARITY_NAME[it.rarity]}${it.kind === 'weapon' ? ` · 공격력 +${it.power}` : it.kind === 'armor' ? ` · 방어력 +${it.power}` : it.kind === 'potion' ? ` · HP +${it.power >= 9999 ? '전부' : it.power}` : ''}</span></div>
+          <span class="muted small">${RARITY_NAME[it.rarity]}${it.kind === 'weapon' ? ` · 공격력 +${it.power}` : it.kind === 'armor' ? ` · 방어력 +${it.power}` : it.kind === 'potion' ? ` · HP +${it.power >= 9999 ? '전부' : it.power}` : it.kind === 'trinket' ? ` · ${trinketText(it)}` : ''}</span></div>
         <div class="bag-btns">
-          ${it.kind === 'weapon' || it.kind === 'armor' ? `<button class="btn small primary" data-act="equip" data-arg="${it.uid}">장착</button>` : ''}
+          ${it.kind === 'weapon' || it.kind === 'armor' || it.kind === 'trinket' ? `<button class="btn small primary" data-act="equip" data-arg="${it.uid}" ${it.kind === 'trinket' && worn.length >= slots ? 'disabled' : ''}>${it.kind === 'trinket' ? '차기' : '장착'}</button>` : ''}
           ${it.kind === 'potion' ? `<button class="btn small" data-act="drink-item" data-arg="${it.uid}">마시기</button>` : ''}
           <button class="btn small" data-act="sell" data-arg="${it.uid}">${fmtGold(it.value)}</button>
         </div>
