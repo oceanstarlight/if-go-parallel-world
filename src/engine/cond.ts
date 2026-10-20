@@ -41,6 +41,7 @@ export function matches(c: Cond | undefined, s: LifeState): boolean {
   if (c.goldMin !== undefined && (s.gold ?? 0) < c.goldMin) return false;
   if (c.goldMax !== undefined && (s.gold ?? 0) > c.goldMax) return false;
   if (c.owns && !c.owns.every((o) => (s.owned ?? []).includes(o))) return false;
+  if (c.gender && (s.gender ?? 'm') !== c.gender) return false;
   if (c.test && !c.test(s)) return false;
   return true;
 }

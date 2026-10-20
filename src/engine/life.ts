@@ -6,6 +6,7 @@ import { BATTLE_ENEMY, ENEMY_NAME, battleOdds, isCombat } from './combat';
 import { maxHp, monthlyEconomy, starterKit, yearEndEconomy } from './economy';
 import { bump, rec } from './record';
 import { statOf, trinketSlots } from './trinket';
+import { pickNote } from './notes';
 import { makeTrinket, randomTrinket, trinketDef } from '../data/trinkets';
 import { deathById } from '../data/deaths';
 import { OWNED_FOCUS } from '../data/market';
@@ -575,7 +576,20 @@ function startYear(s: LifeState, rng: Rng) {
   s.hp = maxHp(s);
   // 던전의 악몽 중에는 스트레스가 묶여 있을 뿐, 과로로 쓰러지지는 않는다
   if (!(s.trauma ?? 0) && overwork(s, rng) && s.death) return;
-  if (rng() < naturalDeathChance(s)) kill(s, 'old_age');
+  if (rng() < naturalDeathChance(s)) {
+    kill(s, 'old_age');
+    return;
+  }
+  yearNote(s, rng);
+}
+
+/** 한 해 기록: 나이·직업에 맞는 삶의 한 장면을 연대기에 남긴다 */
+function yearNote(s: LifeState, rng: Rng) {
+  const n = pickNote(s, rng);
+  if (!n) return;
+  s.notesAt = { ...(s.notesAt ?? {}), [n.id]: s.age };
+  applyEffect(s, n.effect, rng);
+  log(s, fill(n.text, s), n.tone ?? 'normal');
 }
 
 /** 이번 달에 사건이 일어날 확률 (한 해 평균 약 1.3개) */
@@ -620,7 +634,8 @@ export function advanceMonth(s: LifeState, rng: Rng = Math.random) {
 function endYear(s: LifeState, rng: Rng) {
   const money = yearEndEconomy(s, rng);
   if (money) log(s, money, (s.gold ?? 0) < 0 ? 'bad' : 'normal');
-  if ((s.yearEvents ?? 0) > 0 || s.death) return;
+  // 사건도, 한 해 기록도 없던 해에만 방침 문장 한 줄
+  if ((s.yearEvents ?? 0) > 0 || s.death || s.notesAt && Object.values(s.notesAt).includes(s.age)) return;
   if ((s.stress ?? 0) >= STRESS_HIGH && s.focus !== 'rest' && rng() < 0.5) {
     log(s, pick(TIRED_LINES, rng), 'bad');
     return;

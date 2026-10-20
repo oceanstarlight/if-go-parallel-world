@@ -117,6 +117,7 @@ describe('v1.0 던전에서 쓰러짐', () => {
     }
     s.age = 30;
     s.trauma = 0;
+    s.pendingEventId = null; // 진행 중 사건이 있으면 던전에 못 들어간다
     expect(canEnterDungeon(s)).toBe(true);
     beginDive(s, 0);
     s.hp = 1;

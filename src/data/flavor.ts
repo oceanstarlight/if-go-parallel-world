@@ -19,7 +19,6 @@ export const BIRTH_TEXT: Record<string, string> = {
 export const QUIET_YEAR: Record<Focus | 'infant', string[]> = {
   infant: [
     '요람 속에서 이세계의 소리에 귀를 기울였다. 새소리가 예쁘다.',
-    '처음으로 두 발로 섰다! 가족들이 박수를 쳤다.',
     '이 세계의 말을 조금씩 알아듣기 시작했다. 옹알옹알.',
   ],
   train: [

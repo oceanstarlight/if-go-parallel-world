@@ -1,6 +1,6 @@
 # Current — 작업 현황
 
-> 이 문서는 진행 상황을 추적한다. 상세 기획은 [`docs/DESIGN.md`](docs/DESIGN.md), 사건 카드 작성 규칙은 [`docs/EVENTS_GUIDE.md`](docs/EVENTS_GUIDE.md)를 본다.
+> 이 문서는 진행 상황을 추적한다. 상세 기획은 [`docs/DESIGN.md`](docs/DESIGN.md), 사건 카드 작성 규칙은 [`docs/EVENTS_GUIDE.md`](docs/EVENTS_GUIDE.md), 한 해 기록 작성 규칙은 [`docs/NOTES_GUIDE.md`](docs/NOTES_GUIDE.md)를 본다.
 
 ## 확정된 결정
 
@@ -81,7 +81,13 @@
   - 장신구를 주는 이야기 사건 6개: 어머니의 손수건, 스승의 반지, 요정의 은방울, 용사의 견장, 별똥별 조각, 축제 왕관.
   - 기존 사건 7개에 장신구 보상을 붙였다: 신규 던전 왕관, 징집 훈장, 요정의 숲 등.
 - [x] 소년기 첫사랑 사슬(크러시 → 편지 → 축제 → 끝)의 가중치와 나이 범위를 넓혔다. 이전에는 거의 나오지 않았다.
-- [x] 테스트 73개 (`tests/v12.test.ts`)
+- [x] **한 해 기록 틀** (`src/data/notes/`, `src/engine/notes.ts`)
+  - 매년 새해에 나이·직업·성별·인연에 맞는 삶의 한 장면을 연대기에 한 줄 남긴다.
+  - 기록이 남을 확률: 30세 이하 85%, 31~50세 55%, 51세 이상 35%.
+  - 한 번뿐인 이정표(`once`)는 우선 뽑히고, 범위의 마지막 나이에는 반드시 나온다. 같은 기록은 8년 안에 다시 나오지 않는다.
+  - 파일을 나이대별(infant·child·teen·young·middle·elder)과 직업(job)으로 나눴다. 여러 세션이 동시에 채울 수 있다. 지금은 예시 16개뿐이다.
+  - 조건에 `gender`를 추가했다.
+- [x] 테스트 76개 (`tests/v12.test.ts`, `tests/notes.test.ts`)
 
 ## 완료 (v1.1: 턴제 전투 + 엔딩 크레딧 + 다듬기)
 
