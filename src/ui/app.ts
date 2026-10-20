@@ -1,3 +1,4 @@
+import morphdom from 'morphdom';
 import { Music } from '../audio/music';
 import { moodFor } from '../audio/compose';
 import type { Focus, LifeState, MetaSave, RelKey } from '../types';
@@ -110,7 +111,14 @@ export async function mount(root: HTMLElement) {
   if (app.life?.death) settle(app);
 
   const render = () => {
-    root.innerHTML = view(app);
+    // 바뀐 부분만 고친다: 통째로 갈아 끼우면 달이 넘어갈 때마다 글자가 깜빡이고 등장 애니메이션이 다시 돈다
+    morphdom(root, `<div>${view(app)}</div>`, {
+      childrenOnly: true,
+      // 도트 캔버스가 붙는 자리는 속을 건드리지 않는다
+      onBeforeElChildrenUpdated: (from, to) => !((from as HTMLElement).dataset?.gfx && (to as HTMLElement).dataset?.gfx),
+      // 입력 중인 칸은 그대로 둔다
+      onBeforeElUpdated: (from) => !(from === document.activeElement && from.tagName === 'INPUT'),
+    });
     syncGfx(app, root); // 캔버스가 붙어 높이가 정해진 뒤에 스크롤
     app.music.setMood(moodFor(app.screen));
     const log = root.querySelector('.chronicle');
@@ -1059,9 +1067,13 @@ function viewLives(app: App): string {
 
 // ───────────────────────── 스와이프 (2지선다) ─────────────────────────
 
+const swipeBound = new WeakSet<HTMLElement>();
+
 function bindSwipe(root: HTMLElement, pickChoice: (act: string, i: number) => void) {
   const card = root.querySelector<HTMLElement>('.event-card.swipeable');
-  if (!card) return;
+  // 화면을 고쳐 그려도 같은 카드가 남으므로 한 번만 붙인다
+  if (!card || swipeBound.has(card)) return;
+  swipeBound.add(card);
   let startX = 0, dx = 0, dragging = false;
   // 밀고 있는 방향의 선택지를 카드 위에 띄운다 (Reigns 방식)
   const label = card.querySelector<HTMLElement>('.swipe-label')!;
