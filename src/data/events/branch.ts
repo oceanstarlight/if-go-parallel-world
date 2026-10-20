@@ -18,7 +18,7 @@ export const BRANCH_EVENTS: GameEvent[] = [
         fail: { text: '전 재산이 바다에 가라앉았다… 장부를 보며 멍하니 앉아 있었다.', effect: { goldPct: -0.8, stress: 25, mood: 'gloom' } } },
       { label: '빚을 내서 2,000G를 건다', check: { stat: 'int', dc: 50 },
         success: { text: '빚을 갚고도 남았다! 하이 리스크 하이 리턴!', effect: { gold: 4000, stats: { fame: 4 } }, tone: 'milestone' },
-        fail: { text: '망했다. 빚 2,000G만 남았다. 빚쟁이들이 냄새를 맡기 시작했다…', effect: { gold: -2000, stress: 30, mood: 'fear' } } },
+        fail: { text: '망했다. 빚 2,000G만 남았다. 빚쟁이들이 냄새를 맡기 시작했다…', effect: { gold: -2000, debt: true, stress: 30, mood: 'fear' } } },
       { label: '거절한다', success: { text: '"너무 좋은 얘기는 의심하라." 아버지의 말씀이 떠올랐다.' } },
     ],
   },

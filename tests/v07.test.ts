@@ -26,7 +26,7 @@ describe('v0.7 전투력', () => {
     s.gold = 10000;
     expect(buy(s, 'w4').ok).toBe(true);
     equip(s, s.bag![0].uid);
-    expect(combatPower(s) - before).toBe(42);
+    expect(combatPower(s) - before).toBe(48); // 42 × 1.15
   });
   it('100층 마왕은 1층보다 훨씬 강하다', () => {
     expect(floorPower(100, true)).toBeGreaterThan(floorPower(5, true) * 8);

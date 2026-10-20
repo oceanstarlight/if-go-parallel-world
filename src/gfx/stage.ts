@@ -89,6 +89,8 @@ function fitCanvas(canvas: HTMLCanvasElement, host: HTMLElement, w: number, h: n
   const k = dev / dpr;
   canvas.style.width = `${w * k}px`;
   canvas.style.height = `${h * k}px`;
+  // CSS 가 장면 높이를 알 수 있게 (모바일: 평소엔 위를 잘라 작게, 전투 중엔 전부)
+  host.style.setProperty('--ch', `${h * k}px`);
 }
 
 export class GfxStage {

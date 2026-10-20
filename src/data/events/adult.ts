@@ -68,7 +68,7 @@ export const ADULT: GameEvent[] = [
     id: 'a_mentor_death', title: '스승님의 마지막 수업', once: true, weight: 1.5,
     cond: { minAge: 30, maxAge: 80, hasRel: ['mentor'] },
     text: '스승 {mentor:이} 위독하다는 소식이 날아왔다.',
-    auto: { success: { text: '{mentor:은} "잘 컸구나" 하고 웃으며 눈을 감았다. 남은 것은 낡은 지팡이와 빼곡한 연구 노트였다.', effect: { removeRel: ['mentor'], stats: { int: 5, mana: 3 } }, tone: 'bad' } },
+    auto: { success: { text: '{mentor:은} "잘 컸구나" 하고 웃으며 눈을 감았다. 남은 것은 낡은 지팡이와 빼곡한 연구 노트였다.', effect: { removeRel: ['mentor'], stats: { int: 5, mana: 3 }, item: { base: 'w2', rarity: 'rare', name: '스승의 낡은 지팡이' } }, tone: 'bad' } },
   },
   {
     id: 'a_rival_duel', title: '결투 신청', weight: 2,
@@ -774,7 +774,7 @@ export const ADULT: GameEvent[] = [
     cond: { minAge: 18, maxAge: 60 },
     text: '주점 한구석에서 팔뚝에 상처 투성이인 노인이 혼자 술잔을 기울인다. 모험담을 들려 달라는 아이들에게 둘러싸여 있다.',
     choices: [
-      { label: '자리에 끼어 이야기를 듣는다', success: { text: '용 비늘을 닦던 이야기, 눈보라 속 탈출기. 노인의 이야기가 끝날 때쯤 소매에서 작은 부적이 굴러떨어졌다.', effect: { stats: { int: 1, cha: 1, luck: 1 }, mood: 'joy' }, tone: 'good' } },
+      { label: '자리에 끼어 이야기를 듣는다', success: { text: '용 비늘을 닦던 이야기, 눈보라 속 탈출기. 노인의 이야기가 끝날 때쯤 소매에서 작은 부적이 굴러떨어졌다.', effect: { stats: { int: 1, cha: 1, luck: 1 }, mood: 'joy', trinket: { stat: 'luck', rarity: 'common' } }, tone: 'good' } },
       { label: '한 수 가르쳐 달라고 청한다', check: { stat: 'cha', dc: 30 },
         success: { text: '노인이 껄껄 웃으며 모험의 요령을 몇 가지 알려 주었다. "도망칠 때를 아는 게 제일 중요하지."', effect: { stats: { vit: 1, int: 2 } }, tone: 'good' },
         fail: { text: '"젊은 놈이 건방지게!" 호통만 듣고 쫓겨났다. 그래도 배운 건 하나 있다. 노인에게는 예의를.', effect: { stats: { cha: 1 } } } },

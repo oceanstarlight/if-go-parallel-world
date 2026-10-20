@@ -142,6 +142,12 @@ export interface LifeState {
   dgFallen?: boolean;
   /** 이 나이부터 던전에 다시 들어갈 수 있다 */
   dgBanUntil?: number;
+  /** 이 나이부터 던전에 다시 들어갈 수 있다 (2년에 한 번) */
+  dgNextAge?: number;
+  /** 던전에 다시 들어갈 수 있다고 알렸다 */
+  dgNotified?: boolean;
+  /** UI 에 한 번 띄울 알림 */
+  toast?: string | null;
   /** 던전의 악몽: 남은 달 동안 스트레스가 100으로 묶인다 */
   trauma?: number;
   /** 방금 입은 중상 (사건 결과 문장 뒤에 알린다) */
@@ -183,6 +189,12 @@ export interface Dive {
   last?: 'cleared' | 'fled' | null;
   /** 쓰러져서 모든 것을 잃었다 (지상으로 돌아갈 일만 남았다) */
   fallen?: boolean;
+  /** 이번 구간에서 지나온 마지막 층 (마물과 싸우느라 멈췄던 곳) */
+  cursor?: number;
+  /** 길을 막은 마물 (턴제 전투 대기) */
+  mob?: { floor: number; name: string; ep: number } | null;
+  /** 보스 방 앞에 섰다 (가방을 점검하고 도전) */
+  atBoss?: boolean;
 }
 
 /** 다음 생에 전해지는 전생의 이야기 */
@@ -267,6 +279,10 @@ export interface Effect {
   own?: string;
   /** 장신구를 얻는다: 원형 id(TRINKETS) 또는 주 능력치, 희귀도 */
   trinket?: { base?: string; stat?: StatKey; rarity?: Rarity };
+  /** 장비·물약을 가방에 넣는다 (base: src/data/items.ts, name 으로 이름만 바꿀 수 있다) */
+  item?: { base: string; rarity?: Rarity; name?: string };
+  /** gold 가 음수일 때 가진 돈보다 많이 잃어 빚이 될 수 있다 (빚 투자 같은 사건만) */
+  debt?: boolean;
 }
 
 export interface Outcome {

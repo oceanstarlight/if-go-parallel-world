@@ -79,9 +79,12 @@
 | `job` / `jobRank` | 직업 얻기, 직급 증감 |
 | `own` | 상점 소유물 얻기 (`cat` `horse` `house` 등) |
 | `trinket` | 장신구 보상. `{ stat: 'luck', rarity: 'rare' }`(그 능력치 장신구 무작위) 또는 `{ base: 't_fairy', rarity: 'epic' }`(이야기 장신구, `src/data/trinkets.ts`). 희귀도: `common` `rare` `epic` `legend` |
+| `item` | 장비·물약을 가방에 넣는다. `{ base: 'w1', rarity: 'rare', name: '반짝이는 지팡이' }` (base: `src/data/items.ts`의 `w1~w8` 무기, `a1~` 방어구, `p1~p3` 회복약. `name`으로 이름만 바꿀 수 있다) |
+| `debt` | `gold`가 음수일 때 가진 돈보다 많이 잃어 **빚이 될 수 있게** 한다. 빚 투자 같은 사건에만 쓴다 (없으면 가진 돈까지만 잃는다) |
 | `death` | 사인 id. 판정 실패 쪽에만 쓴다. 대부분 중상으로 바뀐다 |
 | `zeroCause` | 이 효과로 체력이 0이 될 때의 사인 |
 
+- **문장과 효과를 맞춘다**: 결과 문장에 「금화를 주웠다」, 「지팡이를 받았다」, 「부적이 굴러떨어졌다」처럼 무언가를 얻었다고 쓰면 반드시 `gold` · `item` · `trinket` · `own` 중 맞는 효과를 넣는다. 문장만 있고 효과가 없으면 버그다.
 - 사인 id: `illness plague famine mana_overload carriage assassination duel war bandits dragon yandere heresy experiment pact overwork debt` 등. 전체 목록은 `src/data/deaths.ts`.
 - `tone`: `good` `bad` `milestone`. 생략하면 판정 결과에 따라 정해진다.
 

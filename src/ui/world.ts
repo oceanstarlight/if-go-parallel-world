@@ -4,8 +4,8 @@ import { trinketSlots, wornTrinkets } from '../engine/trinket';
 import { MARKET, MARKET_CATS, marketPrice, owns, type MarketCat } from '../data/market';
 import { RARITY_NAME, biomeOf } from '../data/items';
 import { combatPower } from '../engine/combat';
-import { DUNGEON_DEPTH, DUNGEON_MIN_AGE, canEnterDungeon, preview, startFloors } from '../engine/dungeon';
-import { INN_PRICE, bagCap, fmtGold, goldOf, maxHp } from '../engine/economy';
+import { DUNGEON_DEPTH, DUNGEON_MIN_AGE, canEnterDungeon, dungeonOpenAge, preview, startFloors } from '../engine/dungeon';
+import { bagCap, fmtGold, goldOf, innPrice, maxHp } from '../engine/economy';
 import { icon, type IconName } from './icons';
 
 const esc = (v: string | number) =>
@@ -15,8 +15,8 @@ const KIND_ICON: Record<Item['kind'], IconName> = { weapon: 'sword', armor: 'shi
 
 /** HP 막대 */
 export function hpBar(s: LifeState): string {
-  const hp = s.hp ?? maxHp(s);
   const max = maxHp(s);
+  const hp = Math.min(s.hp ?? max, max);
   const pct = Math.round((hp / max) * 100);
   return `<span class="hpbar ${pct < 30 ? 'low' : ''}">${icon('heart')}<i><u style="width:${pct}%"></u></i><small>${hp}/${max}</small></span>`;
 }
@@ -69,7 +69,8 @@ export function viewDungeon(s: LifeState, duelHtml = ''): string {
 
   if (!d) {
     if (!canEnterDungeon(s)) {
-      return `${head}${scene}<div class="dg-card"><p>${s.age < DUNGEON_MIN_AGE ? `던전은 ${DUNGEON_MIN_AGE}세부터 들어갈 수 있다.` : s.age < (s.dgBanUntil ?? 0) ? `던전의 기억이 발을 붙잡는다… ${s.dgBanUntil}세부터 다시 도전할 수 있다.` : '지금은 던전에 갈 수 없다. (진행 중인 사건이 있다)'}</p>
+      const open = dungeonOpenAge(s);
+      return `${head}${scene}<div class="dg-card"><p>${s.age < DUNGEON_MIN_AGE ? `던전은 ${DUNGEON_MIN_AGE}세부터 들어갈 수 있다.` : s.age < (s.dgBanUntil ?? 0) ? `던전의 기억이 발을 붙잡는다… ${s.dgBanUntil}세부터 다시 도전할 수 있다.` : s.age < open ? `지난 원정의 피로가 아직 남아 있다. 던전은 2년에 한 번, ${open}세부터 다시 들어갈 수 있다.` : '지금은 던전에 갈 수 없다. (진행 중인 사건이 있다)'}</p>
         <button class="btn" data-act="go" data-arg="life">돌아간다</button></div>`;
     }
     const floors = startFloors(s);
@@ -81,7 +82,8 @@ export function viewDungeon(s: LifeState, duelHtml = ''): string {
         <div class="floor-grid">
           ${floors.map((f) => `<button class="floor" data-act="dive" data-arg="${f}">${f === 0 ? '입구 (1층~)' : `${f}층 포탈`}</button>`).join('')}
         </div>
-        ${(s.hp ?? 0) < maxHp(s) * 0.5 ? `<p class="warn small">HP가 절반 아래다. 마을 여관(${fmtGold(INN_PRICE)})이나 회복약으로 회복하고 가자.</p>` : ''}
+        <p class="warn small">한 번 내려가면 귀환할 때까지 상점에 갈 수 없다 (가방은 열 수 있다). 던전은 2년에 한 번이다.</p>
+        ${(s.hp ?? 0) < maxHp(s) * 0.5 ? `<p class="warn small">HP가 절반 아래다. 마을 여관(${fmtGold(innPrice(s))})이나 회복약으로 회복하고 가자.</p>` : ''}
         <div class="setup-actions">
           <button class="btn" data-act="town">${icon('store')} 마을</button>
           <button class="btn" data-act="go" data-arg="life">돌아간다</button>
@@ -89,8 +91,31 @@ export function viewDungeon(s: LifeState, duelHtml = ''): string {
       </div>`;
   }
 
+  // 보스 방 앞: 가방을 점검하고 도전한다
+  if (d.atBoss) {
+    const pv = preview(s);
+    return `${head}${scene}
+      <div class="dg-card boss-gate">
+        <p class="eyebrow">${pv.to}층 · 보스의 방 앞</p>
+        <h3>${icon('skull')} 「${esc(pv.boss)}」</h3>
+        <div class="boss-odds">
+          <span class="vs">${icon('sword')} 전투력 <b>${pv.cp}</b> vs <b>${pv.ep}</b></span>
+          <span class="winp ${pv.p >= 60 ? 'good' : pv.p >= 35 ? 'mid' : 'bad'}">승률 <b>${pv.p}%</b></span>
+        </div>
+        <p class="small muted">문을 열기 전에 가방에서 장비를 바꾸거나 회복약을 마실 수 있다.</p>
+        <div class="dg-actions">
+          <button class="btn primary" data-act="boss">${icon('sword')} 보스에게 도전한다</button>
+          <button class="btn" data-act="town" data-arg="bag">${icon('backpack')} 가방 점검</button>
+          <button class="btn" data-act="drink" ${potions ? '' : 'disabled'}>${icon('potion')} 회복약 (${potions})</button>
+          <button class="btn" data-act="retreat">${icon('door-closed')} 귀환한다</button>
+        </div>
+        ${diveLog(s)}
+      </div>`;
+  }
+
   const done = d.floor >= DUNGEON_DEPTH;
   const pv = preview(s);
+  const midway = (d.cursor ?? d.floor) > d.floor;
   return `${head}${scene}
     <div class="dg-card">
       ${done ? `<p class="dg-conquered">${icon('crown')} 던전 100층 완전 공략!</p>` : `
@@ -103,7 +128,7 @@ export function viewDungeon(s: LifeState, duelHtml = ''): string {
       </div>`}
       <p class="small muted">이번 원정: 전리품 ${d.loot.length}개 · ${fmtGold(d.gold)}</p>
       <div class="dg-actions">
-        ${done ? '' : `<button class="btn primary" data-act="descend">${icon('arrow-down')} 5층 내려간다</button>`}
+        ${done ? '' : `<button class="btn primary" data-act="descend">${icon('arrow-down')} ${midway ? `계속 내려간다 (${(d.cursor ?? d.floor) + 1}층~)` : '5층 내려간다'}</button>`}
         <button class="btn" data-act="drink" ${potions ? '' : 'disabled'}>${icon('potion')} 회복약 (${potions})</button>
         <button class="btn" data-act="retreat">${icon('door-closed')} 귀환한다</button>
       </div>
@@ -119,6 +144,17 @@ function diveLog(s: LifeState): string {
 // ───────────────────────── 마을 (상점 · 가방 · 여관) ─────────────────────────
 
 export function viewTown(s: LifeState, tab: 'shop' | 'bag', cat: MarketCat): string {
+  if (s.dive) {
+    // 던전 원정 중: 상점·여관은 닫혀 있고 가방만 점검할 수 있다
+    return `
+    <div class="dg-head">
+      <div><p class="eyebrow">던전 원정 중 · 가방 점검</p><h2>${icon('backpack')} 가방 ${(s.bag ?? []).length}/${bagCap(s)}</h2></div>
+      ${econRow(s)}
+    </div>
+    <p class="warn small">원정 중에는 상점·여관에 갈 수 없다. 장비를 바꾸고 회복약을 마실 수 있다.</p>
+    <div class="town-nav"><button class="btn primary" data-act="dungeon">${icon('sword')} 던전으로 돌아간다</button></div>
+    ${bagView(s, true)}`;
+  }
   const head = `
     <div class="dg-head">
       <div><p class="eyebrow">마을 · 시간이 흐르지 않는다</p><h2>${icon('store')} 마을</h2></div>
@@ -127,7 +163,7 @@ export function viewTown(s: LifeState, tab: 'shop' | 'bag', cat: MarketCat): str
     <div class="town-tabs">
       <button class="tab-btn ${tab === 'shop' ? 'on' : ''}" data-act="town-tab" data-arg="shop">${icon('store')} 상점</button>
       <button class="tab-btn ${tab === 'bag' ? 'on' : ''}" data-act="town-tab" data-arg="bag">${icon('backpack')} 가방 ${(s.bag ?? []).length}/${bagCap(s)}</button>
-      <button class="tab-btn" data-act="inn" ${(s.hp ?? 0) >= maxHp(s) ? 'disabled' : ''}>${icon('bed')} 여관 ${fmtGold(INN_PRICE)}</button>
+      <button class="tab-btn" data-act="inn" ${(s.hp ?? 0) >= maxHp(s) ? 'disabled' : ''}>${icon('bed')} 여관 ${fmtGold(innPrice(s))}</button>
     </div>
     <div class="town-nav">
       <button class="btn" data-act="go" data-arg="life">${icon('user')} 인생으로</button>
@@ -163,7 +199,22 @@ function shopView(s: LifeState, cat: MarketCat): string {
 export const trinketText = (it: Item) =>
   Object.entries(it.stats ?? {}).map(([k, v]) => `${STAT_NAMES[k as StatKey]} +${v}`).join(', ');
 
-function bagView(s: LifeState): string {
+/** 같은 물건(회복약·전리품)은 한 줄로 묶는다: [대표 물건, 개수] */
+function stackBag(items: Item[]): [Item, number][] {
+  const out: [Item, number][] = [];
+  const at = new Map<string, number>();
+  for (const it of items) {
+    const key = it.kind === 'potion' || it.kind === 'loot' ? `${it.kind}|${it.base}|${it.rarity}|${it.power}|${it.value}` : `u${it.uid}`;
+    const i = at.get(key);
+    if (i === undefined) {
+      at.set(key, out.length);
+      out.push([it, 1]);
+    } else out[i][1]++;
+  }
+  return out;
+}
+
+function bagView(s: LifeState, inDive = false): string {
   const bag = [...(s.bag ?? [])].sort((a, b) => (a.kind === b.kind ? b.value - a.value : a.kind.localeCompare(b.kind)));
   const loot = bag.filter((x) => x.kind === 'loot');
   const lootTotal = loot.reduce((a, x) => a + x.value, 0);
@@ -184,18 +235,18 @@ function bagView(s: LifeState): string {
     <div class="slots">${slot('무기', s.equip?.weapon)}${slot('방어구', s.equip?.armor)}</div>
     <h4 class="t-head">${icon('sparkle')} 장신구 ${worn.length}/${slots} <span class="muted small">누르면 푼다 · 20세·40세에 한 칸씩</span></h4>
     <div class="t-slots">${trinketCells}</div>
-    <div class="bag-actions">
+    ${inDive ? '' : `<div class="bag-actions">
       <button class="btn primary" data-act="sell-loot" ${loot.length ? '' : 'disabled'}>${icon('coins')} 전리품 모두 팔기 (${loot.length}개 · ${fmtGold(lootTotal)})</button>
-    </div>
-    ${bag.length ? `<ul class="market bag">${bag.map((it) => `
+    </div>`}
+    ${bag.length ? `<ul class="market bag">${stackBag(bag).map(([it, n]) => `
       <li>
-        <span class="m-icon r-${it.rarity}">${icon(KIND_ICON[it.kind])}</span>
-        <div><strong class="r-${it.rarity}">${esc(it.name)}</strong>
+        <span class="m-icon r-${it.rarity}">${icon(KIND_ICON[it.kind])}${n > 1 ? `<b class="stack">×${n}</b>` : ''}</span>
+        <div><strong class="r-${it.rarity}">${esc(it.name)}${n > 1 ? ` <span class="muted">×${n}</span>` : ''}</strong>
           <span class="muted small">${RARITY_NAME[it.rarity]}${it.kind === 'weapon' ? ` · 공격력 +${it.power}` : it.kind === 'armor' ? ` · 방어력 +${it.power}` : it.kind === 'potion' ? ` · HP +${it.power >= 9999 ? '전부' : it.power}` : it.kind === 'trinket' ? ` · ${trinketText(it)}` : ''}</span></div>
         <div class="bag-btns">
           ${it.kind === 'weapon' || it.kind === 'armor' || it.kind === 'trinket' ? `<button class="btn small primary" data-act="equip" data-arg="${it.uid}" ${it.kind === 'trinket' && worn.length >= slots ? 'disabled' : ''}>${it.kind === 'trinket' ? '차기' : '장착'}</button>` : ''}
           ${it.kind === 'potion' ? `<button class="btn small" data-act="drink-item" data-arg="${it.uid}">마시기</button>` : ''}
-          <button class="btn small" data-act="sell" data-arg="${it.uid}">${fmtGold(it.value)}</button>
+          ${inDive ? '' : `<button class="btn small" data-act="sell" data-arg="${it.uid}">${fmtGold(it.value)}</button>`}
         </div>
       </li>`).join('')}</ul>` : '<p class="muted">가방이 비었다. 던전에서 전리품을 모아 오자!</p>'}`;
 }

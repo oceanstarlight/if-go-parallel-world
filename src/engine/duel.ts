@@ -16,7 +16,7 @@ export type DuelAction = 'attack' | 'magic' | 'guard' | 'flee';
 export type DuelResult = 'win' | 'lose' | 'fled';
 
 export interface Duel {
-  kind: 'event' | 'boss';
+  kind: 'event' | 'boss' | 'mob';
   /** 상대 이름 */
   foe: string;
   cp: number;
@@ -58,8 +58,14 @@ const CRIT_MUL = 1.7;
 export const critChance = (s: LifeState) => Math.min(0.45, 0.05 + statOf(s, 'luck') * 0.003);
 export const dodgeChance = (s: LifeState) => Math.min(0.25, 0.03 + statOf(s, 'luck') * 0.0015);
 export const fleeChance = (s: LifeState) => Math.min(0.9, 0.3 + statOf(s, 'luck') * 0.006);
-/** 마법 배율: 마력이 높을수록 강하다 */
-export const magicMul = (s: LifeState) => 0.9 + statOf(s, 'mana') / 50;
+/**
+ * 공격·마법 배율. 능력치 40 언저리에서 둘 다 약 1.0 이 되도록 맞췄다.
+ *  - 공격: 체력 + 무기. 빗나갈 수 있지만 행운만큼 치명타
+ *  - 마법: 마력. 마나를 쓰고 치명타는 없지만 빗나가지 않는다
+ * 그래서 체력이 높으면 공격이, 마력이 높으면 마법이 세다.
+ */
+export const attackMul = (s: LifeState) => 0.6 + statOf(s, 'vit') / 100 + (s.equip?.weapon?.power ?? 0) / 200;
+export const magicMul = (s: LifeState) => 0.65 + statOf(s, 'mana') / 100;
 
 export function startDuel(s: LifeState, kind: Duel['kind'], foe: string, ep: number): Duel {
   const hpMax = maxHp(s);
@@ -90,8 +96,8 @@ export function duelTurn(d: Duel, s: LifeState, action: DuelAction, rng: Rng): B
     const magic = action === 'magic';
     if (magic) d.mp -= MAGIC_COST;
     const miss = !magic && rng() < 0.06;
-    const crit = !miss && rng() < critChance(s);
-    let dmg = miss ? 0 : pBase * spread(rng) * (magic ? magicMul(s) : 1) * (crit ? CRIT_MUL : 1) * (d.counter ? 1.5 : 1);
+    const crit = !miss && !magic && rng() < critChance(s);
+    let dmg = miss ? 0 : pBase * spread(rng) * (magic ? magicMul(s) : attackMul(s)) * (crit ? CRIT_MUL : 1) * (d.counter ? 1.5 : 1);
     dmg = miss ? 0 : Math.max(1, Math.round(dmg));
     d.eHp = Math.max(0, d.eHp - dmg);
     blows.push({ from: 'p', dmg, crit, magic, miss, hpTo: d.eHp / d.eMax });
@@ -133,8 +139,9 @@ export function duelTurn(d: Duel, s: LifeState, action: DuelAction, rng: Rng): B
   return blows;
 }
 
-/** 자동 전투 (테스트·밸런스 확인용): 마나가 있으면 마법, 아니면 공격 */
+/** 자동 전투 (테스트·밸런스 확인용): 더 센 쪽(공격/마법)을 쓴다 */
 export function autoDuel(d: Duel, s: LifeState, rng: Rng): DuelResult {
-  for (let i = 0; i < 60 && !d.result; i++) duelTurn(d, s, d.mp >= MAGIC_COST && statOf(s, 'mana') > statOf(s, 'vit') ? 'magic' : 'attack', rng);
+  const magicBetter = magicMul(s) > attackMul(s) * (1 + critChance(s) * 0.7);
+  for (let i = 0; i < 60 && !d.result; i++) duelTurn(d, s, magicBetter && d.mp >= MAGIC_COST ? 'magic' : 'attack', rng);
   return d.result ?? 'lose';
 }

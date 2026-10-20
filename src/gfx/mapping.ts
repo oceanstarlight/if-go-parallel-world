@@ -129,6 +129,11 @@ export function timeFor(s: LifeState, kind: SceneKind): TimeOfDay {
 }
 
 /** 던전 보스의 전투 스프라이트 */
+/** 던전 길목의 마물 (지대마다) */
+export function mobEnemy(floor: number): EnemyKind {
+  return (['wolf', 'shadow', 'wolf', 'wyvern', 'shadow'] as EnemyKind[])[Math.min(4, Math.floor((Math.max(1, floor) - 1) / 20))];
+}
+
 export function bossEnemy(floor: number): EnemyKind {
   if (floor >= 100) return 'demon_lord';
   if (floor === 60 || floor === 75) return 'dragon';

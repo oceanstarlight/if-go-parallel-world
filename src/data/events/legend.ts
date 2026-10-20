@@ -20,7 +20,7 @@ export const LEGEND_EVENTS: GameEvent[] = [
       { label: '동상 앞에서 맹세한다',
         success: { text: '"이번 생도 멋지게 살아볼게." 동상이 햇빛을 받아 반짝 웃은 것 같았다.', effect: { will: 15, stats: { fame: 2 } }, tone: 'good' } },
       { label: '동상 머리 위에 올라가 본다', check: { stat: 'luck', dc: 25 },
-        success: { text: '꼭대기에서 본 마을은 장난감 같았다. 동상 왕관 틈에서 낡은 금화 한 닢을 발견했다!', effect: { stats: { luck: 5 } }, tone: 'good' },
+        success: { text: '꼭대기에서 본 마을은 장난감 같았다. 동상 왕관 틈에서 낡은 금화 한 닢을 발견했다!', effect: { stats: { luck: 5 }, gold: 30 }, tone: 'good' },
         fail: { text: '경비병에게 딱 걸렸다. "위인의 머리를 밟다니!" 너도 그 위인이었다고 말해봤자 소용없다.', effect: { stats: { fame: -1 }, karma: -2 } } },
     ],
   },

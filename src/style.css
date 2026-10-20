@@ -843,10 +843,11 @@ button.t-slot { cursor: pointer; }
   .view-life .stat .bar { height: 4px; }
   .view-life .mind { margin-top: 4px; }
   .view-life .econ { margin-top: 2px; }
-  /* 장면: 화면 높이의 약 1/5. 하늘 쪽을 잘라 땅(인물이 서는 곳)은 남긴다 */
-  .view-life .scene-host { height: clamp(104px, 21dvh, 190px); overflow: hidden; display: flex; align-items: flex-end; justify-content: center; flex: none; }
-  /* 전투 중: 전투 시트가 아래를 덮으므로 하늘을 더 잘라 인물이 시트 위에 오게 한다 (HP 는 시트에 있다) */
-  .view-life.dueling .scene-host { height: clamp(100px, calc(100dvh - 45px - var(--ub-h) - 400px), 200px); }
+  /* 장면: 평소엔 하늘 쪽 30%를 잘라 작게 (땅·인물은 남긴다) */
+  .view-life .scene-host { height: calc(var(--ch, 190px) * 0.7); overflow: hidden; display: flex; align-items: flex-end; justify-content: center; flex: none; transition: height 0.25s ease-out; }
+  /* 전투 중: 장면을 전부 보여 주고, 인물 정보·시간 막대는 접는다 (HP 는 전투 시트에 있다) */
+  .view-life.dueling .scene-host { height: var(--ch, 200px); }
+  .view-life.dueling > .sheet, .view-life.dueling .timebar { display: none; }
   /* 시간 막대: 한 줄 */
   .view-life .timebar { flex-wrap: nowrap; padding: 2px 2px 6px; gap: 6px; }
   .view-life .tb-play { width: 28px; height: 28px; }
@@ -860,3 +861,26 @@ button.t-slot { cursor: pointer; }
   .view-life .chronicle { min-height: 150px; padding: 10px 12px; }
   .view-life .year { grid-template-columns: 34px 1fr; font-size: 13px; }
 }
+
+/* 가방 묶음 · 보스 방 앞 */
+.m-icon { position: relative; }
+.m-icon .stack { position: absolute; right: -6px; bottom: -4px; font-size: 10px; background: #4a62f0; color: #fff; border-radius: 8px; padding: 0 4px; line-height: 14px; }
+.boss-gate h3 { display: flex; align-items: center; gap: 6px; }
+.boss-gate .dg-actions { flex-wrap: wrap; }
+
+/* 안내창 */
+.modal-back { position: fixed; inset: 0; z-index: 90; background: rgba(20, 24, 60, 0.45); }
+.modal { position: fixed; z-index: 91; inset: 0; margin: auto; height: fit-content; max-height: calc(100dvh - 32px); overflow-y: auto; width: min(420px, calc(100vw - 32px)); box-sizing: border-box; background: var(--panel); border-radius: 16px; padding: 18px 18px 14px; box-shadow: 0 16px 40px rgba(30, 40, 120, 0.3); animation: appear 0.2s ease-out both; }
+.modal h3 { margin: 0 0 8px; display: flex; align-items: center; gap: 6px; }
+.modal ul { margin: 0 0 14px; padding-left: 18px; line-height: 1.6; }
+.modal-actions { display: flex; flex-direction: column; gap: 8px; }
+
+/* 능력치 변화 잔상 */
+.stat-val { position: relative; }
+.stat-val .ghost { position: absolute; right: 100%; margin-right: 3px; top: -1px; font-style: normal; font-size: 0.72em; font-weight: 700; padding: 0 4px; border-radius: 6px; white-space: nowrap; animation: appear 0.25s ease-out both; }
+.stat-val .ghost.up { color: #1a8a4a; background: rgba(40, 180, 100, 0.14); }
+.stat-val .ghost.down { color: #c0392b; background: rgba(220, 70, 60, 0.14); }
+
+/* 가로로 넘치는 요소가 있어도 화면 전체가 옆으로 밀리지 않게 (sticky 를 깨지 않는 clip) */
+#app { overflow-x: clip; }
+.duel, .du-log, .dg-log { min-width: 0; overflow-wrap: anywhere; }

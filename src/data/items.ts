@@ -35,9 +35,9 @@ export const ARMORS: ItemDef[] = [
 ];
 
 export const POTIONS: ItemDef[] = [
-  { base: 'p1', name: '회복약', kind: 'potion', power: 60, price: 25 },
-  { base: 'p2', name: '상급 회복약', kind: 'potion', power: 200, price: 120 },
-  { base: 'p3', name: '엘릭서', kind: 'potion', power: 9999, price: 600 },
+  { base: 'p1', name: '회복약', kind: 'potion', power: 50, price: 25 },
+  { base: 'p2', name: '상급 회복약', kind: 'potion', power: 100, price: 40 },
+  { base: 'p3', name: '엘릭서', kind: 'potion', power: 9999, price: 500 },
 ];
 
 /** 던전 지대 (20층씩) */

@@ -3,11 +3,12 @@ import type {
 } from '../types';
 import { rollTraits, traitById } from '../data/traits';
 import { BATTLE_ENEMY, ENEMY_NAME, battleOdds, isCombat } from './combat';
-import { maxHp, monthlyEconomy, starterKit, yearEndEconomy } from './economy';
+import { clampHp, maxHp, monthlyEconomy, starterKit, yearEndEconomy } from './economy';
 import { bump, rec } from './record';
 import { statOf, trinketSlots } from './trinket';
 import { pickNote } from './notes';
 import { makeTrinket, randomTrinket, trinketDef } from '../data/trinkets';
+import { gearByBase, makeItem } from '../data/items';
 import { deathById } from '../data/deaths';
 import { OWNED_FOCUS } from '../data/market';
 import { inBranch } from '../data/branches';
@@ -380,6 +381,11 @@ export function successChance(s: LifeState, check: Check): number {
 }
 
 export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
+  applyEffectRaw(s, e, rng);
+  clampHp(s);
+}
+
+function applyEffectRaw(s: LifeState, e: Effect | undefined, rng: Rng) {
   if (!e) return;
   if (e.stats) {
     for (const [k, v] of Object.entries(e.stats)) {
@@ -426,7 +432,8 @@ export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
   if (e.will) s.will = clamp((s.will ?? 50) + e.will, 0, 100);
   if (e.extraLives) s.extraLives = Math.max(0, s.extraLives + e.extraLives);
   const g0 = s.gold ?? 0;
-  if (e.gold) s.gold = (s.gold ?? 0) + e.gold;
+  // 잃는 돈은 가진 만큼만 (빚을 지는 사건만 마이너스가 된다)
+  if (e.gold) s.gold = e.gold < 0 && !e.debt ? Math.max(Math.min(g0, 0), g0 + e.gold) : g0 + e.gold;
   if (e.goldPct && (s.gold ?? 0) > 0) {
     const delta = (s.gold ?? 0) * e.goldPct;
     s.gold = Math.round((s.gold ?? 0) + (delta > 0 ? Math.min(delta, e.goldCap ?? Infinity) : delta));
@@ -435,6 +442,7 @@ export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
   if ((s.gold ?? 0) > g0) rec(s).earned += (s.gold ?? 0) - g0;
   if (e.own && !(s.owned ?? []).includes(e.own)) s.owned = [...(s.owned ?? []), e.own];
   if (e.trinket) gainTrinket(s, e.trinket, rng);
+  if (e.item) gainItem(s, e.item);
   if (e.caught) {
     s.caught = (s.caught ?? 0) + 1;
     if ((s.gold ?? 0) > 0) s.gold = 0;
@@ -447,6 +455,15 @@ export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
 }
 
 /** 사건 보상 장신구: 빈 칸이 있으면 바로 차고, 없으면 가방에 넣는다 */
+function gainItem(s: LifeState, t: NonNullable<Effect['item']>) {
+  const def = gearByBase(t.base);
+  if (!def) return;
+  const it = makeItem(def, t.rarity ?? 'common');
+  if (t.name) it.name = t.name;
+  s.bag = [...(s.bag ?? []), it];
+  log(s, `「${it.name}」을(를) 가방에 넣었다.`, 'good');
+}
+
 function gainTrinket(s: LifeState, t: NonNullable<Effect['trinket']>, rng: Rng) {
   const rarity = t.rarity ?? 'rare';
   const def = t.base ? trinketDef(t.base) : undefined;
@@ -581,6 +598,17 @@ function startYear(s: LifeState, rng: Rng) {
     return;
   }
   yearNote(s, rng);
+  dungeonReady(s);
+}
+
+/** 던전에 다시 들어갈 수 있게 되면 한 번만 알린다 (12세 · 2년 쿨다운 · 출입 금지가 풀릴 때) */
+function dungeonReady(s: LifeState) {
+  const open = Math.max(12, s.dgBanUntil ?? 0, s.dgNextAge ?? 0);
+  if (s.dgNotified || s.age < open) return;
+  s.dgNotified = true;
+  const first = !(s.record?.dives);
+  s.toast = first ? '던전에 들어갈 수 있는 나이가 되었다!' : '던전에 다시 도전할 수 있다!';
+  log(s, first ? '마을 어른들이 「이제 던전에 들어가도 된다」며 등을 두드려 주었다. (던전 개방)' : '몸도 마음도 준비됐다. 던전에 다시 도전할 수 있다! (던전 2년마다 1회)', 'milestone');
 }
 
 /** 한 해 기록: 나이·직업에 맞는 삶의 한 장면을 연대기에 남긴다 */
@@ -608,6 +636,7 @@ export function advanceMonth(s: LifeState, rng: Rng = Math.random) {
     startYear(s, rng);
     if (s.death) return;
   }
+  clampHp(s);
   const money = monthlyEconomy(s, month, rng);
   if (money) log(s, money, 'normal');
   if ((s.trauma ?? 0) > 0) {

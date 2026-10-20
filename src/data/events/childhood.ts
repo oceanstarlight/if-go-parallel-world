@@ -178,7 +178,7 @@ export const CHILDHOOD: GameEvent[] = [
     cond: { minAge: 8, maxAge: 12, test: (s) => s.flags.includes('prodigy') || s.flags.includes('gifted') },
     text: '신동 소문을 듣고 궁정 마법사가 찾아왔다! 긴 수염의 할아버지가 당신을 흥미롭게 내려다본다.',
     choices: [
-      { label: '제자가 된다', success: { text: '대마법사 {mentor:이} 싱긋 웃으며 반짝이는 지팡이를 건넸다. 오늘부터 마법 수업 시작!', effect: { addRel: 'mentor', stats: { mana: 4, int: 2 }, flags: ['apprentice'] }, tone: 'good' } },
+      { label: '제자가 된다', success: { text: '대마법사 {mentor:이} 싱긋 웃으며 반짝이는 지팡이를 건넸다. 오늘부터 마법 수업 시작!', effect: { addRel: 'mentor', stats: { mana: 4, int: 2 }, flags: ['apprentice'], item: { base: 'w1', rarity: 'rare', name: '반짝이는 지팡이' } }, tone: 'good' } },
       { label: '거절한다', success: { text: '"허허, 아쉽구먼." 할아버지는 사탕 하나를 쥐여주고 떠났다.', effect: { stats: { luck: 2 } } } },
     ],
   },

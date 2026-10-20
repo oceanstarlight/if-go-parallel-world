@@ -46,7 +46,7 @@ export const HOUSES: House[] = [
   {
     id: 'hero',
     name: '용사의 혈통',
-    desc: '전설의 용사 혈통! 지하실의 성검이 당신을 기다리고 있다. 주인공 확정 루트.',
+    desc: '전설의 용사 혈통! 지하실의 성검이 당신을 기다리고 있다.',
     stats: { vit: 20, mana: 18, int: 14, cha: 16, fame: 15, luck: 14 },
     karma: 10,
     flags: ['heroblood'],

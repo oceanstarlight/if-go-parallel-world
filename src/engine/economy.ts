@@ -11,6 +11,10 @@ export const bagCap = (s: LifeState) => 30 + (owns(s, 'big_bag') ? 20 : 0);
 
 /** 던전 최대 HP */
 export const maxHp = (s: LifeState) => 60 + statOf(s, 'vit') * 2 + (s.equip?.armor?.power ?? 0);
+/** 능력치·장비가 줄어 최대 체력이 내려가면 현재 체력도 맞춘다 */
+export function clampHp(s: LifeState) {
+  if (s.hp !== undefined && s.hp > maxHp(s)) s.hp = maxHp(s);
+}
 
 export const goldOf = (s: LifeState) => s.gold ?? 0;
 
@@ -75,7 +79,8 @@ export function monthlyEconomy(s: LifeState, month: number, rng: Rng): string | 
  */
 export function yearEndEconomy(s: LifeState, rng: Rng): string | null {
   let note: string | null = null;
-  const living = s.age >= 18 && !owns(s, 'house') && !owns(s, 'villa') ? 60 : 0;
+  // 생활비는 가진 만큼만 나간다 (빈털터리를 빚더미로 만들지 않는다)
+  const living = s.age >= 18 && !owns(s, 'house') && !owns(s, 'villa') ? Math.min(60, Math.max(0, goldOf(s))) : 0;
   let net = (s.yearIncome ?? 0) - living;
   s.gold = goldOf(s) - living;
   earn(s, -living);
@@ -206,16 +211,18 @@ export function drinkBest(s: LifeState): Result {
   return drink(s, potions[0].uid);
 }
 
-export const INN_PRICE = 30;
+/** 여관비: 회복할 HP 3당 1골드 (나머지가 있으면 1골드 더) */
+export const innPrice = (s: LifeState) => Math.ceil(Math.max(0, maxHp(s) - (s.hp ?? maxHp(s))) / 3);
 
 /** 여관에서 쉰다: HP 완전 회복 */
 export function innRest(s: LifeState): Result {
   if ((s.hp ?? maxHp(s)) >= maxHp(s)) return { ok: false, msg: '이미 HP가 가득하다.' };
-  if (goldOf(s) < INN_PRICE) return { ok: false, msg: '여관비가 모자라다.' };
-  s.gold = goldOf(s) - INN_PRICE;
-  earn(s, -INN_PRICE);
+  const price = innPrice(s);
+  if (goldOf(s) < price) return { ok: false, msg: `여관비가 모자라다. (${fmtGold(price)})` };
+  s.gold = goldOf(s) - price;
+  earn(s, -price);
   s.hp = maxHp(s);
-  return { ok: true, msg: `여관에서 푹 쉬었다. HP 가득! (-${fmtGold(INN_PRICE)})` };
+  return { ok: true, msg: `여관에서 푹 쉬었다. HP 가득! (-${fmtGold(price)})` };
 }
 
 /** 시작 장비 (출신에 관계없이 천 옷 한 벌) */
