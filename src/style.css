@@ -326,7 +326,69 @@ h4 { font-size: 13px; color: var(--muted); margin: 20px 0 6px; letter-spacing: 0
 .portrait-host.small { width: 128px; margin: 0 auto 12px; }
 
 .center { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
-.center .chronicle { flex: 1; min-height: 0; }
+.center .chronicle { flex: 1; min-height: 120px; }
+
+/* ───── 메인 사건 / 결투 / 사망 패널 (중앙 확장) ───── */
+.center-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--gold);
+  border-radius: 8px;
+  padding: 20px 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  max-height: 52vh;
+  overflow-y: auto;
+  flex: none;
+  animation: appear 0.25s ease-out both;
+}
+.center-panel .event-card {
+  margin: 0;
+}
+.center-panel .event-card .eyebrow {
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+.center-panel .event-card h3 {
+  font-size: 22px;
+  margin: 0 0 12px;
+  color: var(--accent);
+  line-height: 1.35;
+}
+.center-panel .event-text {
+  font-size: 15px;
+  line-height: 1.75;
+  margin: 0 0 20px;
+  color: var(--text);
+  word-break: keep-all;
+}
+.center-panel .choices {
+  gap: 10px;
+}
+.center-panel .choice {
+  padding: 12px 16px;
+  font-size: 15px;
+  border-radius: 6px;
+  transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.center-panel .choice:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--gold);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+.center-panel .choices.duo .choice {
+  padding: 18px 14px;
+  font-size: 15px;
+  min-height: 80px;
+}
+.center-panel .death-call {
+  padding: 16px 0;
+}
+.center-panel .death-cause {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
 
 .battle-caption {
   position: absolute;
