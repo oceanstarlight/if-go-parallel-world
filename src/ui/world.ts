@@ -25,14 +25,14 @@ export function econRow(s: LifeState): string {
   return `
     <div class="econ">
       <span class="gold ${goldOf(s) < 0 ? 'debt' : ''}" title="골드 (작년 ${inc >= 0 ? '+' : ''}${fmtGold(inc)})">${icon('coins')}${fmtGold(goldOf(s))}</span>
-      <span class="cp" title="전투력">${icon('sword')}${combatPower(s)}</span>
+      <span class="cp" title="전투력: 누르면 내역" data-act="stat" data-arg="cp">${icon('sword')}${combatPower(s)}</span>
       ${hpBar(s)}
     </div>`;
 }
 
 // ───────────────────────── 던전 ─────────────────────────
 
-export function viewDungeon(s: LifeState): string {
+export function viewDungeon(s: LifeState, duelHtml = ''): string {
   const d = s.dive;
   const head = `
     <div class="dg-head">
@@ -45,6 +45,8 @@ export function viewDungeon(s: LifeState): string {
   const scene = `<div class="scene-host" data-gfx="scene" data-maxh="${Math.floor(window.innerHeight * 0.32)}"></div>`;
   const potions = (s.bag ?? []).filter((x) => x.kind === 'potion').length;
 
+  // 보스와 턴제 전투 중
+  if (duelHtml) return `${head}${scene}<div class="dg-card">${duelHtml}</div>`;
   if (d?.fallen) {
     return `${head}${scene}
       <div class="dg-card dead">

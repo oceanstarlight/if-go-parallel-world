@@ -1,7 +1,7 @@
 import morphdom from 'morphdom';
 import { Music } from '../audio/music';
 import { moodFor } from '../audio/compose';
-import type { Focus, LifeState, MetaSave, RelKey } from '../types';
+import type { Focus, LifeState, MetaSave, RelKey, StatKey } from '../types';
 import { HOUSES, houseById } from '../data/houses';
 import { CHEATS, cheatById } from '../data/cheats';
 import { jobById, jobTitle } from '../data/jobs';
@@ -9,7 +9,7 @@ import { DEATHS, deathById } from '../data/deaths';
 import { type Gender, namesOf, pick } from '../data/names';
 import { SHOP, itemCost } from '../data/shop';
 import { goalById } from '../data/goals';
-import { FOCUS_DESC, FOCUS_NAMES, MOOD_HINT, MOOD_NAMES, REL_NAMES, STAT_KEYS, STAT_NAMES, affectionWord } from '../data/stats';
+import { FOCUS_DESC, FOCUS_NAMES, MOOD_HINT, MOOD_NAMES, REL_NAMES, STAT_INFO, STAT_KEYS, STAT_NAMES, affectionWord } from '../data/stats';
 import {
   MAX_INJURY, MONTHS, STRESS_HIGH, advanceMonth, applyOracle, canAdvance, genderOf, choiceLocked, choose, createLife, currentEvent, focusMul,
   successChance, traitsOf, visibleChoices, rollHouse, rollCheat,
@@ -21,22 +21,23 @@ import { buy, isUnlocked, loadMeta, loadRun, saveRun, settleLife, type SettleRes
 import { GfxStage } from '../gfx/stage';
 import { drawPortrait, specFromLife } from '../gfx/portrait';
 import { ENEMY_HP, battleFor, graveWeather, sceneFor, timeFor } from '../gfx/mapping';
-import { enemySprite, playerSprite } from '../gfx/sprites';
+import { enemySprite, playerSprite, type EnemyKind } from '../gfx/sprites';
 import { hashStr } from '../gfx/painter';
 import { lifeTitle, makeShareCard, shareOrDownload } from './sharecard';
 import { icon, type IconName } from './icons';
 import { econRow, viewDungeon, viewTown } from './world';
 import type { MarketCat } from '../data/market';
 import { branchPaths } from '../data/branches';
-import { battleOdds, isCombat } from '../engine/combat';
-import { beginDive, canEnterDungeon, descend, endDiveOnDeath, retreat } from '../engine/dungeon';
+import { BATTLE_ENEMY, CP_WEIGHT, ENEMY_NAME, battleOdds, combatPower, isCombat } from '../engine/combat';
+import { MAGIC_COST, autoDuel, critChance, duelTurn, fleeChance, magicMul, startDuel, type Duel, type DuelAction } from '../engine/duel';
+import { beginDive, bossAhead, canEnterDungeon, descendPath, endDiveOnDeath, retreat, settleBoss } from '../engine/dungeon';
 import { buy as marketBuy, drink, drinkBest, equip, fmtGold, innRest, payLabel, repairItems, sell, sellAllLoot } from '../engine/economy';
 import { rec } from '../engine/record';
 import { bossEnemy } from '../gfx/mapping';
 import { biomeOf } from '../data/items';
 import { ENEMY_HP as BOSS_HP } from '../gfx/mapping';
 
-type Screen = 'title' | 'setup' | 'oracle' | 'life' | 'dungeon' | 'town' | 'death' | 'altar' | 'codex' | 'lives';
+type Screen = 'title' | 'setup' | 'oracle' | 'life' | 'dungeon' | 'town' | 'credits' | 'death' | 'altar' | 'codex' | 'lives';
 /** 모바일 바텀시트 탭 */
 type Tab = 'none' | 'action' | 'menu';
 
@@ -76,6 +77,12 @@ interface App {
   /** 시간 흐름: 일시 정지 · 한 해의 길이(초) */
   paused: boolean;
   pace: Pace;
+  /** 이번 달이 얼마나 지났나 (0~1) */
+  monthFrac: number;
+  /** 설명을 펼친 능력치 (cp = 전투력) */
+  statInfo: StatKey | 'cp' | null;
+  /** 진행 중인 턴제 전투 */
+  duel: DuelState | null;
   townTab: 'shop' | 'bag';
   townCat: MarketCat;
   music: Music;
@@ -102,6 +109,9 @@ export async function mount(root: HTMLElement) {
     focusNudge: false,
     paused: false,
     pace: loadPace(),
+    monthFrac: 0,
+    statInfo: null,
+    duel: null,
     townTab: 'shop',
     townCat: 'weapon',
     music: new Music(),
@@ -136,6 +146,10 @@ export async function mount(root: HTMLElement) {
   };
 
   root.addEventListener('click', (ev) => {
+    if (app.duel?.busy && (ev.target as HTMLElement).closest('.scene-host')) {
+      app.gfx?.skipBattle();
+      return;
+    }
     if (app.battleLogFrom !== null && (ev.target as HTMLElement).closest('.scene-host, .action, .underbar')) {
       app.gfx?.skipBattle();
       return;
@@ -143,6 +157,10 @@ export async function mount(root: HTMLElement) {
     const el = (ev.target as HTMLElement).closest<HTMLElement>('[data-act]');
     if (!el || el.hasAttribute('disabled')) return;
     run(el.dataset.act!, el.dataset.arg);
+  });
+  // 크레딧이 끝까지 올라가면 묘비로
+  root.addEventListener('animationend', (ev) => {
+    if ((ev.target as HTMLElement).classList?.contains('credits-roll')) run('credits-end');
   });
   root.addEventListener('input', (ev) => {
     const el = ev.target as HTMLInputElement;
@@ -153,6 +171,15 @@ export async function mount(root: HTMLElement) {
     if (app.screen === 'oracle') {
       if (ev.code === 'Digit1' || ev.code === 'ArrowLeft') run('oracle', '0');
       else if (ev.code === 'Digit2' || ev.code === 'ArrowRight') run('oracle', '1');
+      return;
+    }
+    if (app.duel) {
+      const acts: DuelAction[] = ['attack', 'magic', 'guard', 'flee'];
+      if (/^Digit[1-4]$/.test(ev.code)) run('duel', acts[Number(ev.code.slice(5)) - 1]);
+      else if ((ev.code === 'Enter' || ev.code === 'Space') && app.duel.done) {
+        ev.preventDefault();
+        run('duel-end');
+      }
       return;
     }
     if (app.screen !== 'life' || !app.life) return;
@@ -169,30 +196,34 @@ export async function mount(root: HTMLElement) {
     }
   });
   // ── 시간: 한 해 = pace 초. 한 달씩 저절로 흐르고, 선택이 필요한 사건이 뜨면 멈춘다 ──
+  // 진행도는 app.monthFrac 하나로 관리한다 (화면을 다시 그려도 같은 값 → 막대가 되감기지 않는다)
   let last = performance.now();
-  let acc = 0;
-  window.setInterval(() => {
-    const now = performance.now();
-    const dt = Math.min(500, now - last);
+  const frame = (now: number) => {
+    const dt = Math.min(250, now - last);
     last = now;
     const s = app.life;
-    if (!s || !timeFlows(app)) return;
-    const monthMs = (app.pace * 1000) / MONTHS;
-    acc += dt;
-    if (acc >= monthMs) {
-      acc = 0;
-      advanceMonth(s);
-      afterStep(app);
-      render();
-      popPay(root, s);
+    if (s && timeFlows(app)) {
+      app.monthFrac += dt / ((app.pace * 1000) / MONTHS);
+      if (app.monthFrac >= 1) {
+        app.monthFrac = Math.min(0.99, app.monthFrac - 1);
+        advanceMonth(s);
+        afterStep(app);
+        render();
+        popPay(root, s);
+      }
+      const bar = root.querySelector<HTMLElement>('.year-bar > i');
+      if (bar) bar.style.width = yearPct(s, app.monthFrac);
     }
-    const bar = root.querySelector<HTMLElement>('.year-bar > i');
-    if (bar) bar.style.width = `${(((s.month ?? 0) + acc / monthMs) / MONTHS) * 100}%`;
-  }, 100);
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
   render();
 }
 
 type Pace = 10 | 15 | 25;
+
+/** 올해 진행도 (%) */
+const yearPct = (s: LifeState, frac: number) => `${(((s.month ?? 0) + frac) / MONTHS) * 100}%`;
 const PACE_KEY = 'igpw-pace-v1';
 const PACES: { v: Pace; name: string }[] = [{ v: 25, name: '느리게' }, { v: 15, name: '보통' }, { v: 10, name: '빠르게' }];
 
@@ -230,7 +261,11 @@ function settle(app: App) {
 }
 
 /** 비동기 연출(전투·공유)이 있으면 끝날 때 resolve 되는 Promise 를 돌려준다 */
+/** 전투 중에도 되는 일 */
+const DUEL_OK = new Set(['duel', 'duel-end', 'music', 'stat', 'pause', 'tab', 'pace']);
+
 function act(app: App, action: string, arg?: string): Promise<void> | void {
+  if (app.duel && !DUEL_OK.has(action)) return;
   app.notice = '';
   app.focusNudge = false;
   switch (action) {
@@ -292,6 +327,10 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
     case 'pause':
       app.paused = !app.paused;
       break;
+    case 'stat':
+      // 같은 것을 다시 누르면 닫는다
+      app.statInfo = app.statInfo === arg ? null : ((arg ?? null) as App['statInfo']);
+      break;
     case 'pace': {
       const v = Number(arg);
       if (v === 10 || v === 15 || v === 25) {
@@ -308,7 +347,15 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
       const ev = s && currentEvent(s);
       if (!s || !ev) break;
       const picked = visibleChoices(s, ev)[Number(arg)];
-      const battle = picked && app.gfx ? battleFor(ev.id, picked) : null;
+      if (!picked || choiceLocked(s, picked)) break;
+      // 전투 선택지는 턴제 전투로 승패를 가린다
+      if (app.gfx && isCombat(ev.id, picked) && !app.duel) {
+        const look = battleFor(ev.id, picked);
+        const d = startDuel(s, 'event', ENEMY_NAME[BATTLE_ENEMY[ev.id]] ?? '적', battleOdds(s, picked).ep);
+        app.tab = 'none';
+        return openDuel(app, d, { kind: 'event', choice: Number(arg) }, look?.enemy ?? 'bandit', !!look?.magic);
+      }
+      const battle = app.gfx ? battleFor(ev.id, picked) : null;
       const logFrom = s.log.length;
       const res = choose(s, Number(arg));
       app.tab = 'none';
@@ -335,9 +382,13 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
     case 'see-grave':
       if (app.life?.death) {
         settle(app);
-        app.screen = 'death';
+        // 먼저 엔딩 크레딧, 끝나거나 건너뛰면 묘비
+        app.screen = 'credits';
         app.tab = 'none';
       }
+      break;
+    case 'credits-end':
+      if (app.screen === 'credits') app.screen = 'death';
       break;
     case 'share':
     case 'save-card': {
@@ -367,31 +418,61 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
       break;
     case 'descend': {
       const s = app.life;
-      if (!s?.dive) break;
-      const bossFloor = s.dive.floor + 5;
-      const res = descend(s);
-      if (res === 'dead') endDiveOnDeath(s);
-      afterStep(app);
-      // 보스전 연출 (보스 앞까지 못 가고 쓰러졌으면 생략)
-      if (app.gfx && res !== 'fallen') {
-        const kind = bossEnemy(bossFloor);
-        const magic = s.stats.mana > s.stats.vit;
-        app.battleLogFrom = s.log.length;
-        return app.gfx
-          .playBattle({
-            player: playerSprite(specFromLife(s), magic),
-            enemy: enemySprite(kind),
-            magic,
-            glow: magic ? 0x7ad0ff : undefined,
-            enemyHp: BOSS_HP[kind],
-            win: res === 'cleared' || res === 'conquered',
-            died: res === 'dead', // 처음 쓰러짐(fallen)은 죽지 않는다
-            groundY: app.gfx.groundY,
-          })
-          .then(() => {
-            app.battleLogFrom = null;
-          });
+      if (!s?.dive || app.duel) break;
+      const res = descendPath(s);
+      if (res !== 'boss') {
+        // 보스 앞까지 못 가고 끝났다 (쓰러짐·죽음)
+        if (res === 'dead') endDiveOnDeath(s);
+        afterStep(app);
+        break;
       }
+      afterStep(app);
+      const boss = bossAhead(s);
+      const d = startDuel(s, 'boss', boss.name, boss.ep);
+      if (!app.gfx) {
+        // 그래픽이 없으면 자동 전투
+        const r = settleBoss(s, autoDuel(d, s, Math.random), d.hp);
+        if (r === 'dead') endDiveOnDeath(s);
+        afterStep(app);
+        break;
+      }
+      return openDuel(app, d, { kind: 'boss' }, bossEnemy(boss.floor), s.stats.mana > s.stats.vit);
+    }
+    case 'duel': {
+      const du = app.duel;
+      const s = app.life;
+      if (!du || !s || du.busy || du.done) break;
+      const blows = duelTurn(du.d, s, arg as DuelAction, Math.random);
+      du.busy = true;
+      const g = app.gfx;
+      const after = () => {
+        if (!du.d.result) {
+          du.busy = false;
+          return;
+        }
+        // 보스에게 지면: 한 번 쓰러진 적이 있으면 진짜 죽음
+        const anim = du.d.result === 'win' ? 'win' : du.d.result === 'fled' ? 'fled'
+          : du.ctx.kind === 'boss' && s.dgFallen && s.extraLives <= 0 ? 'died' : 'lose';
+        return (g ? g.closeBattle(anim) : Promise.resolve()).then(() => {
+          du.busy = false;
+          du.done = true;
+        });
+      };
+      return g ? g.battleTurn(blows).then(after) : (after() ?? undefined);
+    }
+    case 'duel-end': {
+      const du = app.duel;
+      const s = app.life;
+      if (!du || !s || !du.done || !du.d.result) break;
+      app.duel = null;
+      if (du.ctx.kind === 'event') {
+        s.hp = Math.max(1, du.d.hp);
+        choose(s, du.ctx.choice, Math.random, du.d.result === 'win');
+      } else {
+        const r = settleBoss(s, du.d.result, du.d.hp);
+        if (r === 'dead') endDiveOnDeath(s);
+      }
+      afterStep(app);
       break;
     }
     case 'retreat':
@@ -457,6 +538,7 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
 
 /** 문답을 마치고 태어난다 */
 function birth(app: App) {
+  app.monthFrac = 0;
   // 성별은 매 생 무작위. 이름을 비워 두면 그 성별의 이름 목록에서 짓는다
   const gender: Gender = Math.random() < 0.5 ? 'm' : 'f';
   const name = app.setup.name.trim().slice(0, 12) || pick(namesOf(gender), Math.random);
@@ -493,9 +575,9 @@ function afterStep(app: App) {
 function view(app: App): string {
   const body = {
     title: viewTitle, setup: viewSetup, oracle: viewOracle, life: viewLife, death: viewDeath,
-    dungeon: (a: App) => (a.life ? viewDungeon(a.life) : viewTitle(a)),
+    dungeon: (a: App) => (a.life ? viewDungeon(a.life, a.duel ? duelPanel(a) : '') : viewTitle(a)),
     town: (a: App) => (a.life ? viewTown(a.life, a.townTab, a.townCat) : viewTitle(a)),
-    altar: viewAltar, codex: viewCodex, lives: viewLives,
+    altar: viewAltar, codex: viewCodex, lives: viewLives, credits: viewCredits,
   }[app.screen](app);
   return `
     <header class="topbar">
@@ -505,7 +587,7 @@ function view(app: App): string {
         <div class="stones" title="환생석">${icon('diamond-gem')} ${app.meta.soulStones}</div>
       </div>
     </header>
-    <main class="screen view-${app.screen}">${body}</main>
+    <main class="screen view-${app.screen} ${app.duel ? 'dueling' : ''}">${body}</main>
     ${underbar(app)}
     ${app.notice ? `<div class="toast">${esc(app.notice)}</div>` : ''}
   `;
@@ -513,13 +595,14 @@ function view(app: App): string {
 
 /** 모바일 하단 고정 바 (데스크톱에서는 CSS 로 숨긴다) */
 function underbar(app: App): string {
+  if (app.screen === 'credits') return '';
   const item = (act: string, arg: string, ic: IconName, label: string, on = false, extra = '') =>
     `<button class="ub-item ${on ? 'on' : ''}" data-act="${act}" data-arg="${arg}" ${extra}><span class="ub-icon">${icon(ic)}</span><span class="ub-label">${label}</span></button>`;
   if ((app.screen === 'dungeon' || app.screen === 'town') && app.life) {
     const s = app.life;
     let center = `<button class="ub-main" data-act="go" data-arg="life"><span>인생</span></button>`;
     if (s.death) center = `<button class="ub-main danger" data-act="see-grave"><span>묘비로</span></button>`;
-    else if (app.screen === 'dungeon' && s.dive && !s.dive.fallen && s.dive.floor < 100) center = `<button class="ub-main pulse" data-act="descend"><span>하강</span><small>5층</small></button>`;
+    else if (app.screen === 'dungeon' && !app.duel && s.dive && !s.dive.fallen && s.dive.floor < 100) center = `<button class="ub-main pulse" data-act="descend"><span>하강</span><small>5층</small></button>`;
     const inDive = !!s.dive;
     const inShop = app.screen === 'town' && app.townTab === 'shop';
     const inBag = app.screen === 'town' && app.townTab === 'bag';
@@ -754,11 +837,11 @@ function viewLife(app: App): string {
     </div>`).join('');
 
   const stats = STAT_KEYS.map((k) => `
-    <div class="stat">
+    <button class="stat ${app.statInfo === k ? 'on' : ''}" data-act="stat" data-arg="${k}" title="${STAT_NAMES[k]}: 누르면 설명">
       <span class="stat-name">${STAT_NAMES[k]}</span>
       <div class="bar"><div class="fill fill-${k}" style="width:${s.stats[k]}%"></div></div>
       <span class="stat-val">${s.stats[k]}</span>
-    </div>`).join('');
+    </button>`).join('');
 
   const rels = (['friend', 'rival', 'mentor', 'spouse'] as RelKey[]).map((k) => relLine(s, k)).join('');
   const relBlock = `<ul class="rels">${rels || '<li class="muted small">아직 아무도 없다. 인연을 만들어 보자!</li>'}</ul>`;
@@ -769,7 +852,9 @@ function viewLife(app: App): string {
   ].filter(Boolean).join(' · ');
 
   let panel: string;
-  if (app.battleLogFrom !== null) {
+  if (app.duel) {
+    panel = duelPanel(app);
+  } else if (app.battleLogFrom !== null) {
     panel = `
       <div class="death-call">
         <p class="eyebrow">전투</p>
@@ -846,6 +931,7 @@ function viewLife(app: App): string {
             <p class="muted small">${esc(houseById(s.houseId).name)} · ${esc(cheat.name)}${badges ? ` · ${badges}` : ''}</p>
           </div>
           <div class="stats">${stats}</div>
+          ${statInfoBox(app, s)}
           ${mindRow(s)}
           ${econRow(s)}
         </div>
@@ -897,6 +983,97 @@ function viewLife(app: App): string {
   `;
 }
 
+/** 능력치·전투력 설명 상자 */
+function statInfoBox(app: App, s: LifeState): string {
+  const k = app.statInfo;
+  if (!k) return '';
+  if (k === 'cp') {
+    const { vit, mana, int, luck } = s.stats;
+    const w = CP_WEIGHT;
+    const gear = (s.equip?.weapon?.power ?? 0) + (s.equip?.armor?.power ?? 0);
+    const job = (jobById(s.jobId)?.combat ?? 0) * s.jobRank;
+    const parts = [
+      ['체력', vit * w.vit], ['마력', mana * w.mana], [vit >= mana ? '주력(체력)' : '주력(마력)', w.main * Math.max(vit, mana)],
+      ['행운', luck * w.luck], ['지성', int * w.int], ['장비', gear], ['직업', job],
+    ] as [string, number][];
+    return `
+      <div class="stat-info" data-act="stat" data-arg="cp">
+        <b>${icon('sword')} 전투력 ${combatPower(s)}</b>
+        <p>${parts.filter(([, v]) => v).map(([n, v]) => `${n} ${Math.round(v)}`).join(' + ')}</p>
+        <p class="muted small">사건 전투·던전의 승률을 정한다. 턴제 전투에서 마력은 마법, 행운은 치명타·회피·도주에 쓰인다.</p>
+      </div>`;
+  }
+  return `
+    <div class="stat-info" data-act="stat" data-arg="${k}">
+      <b>${STAT_NAMES[k]} ${s.stats[k]}</b>
+      <ul>${STAT_INFO[k].map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+    </div>`;
+}
+
+interface DuelState {
+  d: Duel;
+  ctx: { kind: 'event'; choice: number } | { kind: 'boss' };
+  /** 연출 중 (행동 버튼 잠금) */
+  busy: boolean;
+  /** 승패가 나고 연출도 끝났다 → 「계속」 */
+  done: boolean;
+}
+
+/** 턴제 전투 시작: 두 인물을 세운다 */
+function openDuel(app: App, d: Duel, ctx: DuelState['ctx'], enemy: EnemyKind, magic: boolean): Promise<void> {
+  const s = app.life!;
+  const du: DuelState = { d, ctx, busy: true, done: false };
+  app.duel = du;
+  return app.gfx!
+    .openBattle({
+      player: playerSprite(specFromLife(s), magic),
+      enemy: enemySprite(enemy),
+      magic,
+      glow: magic ? 0x7ad0ff : s.jobId === 'hero' ? 0xfff0a0 : undefined,
+      enemyHp: ctx.kind === 'boss' ? BOSS_HP[enemy] : ENEMY_HP[enemy],
+      groundY: app.gfx!.groundY,
+      hpP: d.hp / d.hpMax,
+      hpE: 1,
+    })
+    .then(() => {
+      du.busy = false;
+    });
+}
+
+/** 턴제 전투 패널 */
+function duelPanel(app: App): string {
+  const du = app.duel!;
+  const d = du.d;
+  const s = app.life!;
+  const bar = (label: string, v: number, max: number, cls: string) =>
+    `<div class="du-bar ${cls}"><span>${label}</span><i><u style="width:${Math.round((v / max) * 100)}%"></u></i><b>${v}/${max}</b></div>`;
+  const acts: [DuelAction, string, IconName, string, boolean][] = [
+    ['attack', '공격', 'sword', `치명타 ${Math.round(critChance(s) * 100)}%`, false],
+    ['magic', '마법', 'wand', `MP ${MAGIC_COST} · ×${magicMul(s).toFixed(1)}`, d.mp < MAGIC_COST],
+    ['guard', '방어', 'shield', d.counter ? '반격 준비됨' : '피해↓ 반격 준비', false],
+    ['flee', '도주', 'arrow-left', `${Math.round(fleeChance(s) * 100)}%${du.ctx.kind === 'event' ? ' · 패배 처리' : ''}`, false],
+  ];
+  const resultText = d.result === 'win' ? `${esc(d.foe)}을(를) 쓰러뜨렸다!` : d.result === 'fled' ? '전투에서 벗어났다.' : '쓰러졌다…';
+  return `
+    <div class="duel ${du.done ? `done ${d.result}` : ''}">
+      <div class="du-head">
+        <p class="eyebrow">${du.ctx.kind === 'boss' ? '보스전' : '전투'} · ${d.turn + 1}턴</p>
+        <h3>VS ${esc(d.foe)}</h3>
+        <span class="du-cp">${icon('sword')} ${d.cp} vs ${d.ep}</span>
+      </div>
+      ${bar(esc(d.foe), d.eHp, d.eMax, 'enemy')}
+      ${bar('HP', d.hp, d.hpMax, 'hp')}
+      ${bar('MP', d.mp, d.mpMax, 'mp')}
+      <ol class="du-log">${d.log.slice(-4).map((l) => `<li>${esc(l)}</li>`).join('')}</ol>
+      ${du.done
+        ? `<p class="du-result">${resultText}</p><button class="btn primary wide" data-act="duel-end">계속 <kbd>Enter</kbd></button>`
+        : `<div class="du-acts">${acts.map(([a, label, ic, sub, off], i) => `
+            <button class="du-act" data-act="duel" data-arg="${a}" ${du.busy || off || d.result ? 'disabled' : ''}>
+              <kbd>${i + 1}</kbd>${icon(ic)}<strong>${label}</strong><small>${sub}</small>
+            </button>`).join('')}</div>`}
+    </div>`;
+}
+
 /** 시간 막대: 올해 진행도, 일시 정지, 속도 */
 function timeBar(app: App, s: LifeState, held: boolean): string {
   const month = s.month ?? 0;
@@ -904,9 +1081,62 @@ function timeBar(app: App, s: LifeState, held: boolean): string {
     <div class="timebar ${held ? 'held' : app.paused ? 'paused' : ''}">
       <button class="tb-play" data-act="pause" ${held ? 'disabled' : ''} aria-label="${app.paused ? '재생' : '일시 정지'}">${app.paused || held ? '▶' : 'Ⅱ'}</button>
       <span class="tb-month">${s.age}세 ${Math.max(1, month)}월</span>
-      <div class="year-bar"><i style="width:${(month / MONTHS) * 100}%"></i></div>
+      <div class="year-bar"><i style="width:${yearPct(s, app.monthFrac)}"></i></div>
       <span class="tb-state">${held ? '사건!' : app.paused ? '정지' : ''}</span>
       <div class="tb-pace">${PACES.map((p) => `<button class="chip ${app.pace === p.v ? 'on' : ''}" data-act="pace" data-arg="${p.v}" title="한 해 ${p.v}초">${p.name}</button>`).join('')}</div>
+    </div>`;
+}
+
+/** 엔딩 크레딧: 검은 화면에 이번 생의 행적이 아래에서 위로 흐른다 */
+function viewCredits(app: App): string {
+  const st = app.settlement;
+  if (!st) return viewTitle(app);
+  const s = st.life;
+  const r = rec(s);
+  const d = deathById(s.death!.causeId);
+  const line = (k: string, v: string) => `<p class="cr-line"><span>${k}</span><b>${v}</b></p>`;
+  const top = (m: Record<string, number>, n: number) =>
+    Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => `${esc(k)} ×${v}`).join(' · ');
+  // 행적: 이정표·좋은 일·죽을 뻔한 일 중에서 골라 나이순으로
+  const deeds = s.log
+    .filter((l) => (l.tone === 'milestone' || l.tone === 'good' || l.tone === 'death') && l.text.length < 90 && !l.text.startsWith('환생의 여신') && !l.text.startsWith('여신의 문답'))
+    .filter((_, i, a) => a.length <= 18 || i % Math.ceil(a.length / 18) === 0)
+    .slice(0, 18);
+  const rels = (['spouse', 'friend', 'rival', 'mentor'] as RelKey[]).filter((k) => s.rels[k])
+    .map((k) => line(REL_NAMES[k], esc(s.rels[k]!.name)));
+  const slain = Object.values(r.slain).reduce((a, b) => a + b, 0);
+  const section = (title: string, body: string) => (body ? `<h3 class="cr-sec">${title}</h3>${body}` : '');
+  const roll = [
+    `<p class="cr-eyebrow">환생록</p>`,
+    `<h1 class="cr-name">${esc(s.name)}</h1>`,
+    `<p class="cr-sub">${esc(lifeTitle(s))} · ${esc(houseById(s.houseId).name)}</p>`,
+    `<p class="cr-years">0 — ${s.age}</p>`,
+    `<p class="cr-cause">${esc(d.name)}</p>`,
+    section('걸어온 길', deeds.map((l) => `<p class="cr-deed"><i>${l.age}세</i>${esc(l.text)}</p>`).join('')),
+    section('인연', rels.join('')),
+    section('기록', [
+      line('겪은 사건', `${r.events}건`),
+      r.nearDeaths.length ? line('죽을 뻔한 일', `${r.nearDeaths.length}번`) : '',
+      r.battles ? line('사건 전투', `${r.battles}전 ${r.wins}승`) : '',
+      r.battles ? line('맞선 적', top(r.foes, 3)) : '',
+      r.dives ? line('던전', `${r.dives}번 원정 · 최고 ${r.maxFloor}층`) : '',
+      slain ? line('쓰러뜨린 마물', `${slain}마리`) : '',
+      Object.keys(r.bosses).length ? line('격파한 보스', top(r.bosses, 3)) : '',
+      line('번 돈', fmtGold(r.earned)),
+      line('남긴 재산', fmtGold(s.gold ?? 0)),
+      r.jobs.length ? line('직업', r.jobs.map((j) => esc(jobById(j)?.name ?? j)).join(' → ')) : '',
+    ].join('')),
+    section('능력치', STAT_KEYS.map((k) => line(STAT_NAMES[k], String(s.stats[k]))).join('')),
+    section('함께한 힘', [line('여신의 권능', esc(cheatById(s.cheatId).name)), ...traitsOf(s).map((t) => line('타고난 특성', esc(t.name)))].join('')),
+    `<p class="cr-epitaph">${esc(d.epitaph)}</p>`,
+    `<p class="cr-end">— 그리고, 다음 생으로 —</p>`,
+  ].join('');
+  // 줄 수에 맞춰 흐르는 시간을 정한다
+  const secs = Math.max(20, Math.min(48, 14 + deeds.length * 1.2 + rels.length));
+  return `
+    <div class="credits">
+      <div class="credits-roll" style="animation-duration:${secs}s">${roll}</div>
+      <button class="btn cr-skip" data-act="credits-end">건너뛰기 ${icon('arrow-right')}</button>
     </div>`;
 }
 

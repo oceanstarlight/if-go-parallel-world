@@ -730,3 +730,80 @@ h4 { font-size: 13px; color: var(--muted); margin: 20px 0 6px; letter-spacing: 0
   .tb-pace .chip { padding: 2px 7px; }
   .ub-main.paused { background: linear-gradient(180deg, #b8c0dc 0%, #8a94b8 100%); }
 }
+
+/* ───── 능력치 설명 ───── */
+button.stat { background: none; border: 0; padding: 2px 4px; margin: 0 -4px; border-radius: 6px; font-family: inherit; line-height: inherit; color: inherit; text-align: left; cursor: pointer; width: calc(100% + 8px); }
+button.stat:hover, button.stat.on { background: #eef3ff; }
+.econ .cp { cursor: pointer; }
+.stat-info { margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: #f4f7ff; border: 1px solid var(--line); font-size: 13px; cursor: pointer; animation: appear 0.2s ease-out both; }
+.stat-info b { color: var(--gold); }
+.stat-info ul { margin: 6px 0 0; padding-left: 18px; }
+.stat-info li { margin: 2px 0; }
+.stat-info p { margin: 4px 0 0; }
+
+/* ───── 턴제 전투 ───── */
+.duel { display: flex; flex-direction: column; gap: 8px; }
+.du-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.du-head .eyebrow { width: 100%; margin: 0; }
+.du-head h3 { margin: 0; }
+.du-cp { margin-left: auto; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.du-bar { display: grid; grid-template-columns: 5.5em 1fr 5.5em; align-items: center; gap: 8px; font-size: 12px; }
+.du-bar span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.du-bar b { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.du-bar i { display: block; height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.du-bar u { display: block; height: 100%; text-decoration: none; transition: width 0.35s ease-out; }
+.du-bar.enemy u { background: linear-gradient(90deg, #ff7a8a, #e8365a); }
+.du-bar.hp u { background: linear-gradient(90deg, #6ad08a, #2ea866); }
+.du-bar.mp u { background: linear-gradient(90deg, #7ab0ff, #6a6af0); }
+.du-log { list-style: none; margin: 0; padding: 8px 10px; border-radius: 10px; background: #f4f7ff; font-size: 13px; min-height: 5.6em; }
+.du-log li { padding: 1px 0; color: var(--muted); }
+.du-log li:last-child { color: inherit; font-weight: 600; animation: appear 0.3s ease-out both; }
+.du-acts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.du-act { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 4px 8px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--panel); cursor: pointer; font: inherit; color: inherit; position: relative; }
+.du-act .ic { width: 22px; height: 22px; color: var(--gold); }
+.du-act strong { font-size: 14px; }
+.du-act small { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.2; }
+.du-act kbd { position: absolute; top: 4px; left: 6px; font-size: 10px; opacity: 0.6; }
+.du-act:hover:not([disabled]) { background: #eef3ff; border-color: var(--gold); }
+.du-act[disabled] { opacity: 0.45; cursor: default; }
+.du-result { text-align: center; font-size: 18px; font-weight: 700; margin: 4px 0; }
+.duel.done.win .du-result { color: var(--good); }
+.duel.done.lose .du-result { color: var(--death); }
+@media (max-width: 760px) {
+  .du-acts { gap: 6px; }
+  .du-act { padding: 8px 2px 6px; }
+  .du-act small { font-size: 10px; }
+}
+@media (max-width: 760px) {
+  /* 전투 중에는 능력치를 접어서 장면이 보이게 한다 */
+  .dueling .sheet .stats, .dueling .sheet .mind, .dueling .stat-info, .dueling .sheet-head .muted { display: none; }
+  .duel { gap: 5px; }
+  .du-head .eyebrow { display: none; }
+  .du-head h3 { font-size: 16px; }
+  .du-bar { grid-template-columns: 4em 1fr 4.6em; font-size: 11px; gap: 6px; }
+  .du-bar i { height: 6px; }
+  .du-log { min-height: 0; padding: 6px 8px; font-size: 12px; }
+  .du-log li:not(:nth-last-child(-n+2)) { display: none; }
+  .du-result { font-size: 16px; margin: 0; }
+}
+
+/* ───── 엔딩 크레딧 ───── */
+.credits { position: fixed; inset: 0; z-index: 100; background: #000; color: #e8e4f0; overflow: hidden; animation: cr-fade 1.2s ease-out both; }
+@keyframes cr-fade { from { opacity: 0; } to { opacity: 1; } }
+.credits-roll { position: absolute; left: 50%; top: 0; width: min(560px, 88vw); text-align: center; transform: translate(-50%, 100vh); animation: cr-roll linear 1s forwards; animation-delay: 0.8s; }
+@keyframes cr-roll { from { transform: translate(-50%, 100vh); } to { transform: translate(-50%, -100%); } }
+.cr-eyebrow { letter-spacing: 0.5em; color: #8a84a8; font-size: 13px; margin: 0 0 12px; }
+.cr-name { font-size: 40px; margin: 0; letter-spacing: 0.15em; color: #fff; }
+.cr-sub { color: #b8b0d0; margin: 8px 0 0; }
+.cr-years { font-size: 22px; letter-spacing: 0.2em; margin: 18px 0 4px; font-variant-numeric: tabular-nums; }
+.cr-cause { color: #ff8aa0; margin: 0 0 64px; }
+.cr-sec { margin: 56px 0 18px; font-size: 13px; letter-spacing: 0.4em; color: #8a84a8; font-weight: 600; }
+.cr-line { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 6px 0; font-size: 15px; }
+.cr-line span { text-align: right; color: #8a84a8; }
+.cr-line b { text-align: left; font-weight: 500; color: #fff; }
+.cr-deed { margin: 10px 0; font-size: 14px; line-height: 1.6; color: #d8d2e8; }
+.cr-deed i { display: block; font-style: normal; font-size: 12px; color: #8a84a8; }
+.cr-epitaph { margin: 72px 0 0; font-style: italic; color: #c8c0e0; line-height: 1.7; }
+.cr-end { margin: 48px 0 30vh; letter-spacing: 0.3em; color: #8a84a8; }
+.cr-skip { position: fixed; right: 20px; bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 101; background: rgba(255, 255, 255, 0.12); color: #fff; border-color: rgba(255, 255, 255, 0.3); }
+.cr-skip .ic { margin-left: 4px; }

@@ -124,6 +124,8 @@ export interface LifeState {
   // ── 시간 · 중상 · 기록 (v1.0) ──
   /** 올해 지난 달 수 (0~11). 0이면 새해를 시작할 차례 */
   month?: number;
+  /** 사건별로 마지막에 겪은 나이 (반복 쿨다운) */
+  seenAt?: Record<string, number>;
   /** 올해 일어난 사건 수 */
   yearEvents?: number;
   /** 올해 수입 (해가 끝나면 lastIncome 으로) */
