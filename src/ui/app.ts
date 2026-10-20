@@ -1119,17 +1119,18 @@ function viewLife(app: App): string {
     s.fated ? '운명' : '',
   ].filter(Boolean).join(' · ');
 
-  let panel: string;
+  let centerPanel = '';
+  let sidePanel = '';
   if (app.duel) {
-    panel = duelPanel(app);
+    centerPanel = duelPanel(app);
   } else if (app.battleLogFrom !== null) {
-    panel = `
+    centerPanel = `
       <div class="death-call">
         <p class="eyebrow">전투</p>
         <p class="muted small">화면을 누르거나 Space 를 누르면 건너뛴다.</p>
       </div>`;
   } else if (s.death) {
-    panel = `
+    centerPanel = `
       <div class="death-call">
         <p class="death-cause">${esc(deathById(s.death.causeId).name)}</p>
         <p class="muted">${esc(s.name)}의 이번 생은 여기까지! 다음 생을 기약하자.</p>
@@ -1139,7 +1140,7 @@ function viewLife(app: App): string {
     const choices = visibleChoices(s, ev);
     const duo = choices.length === 2;
     const swipe = duo && !choices.some((c) => choiceLocked(s, c));
-    panel = `
+    centerPanel = `
       <div class="event-card ${swipe ? 'swipeable' : ''}" ${swipe ? `data-swipe="choose" data-left="${esc(fill(choices[0].label, s))}" data-right="${esc(fill(choices[1].label, s))}"` : ''}>
         ${swipe ? '<div class="swipe-label"></div>' : ''}
         <p class="eyebrow">${s.age}세 ${(s.month ?? 0) + 1}월의 사건 · 시간이 멈췄다</p>
@@ -1166,7 +1167,7 @@ function viewLife(app: App): string {
       </div>`;
   } else {
     const young = s.age < 2;
-    panel = `
+    sidePanel = `
       <div class="focus-card">
         <p class="eyebrow">성장</p>
         ${young ? '' : '<p class="muted small focus-hint">시간은 저절로 흐른다. 성장은 언제든 바꿀 수 있다. <kbd>1</kbd>~<kbd>5</kbd> · 정지 <kbd>Space</kbd></p>'}
@@ -1218,6 +1219,7 @@ function viewLife(app: App): string {
     <section class="center">
       <div class="scene-host" data-gfx="scene" data-maxh="${Math.floor(window.innerHeight * 0.45)}"></div>
       ${s.death ? '' : timeBar(app, s, !!ev)}
+      ${centerPanel ? `<div class="center-panel">${centerPanel}</div>` : ''}
       <div class="chronicle">${chronicle}</div>
     </section>
     <section class="action ${tab === 'action' ? 'open' : ''}">
@@ -1226,7 +1228,7 @@ function viewLife(app: App): string {
         <button class="btn" data-act="dungeon" ${ev || s.death || s.age < 12 ? 'disabled' : ''}>${icon('sword')} 던전${s.age < 12 ? ' (12세~)' : ''}</button>
         <button class="btn" data-act="town" ${ev || s.death ? 'disabled' : ''}>${icon('store')} 마을</button>
       </div>
-      ${panel}
+      ${sidePanel}
     </section>
     <section class="m-panel ${tab === 'menu' ? 'open' : ''}">
       <button class="sheet-handle" data-act="tab" data-arg="none" aria-label="접기"></button>
