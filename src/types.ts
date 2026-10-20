@@ -2,7 +2,7 @@ export type StatKey = 'vit' | 'mana' | 'int' | 'cha' | 'fame' | 'luck';
 export type Stats = Record<StatKey, number>;
 
 export type Focus = 'train' | 'study' | 'social' | 'explore' | 'rest';
-/** 기분: 방침별 성장 배율과 초상화 표정에 반영된다 */
+/** 기분: 성장별 성장 배율과 초상화 표정에 반영된다 */
 export type MoodKey = 'calm' | 'joy' | 'gloom' | 'anger' | 'fear';
 export type RelKey = 'friend' | 'rival' | 'mentor' | 'spouse';
 
@@ -94,9 +94,9 @@ export interface LifeState {
   mood?: MoodKey;
   /** 의지력 0~100. 숙명을 거스르는 선택에 쓴다 */
   will?: number;
-  /** 방침 고정: 켜면 매년 방침을 묻지 않고 같은 방침으로 넘어간다 */
+  /** 성장 고정: 켜면 매년 성장을 묻지 않고 같은 성장으로 넘어간다 */
   focusLocked?: boolean;
-  /** 직전 해의 방침 (같은 방침을 반복하면 스트레스가 더 쌓인다) */
+  /** 직전 해의 성장 (같은 성장을 반복하면 스트레스가 더 쌓인다) */
   prevFocus?: Focus;
   /** 전설이 된 전생들 (생성 시 메타에서 복사) */
   legends?: Legend[];
@@ -130,6 +130,14 @@ export interface LifeState {
   seenAt?: Record<string, number>;
   /** 올해 일어난 사건 수 */
   yearEvents?: number;
+  /** 능력치 기준 (2 = 200 기준. 없으면 v1.4 전 저장) */
+  statScale?: number;
+  /** 중상 몇 번째에 죽는가 (기본 3. 동시대 환생자의 난이도용) */
+  injuryCap?: number;
+  /** 해마다 갑작스러운 불운(병·사고)을 겪을 확률 (동시대 환생자의 난이도용) */
+  hazard?: number;
+  /** 올해 기록·이정표가 나오는 달 (0~3 = 1~4월) */
+  yearMark?: number;
   /** 올해 수입 (해가 끝나면 lastIncome 으로) */
   yearIncome?: number;
   /** 이번 달 들어온 돈 (UI 팝업용) */
@@ -323,7 +331,7 @@ export interface GameEvent {
   /** 한 삶에서 한 번만 */
   once?: boolean;
   weight?: number;
-  /** 해당 방침일 때 가중치 ×3 */
+  /** 해당 성장일 때 가중치 ×3 */
   focus?: Focus;
   /** 인생 트리의 가지 노드. 그 가지에 있을 때만 일어난다 */
   branch?: string;
@@ -427,7 +435,7 @@ export interface Trait {
   stats?: Partial<Stats>;
   checkBonus?: Partial<Stats>;
   growthMul?: Partial<Stats>;
-  /** 방침별 성장 배율 */
+  /** 성장별 성장 배율 */
   focusMul?: Partial<Record<Focus, number>>;
   stressMul?: number;
   will?: number;

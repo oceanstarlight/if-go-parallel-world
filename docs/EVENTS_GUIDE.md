@@ -40,9 +40,9 @@
   text: '비 오는 골목에서 작은 울음소리가 들린다. 상자 안에 젖은 아기 고양이가 떨고 있다.',
   choices: [
     { label: '품에 안고 집에 간다',
-      success: { text: '엄마가 한숨을 쉬었지만, 결국 우유 한 접시를 내주었다.', effect: { karma: 4, stats: { cha: 1 } }, tone: 'good' } },
-    { label: '이름을 지어 주고 매일 밥을 준다', check: { stat: 'luck', dc: 22 },
-      success: { text: '「코코」는 동네 고양이 대장이 되었다!', effect: { stats: { luck: 2 }, own: 'cat' }, tone: 'good' },
+      success: { text: '엄마가 한숨을 쉬었지만, 결국 우유 한 접시를 내주었다.', effect: { karma: 4, stats: { cha: 2 } }, tone: 'good' } },
+    { label: '이름을 지어 주고 매일 밥을 준다', check: { stat: 'luck', dc: 44 },
+      success: { text: '「코코」는 동네 고양이 대장이 되었다!', effect: { stats: { luck: 4 }, own: 'cat' }, tone: 'good' },
       fail: { text: '사흘째 되던 날, 상자는 비어 있었다. 누군가 데려갔겠지…', effect: { mood: 'gloom' } } },
   ],
 },
@@ -50,18 +50,18 @@
 
 - `once: true`: 한 생에 한 번만 일어난다. 범용 반복 사건을 늘리는 게 목적이면 **빼고** 쓴다.
 - `milestone: true`: 조건이 맞으면 반드시 일어난다. 함부로 쓰지 않는다.
-- `focus: 'train' | 'study' | 'social' | 'explore'`: 그 방침일 때 가중치 ×3.
+- `focus: 'train' | 'study' | 'social' | 'explore'`: 그 성장일 때 가중치 ×3.
 - `auto`: 선택지 없는 자동 사건. 형식은 `{ check?, success, fail? }`.
 - `will: 25`: 숙명을 거스르는 선택지에만 쓴다(의지력 비용).
 
 ### 판정 `check`
-- `{ stat, dc }`. 성공률은 `50 + (능력치 − dc) × 3 + 행운 보정`이고, 5~95%로 제한된다.
+- `{ stat, dc }`. 능력치는 **0~200**이다. 성공률은 `50 + (능력치 − dc) × 1.5 + 행운 보정`이고, 5~95%로 제한된다.
 - dc 기준
 
   | 나이대 | 쉬움 | 보통 | 어려움 |
   |---|---|---|---|
-  | 유년 | 18 | 24 | 30 |
-  | 성인 | 28 | 35 | 45 |
+  | 유년 | 36 | 48 | 60 |
+  | 성인 | 56 | 70 | 90 |
 
 - `check`가 있으면 `fail`도 꼭 쓴다.
 
@@ -69,7 +69,7 @@
 
 | 필드 | 쓰임 |
 |---|---|
-| `stats` | 능력치 증감. 한 번에 ±1~4. 큰 사건은 ±8까지 |
+| `stats` | 능력치 증감 (0~200). 한 번에 ±2~8. 큰 사건은 ±16까지 |
 | `karma` | 업보 ±3~10 |
 | `rel` / `addRel` / `removeRel` / `promoteToSpouse` | 인연. 키는 `friend` `rival` `mentor` `spouse` |
 | `flags` / `unflags` | 플래그 세우기·지우기 (6장 참고) |
@@ -121,7 +121,7 @@
 
 - 체력·마력 판정 선택지를 턴제 전투로 만들려면 `src/engine/combat.ts`의 `BATTLE_ENEMY`에 `사건id: '적종류'`를 추가한다.
 - 적 종류: `bandit soldier rival bully stalker hero demon_lord traitor wolf shadow dragon wyvern`
-- dc가 적 전투력이 된다: `20 + dc × 2.2`.
+- dc가 적 전투력이 된다: `20 + dc × 1.1`.
 
 ## 6. 플래그와 사슬
 

@@ -497,7 +497,7 @@ h4 { font-size: 13px; color: var(--muted); margin: 20px 0 6px; letter-spacing: 0
 .swipe-guide .l { color: #5a7aff; }
 .swipe-guide .r { color: var(--accent); }
 
-/* ───── 방침: 매년 고르기 + 고정 ───── */
+/* ───── 성장: 매년 고르기 + 고정 ───── */
 .focus-hint { margin: -2px 0 6px; }
 .focus-card.nudge .focus-grid { animation: nudge 0.5s ease-in-out 2; }
 .focus-card.nudge .focus-hint { color: var(--gold); font-weight: 700; }
@@ -661,7 +661,7 @@ h4 { font-size: 13px; color: var(--muted); margin: 20px 0 6px; letter-spacing: 0
   .sheet-head .age { display: inline; margin-left: 6px; font-size: 13px; }
   .sheet-head p.small { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .stats { margin-top: 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
-  .stat { grid-template-columns: 28px 1fr 22px; gap: 5px; font-size: 12px; }
+  .stat { grid-template-columns: 28px 1fr 26px; gap: 5px; font-size: 12px; }
   .sheet-extra { display: none; }
   .quick, .town-nav { display: none; }
   .econ { margin-top: 4px; gap: 4px 10px; font-size: 12px; }
@@ -839,7 +839,7 @@ button.t-slot { cursor: pointer; }
   .view-life .sheet-top .portrait-host { width: 64px; }
   .view-life .sheet-head p.small { display: none; } /* 출신·권능은 정보 탭에서 */
   .view-life .stats { grid-template-columns: 1fr 1fr 1fr; gap: 2px 8px; margin-top: 4px; }
-  .view-life .stat { grid-template-columns: 24px 1fr 20px; gap: 3px; font-size: 11px; padding-top: 1px; padding-bottom: 1px; }
+  .view-life .stat { grid-template-columns: 24px 1fr 25px; gap: 3px; font-size: 11px; padding-top: 1px; padding-bottom: 1px; }
   .view-life .stat .bar { height: 4px; }
   .view-life .mind { margin-top: 4px; }
   .view-life .econ { margin-top: 2px; }

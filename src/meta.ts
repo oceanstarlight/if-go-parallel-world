@@ -40,7 +40,18 @@ export function loadMeta(): MetaSave {
 }
 
 export const saveMeta = (m: MetaSave) => write(META_KEY, m);
-export const loadRun = () => read<LifeState>(RUN_KEY);
+export function loadRun(): LifeState | null {
+  const s = read<LifeState>(RUN_KEY);
+  // v1.4 전 저장: 능력치 100 기준 → 200 기준으로 옮긴다
+  if (s && !s.statScale) {
+    for (const k of Object.keys(s.stats) as (keyof LifeState['stats'])[]) s.stats[k] = Math.min(200, s.stats[k] * 2);
+    for (const it of [...(s.bag ?? []), ...(s.equip?.trinkets ?? [])]) {
+      if (it.stats) for (const k of Object.keys(it.stats) as (keyof LifeState['stats'])[]) it.stats[k] = (it.stats[k] ?? 0) * 2;
+    }
+    s.statScale = 2;
+  }
+  return s;
+}
 export const saveRun = (s: LifeState | null) => write(RUN_KEY, s);
 
 export const isUnlocked = (m: MetaSave, id: string) => m.unlocked.includes(id);

@@ -31,7 +31,7 @@ import { branchPaths } from '../data/branches';
 import { BATTLE_ENEMY, CP_WEIGHT, ENEMY_NAME, battleOdds, combatPower, isCombat } from '../engine/combat';
 import { MAGIC_COST, attackMul, autoDuel, critChance, duelTurn, fleeChance, magicMul, startDuel, type Duel, type DuelAction } from '../engine/duel';
 import { beginDive, bossAhead, canEnterDungeon, descendPath, endDiveOnDeath, retreat, settleBoss, settleMob } from '../engine/dungeon';
-import { clampHp, buy as marketBuy, drink, drinkBest, equip, fmtGold, innRest, payLabel, repairItems, sell, sellAllLoot, unequipTrinket } from '../engine/economy';
+import { clampHp, maxHp, buy as marketBuy, drink, drinkBest, equip, fmtGold, innRest, payLabel, repairItems, sell, sellAllLoot, unequipTrinket } from '../engine/economy';
 import { statOf, trinketBonus } from '../engine/trinket';
 import { rec } from '../engine/record';
 import { bossEnemy, mobEnemy } from '../gfx/mapping';
@@ -73,7 +73,7 @@ interface App {
   /** 사용자가 접어둔 사건 (같은 사건이면 다시 자동으로 올리지 않는다) */
   dismissedEvent: string | null;
   oracle: Oracle | null;
-  /** 방침을 고르지 않고 한 해를 넘기려 했다 (방침 카드를 강조) */
+  /** 성장을 고르지 않고 한 해를 넘기려 했다 (성장 카드를 강조) */
   focusNudge: boolean;
   /** 시간 흐름: 일시 정지 · 한 해의 길이(초) */
   paused: boolean;
@@ -89,6 +89,8 @@ interface App {
   /** 능력치 변화 잔상: 누적 변화량과 남은 틱 */
   ghost: Partial<Record<StatKey, { d: number; ttl: number }>>;
   statSnap: Partial<Record<StatKey, number>> | null;
+  /** 마지막으로 알린 스트레스 단계 (0 · 80 · 90 · 100) */
+  stressTier: number;
   townTab: 'shop' | 'bag';
   townCat: MarketCat;
   music: Music;
@@ -121,6 +123,7 @@ export async function mount(root: HTMLElement) {
     dgConfirm: false,
     ghost: {},
     statSnap: null,
+    stressTier: 0,
     townTab: 'shop',
     townCat: 'weapon',
     music: new Music(),
@@ -337,7 +340,7 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
     case 'focus': {
       const s = app.life;
       if (!s) break;
-      // 방침은 언제든 바꿀 수 있다. 시간은 저절로 흐른다
+      // 성장은 언제든 바꿀 수 있다. 시간은 저절로 흐른다
       s.focus = arg as Focus;
       app.tab = 'none';
       afterStep(app);
@@ -512,7 +515,8 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
       if (!du || !s || !du.done || !du.d.result) break;
       app.duel = null;
       if (du.ctx.kind === 'event') {
-        s.hp = Math.max(1, du.d.hp);
+        // 사건 전투가 끝나면 체력은 다시 차오른다 (던전 안에서만 깎인 채로 남는다)
+        s.hp = maxHp(s);
         choose(s, du.ctx.choice, Math.random, du.d.result === 'win');
       } else if (du.ctx.kind === 'mob') {
         const r = settleMob(s, du.d.result, du.d.hp);
@@ -615,6 +619,7 @@ function birth(app: App) {
   };
   app.ghost = {};
   app.statSnap = null;
+  app.stressTier = 0;
   app.life = createLife({
     ...origin,
     name,
@@ -637,6 +642,10 @@ function afterStep(app: App) {
   const s = app.life;
   if (!s) return;
   clampHp(s);
+  // 스트레스 경고: 단계가 올라갈 때 한 번씩
+  const tier = STRESS_TIERS.filter(([t]) => (s.stress ?? 0) >= t).pop();
+  if ((tier?.[0] ?? 0) > app.stressTier && !s.death) app.notice = tier![1];
+  app.stressTier = tier?.[0] ?? 0;
   // 한 번만 뜨는 알림 (던전 개방 등)
   if (s.toast) {
     app.notice = s.toast;
@@ -656,6 +665,12 @@ function afterStep(app: App) {
   app.statSnap = Object.fromEntries(STAT_KEYS.map((k) => [k, statOf(s, k)]));
   saveRun(s);
 }
+
+const STRESS_TIERS: [number, string][] = [
+  [80, '머리가 아프다…'],
+  [90, '휴식이 필요해… 성장을 「휴식」으로 바꾸자.'],
+  [100, '스트레스가 너무 높다! 이대로면 쓰러진다.'],
+];
 
 const GHOST_TICKS = 4;
 function tickGhost(app: App) {
@@ -735,7 +750,7 @@ function underbar(app: App): string {
     return `
       <nav class="underbar">
         ${item('dungeon', '', 'sword', '던전', false, busy || s.age < 12 ? 'disabled' : '')}
-        ${item('tab', 'action', ev ? 'warning-diamond' : 'target', ev ? '사건' : '방침', tab === 'action')}
+        ${item('tab', 'action', ev ? 'warning-diamond' : 'target', ev ? '사건' : '성장', tab === 'action')}
         ${center}
         ${item('town', 'shop', 'store', '상점', false, busy ? 'disabled' : '')}
         ${item('tab', 'menu', 'menu', '정보', tab === 'menu')}
@@ -938,7 +953,7 @@ function viewLife(app: App): string {
   const stats = STAT_KEYS.map((k) => `
     <button class="stat ${app.statInfo === k ? 'on' : ''}" data-act="stat" data-arg="${k}" title="${STAT_NAMES[k]}: 누르면 설명">
       <span class="stat-name">${STAT_NAMES[k]}</span>
-      <div class="bar"><div class="fill fill-${k}" style="width:${s.stats[k]}%"></div>${bonus[k] ? `<div class="fill-bonus" style="left:${s.stats[k]}%;width:${statOf(s, k) - s.stats[k]}%"></div>` : ''}</div>
+      <div class="bar"><div class="fill fill-${k}" style="width:${s.stats[k] / 2}%"></div>${bonus[k] ? `<div class="fill-bonus" style="left:${s.stats[k] / 2}%;width:${Math.min(200, statOf(s, k)) / 2 - s.stats[k] / 2}%"></div>` : ''}</div>
       <span class="stat-val ${bonus[k] ? 'boosted' : ''}" ${bonus[k] ? `title="원래 ${s.stats[k]} + 장신구 ${bonus[k]}"` : ''}>${statOf(s, k)}${app.ghost[k] ? `<i class="ghost ${app.ghost[k]!.d > 0 ? 'up' : 'down'}">${app.ghost[k]!.d > 0 ? '+' : ''}${app.ghost[k]!.d}</i>` : ''}</span>
     </button>`).join('');
 
@@ -973,7 +988,7 @@ function viewLife(app: App): string {
     panel = `
       <div class="event-card ${swipe ? 'swipeable' : ''}" ${swipe ? `data-swipe="choose" data-left="${esc(fill(choices[0].label, s))}" data-right="${esc(fill(choices[1].label, s))}"` : ''}>
         ${swipe ? '<div class="swipe-label"></div>' : ''}
-        <p class="eyebrow">${s.age}세 ${Math.max(1, s.month ?? 0)}월의 사건 · 시간이 멈췄다</p>
+        <p class="eyebrow">${s.age}세 ${(s.month ?? 0) + 1}월의 사건 · 시간이 멈췄다</p>
         <h3>${esc(fill(ev.title, s))}</h3>
         <p class="event-text">${esc(fill(ev.text, s))}</p>
         ${swipe ? '<p class="swipe-guide"><b class="l">← 왼쪽</b> · 카드를 밀어서 선택 · <b class="r">오른쪽 →</b></p>' : ''}
@@ -999,8 +1014,8 @@ function viewLife(app: App): string {
     const young = s.age < 2;
     panel = `
       <div class="focus-card">
-        <p class="eyebrow">방침</p>
-        ${young ? '' : '<p class="muted small focus-hint">시간은 저절로 흐른다. 방침은 언제든 바꿀 수 있다. <kbd>1</kbd>~<kbd>5</kbd> · 정지 <kbd>Space</kbd></p>'}
+        <p class="eyebrow">성장</p>
+        ${young ? '' : '<p class="muted small focus-hint">시간은 저절로 흐른다. 성장은 언제든 바꿀 수 있다. <kbd>1</kbd>~<kbd>5</kbd> · 정지 <kbd>Space</kbd></p>'}
         <div class="focus-grid">
           ${FOCI.map((f) => {
             const mul = f === 'rest' ? 1 : focusMul(s, f);
@@ -1013,7 +1028,7 @@ function viewLife(app: App): string {
           }).join('')}
         </div>
         ${!young && (s.stress ?? 0) >= STRESS_HIGH && s.focus !== 'rest' ? '<p class="warn small">스트레스가 높아 성장이 떨어지고 있다. 한 해 쉬어 가자!</p>' : ''}
-        ${young ? '<p class="muted small">아직 너무 어리다. 세 살이 되면 방침을 정할 수 있다.</p>' : ''}
+        ${young ? '<p class="muted small">아직 너무 어리다. 세 살이 되면 성장을 정할 수 있다.</p>' : ''}
         ${(s.trauma ?? 0) > 0 ? `<p class="warn small">${icon('skull')} 던전의 악몽 (${s.trauma}달 남음) — 스트레스가 100에 묶여 있다.</p>` : ''}
         ${(s.recover ?? 0) > 0 ? `<p class="warn small">${icon('heart')} 요양 중 (${s.recover}달 남음) — 성장과 수입이 절반이다.</p>` : ''}
       </div>`;
@@ -1111,14 +1126,14 @@ function statInfoBox(app: App, s: LifeState): string {
     const gear = (s.equip?.weapon?.power ?? 0) + (s.equip?.armor?.power ?? 0);
     const job = (jobById(s.jobId)?.combat ?? 0) * s.jobRank;
     const parts = [
-      ['체력', vit * w.vit], ['마력', mana * w.mana], [vit >= mana ? '주력(체력)' : '주력(마력)', w.main * Math.max(vit, mana)],
-      ['행운', luck * w.luck], ['지성', int * w.int], ['장비', gear], ['직업', job],
+      ['체력', (vit * w.vit) / 2], ['마력', (mana * w.mana) / 2], [vit >= mana ? '주력(체력)' : '주력(마력)', (w.main * Math.max(vit, mana)) / 2],
+      ['지성', (int * w.int) / 2], ['행운', (luck * w.luck) / 2], ['장비', gear], ['직업', job],
     ] as [string, number][];
     return `
       <div class="stat-info" data-act="stat" data-arg="cp">
         <b>${icon('sword')} 전투력 ${combatPower(s)}</b>
         <p>${parts.filter(([, v]) => v).map(([n, v]) => `${n} ${Math.round(v)}`).join(' + ')}</p>
-        <p class="muted small">사건 전투·던전의 승률을 정한다. 턴제 전투에서 마력은 마법, 행운은 치명타·회피·도주에 쓰인다.</p>
+        <p class="muted small">사건 전투·던전의 승률을 정한다. 턴제 전투에서 체력은 공격, 마력은 마법(같은 수치면 30% 더 셈), 지성은 치명타·마법 배율, 행운은 회피·도주에 쓰인다.</p>
       </div>`;
   }
   return `
@@ -1180,7 +1195,7 @@ function duelPanel(app: App): string {
         <span class="du-cp">${icon('sword')} ${d.cp} vs ${d.ep}</span>
       </div>
       ${bar(esc(d.foe), d.eHp, d.eMax, 'enemy')}
-      ${bar('HP', d.hp, d.hpMax, 'hp')}
+      ${bar('체력', d.hp, d.hpMax, 'hp')}
       ${bar('MP', d.mp, d.mpMax, 'mp')}
       <ol class="du-log">${d.log.slice(-4).map((l) => `<li>${esc(l)}</li>`).join('')}</ol>
       ${du.done
@@ -1198,7 +1213,7 @@ function timeBar(app: App, s: LifeState, held: boolean): string {
   return `
     <div class="timebar ${held ? 'held' : app.paused ? 'paused' : ''}">
       <button class="tb-play" data-act="pause" ${held ? 'disabled' : ''} aria-label="${app.paused ? '재생' : '일시 정지'}">${app.paused || held ? '▶' : 'Ⅱ'}</button>
-      <span class="tb-month">${s.age}세 ${Math.max(1, month)}월</span>
+      <span class="tb-month">${s.age}세 ${month + 1}월</span>
       <div class="year-bar"><i style="width:${yearPct(s, app.monthFrac)}"></i></div>
       <span class="tb-state">${held ? '사건!' : app.paused ? '정지' : ''}</span>
       <div class="tb-pace">${PACES.map((p) => `<button class="chip ${app.pace === p.v ? 'on' : ''}" data-act="pace" data-arg="${p.v}" title="한 해 ${p.v}초">${p.name}</button>`).join('')}</div>

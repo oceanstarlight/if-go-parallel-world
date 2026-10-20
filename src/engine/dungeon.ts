@@ -143,7 +143,7 @@ function fall(s: LifeState, floor: number) {
     [`${floor}층에서 쓰러졌다… 정신을 차려 보니 지상의 진료소였다. 누군가 끌고 나와 준 모양이다.`, 'death'],
     [`장비·소지품 ${lostItems}개와 ${fmtGold(lostGold)}를 모두 잃었다.${lostTrinkets ? ` 차고 있던 장신구 ${lostTrinkets}개도 사라졌다${worn.length ? ` (${worn.length}개는 무사)` : ''}.` : ''} 3년간 악몽에 시달리고, ${s.dgBanUntil}세까지 던전에 들어갈 수 없다. 다음에 또 쓰러지면… 정말 끝이다.`, 'bad'],
   ];
-  s.log.push({ age: s.age, m: Math.max(1, s.month ?? 0), text: `던전 ${floor}층에서 쓰러졌다! 목숨은 건졌지만 장비·소지품과 ${fmtGold(lostGold)}를 모두 잃었다.${lostTrinkets ? ` 장신구도 ${lostTrinkets}개 잃었다.` : ''} 3년간 악몽에 시달린다. (${s.dgBanUntil}세까지 던전 출입 불가 · 다음엔 진짜 죽음)`, tone: 'bad' });
+  s.log.push({ age: s.age, m: (s.month ?? 0) + 1, text: `던전 ${floor}층에서 쓰러졌다! 목숨은 건졌지만 장비·소지품과 ${fmtGold(lostGold)}를 모두 잃었다.${lostTrinkets ? ` 장신구도 ${lostTrinkets}개 잃었다.` : ''} 3년간 악몽에 시달린다. (${s.dgBanUntil}세까지 던전 출입 불가 · 다음엔 진짜 죽음)`, tone: 'bad' });
 }
 
 export type DescendResult = 'cleared' | 'fled' | 'dead' | 'conquered' | 'fallen';
@@ -195,14 +195,14 @@ export function descendPath(s: LifeState, rng: Rng = Math.random, auto = false):
         if (res !== 'ok') return finish(s, res);
       } else {
         const res = hurt(s, ep * 0.32, f);
-        note(s, `${f}층 · ${mon}에게 크게 당했다! 간신히 도망쳤다. (HP ${s.hp})`, 'bad');
+        note(s, `${f}층 · ${mon}에게 크게 당했다! 간신히 도망쳤다. (체력 ${s.hp})`, 'bad');
         if (res !== 'ok') return finish(s, res);
       }
     } else if (r < 0.45) {
-      if (rng() * 100 < 35 + statOf(s, 'luck') / 2) note(s, `${f}층 · 발밑의 함정을 아슬아슬하게 피했다.`);
+      if (rng() * 100 < 35 + statOf(s, 'luck') / 4) note(s, `${f}층 · 발밑의 함정을 아슬아슬하게 피했다.`);
       else {
         const res = hurt(s, floorPower(f) * 0.2, f);
-        note(s, `${f}층 · 함정에 걸렸다! (HP ${s.hp})`, 'bad');
+        note(s, `${f}층 · 함정에 걸렸다! (체력 ${s.hp})`, 'bad');
         if (res !== 'ok') return finish(s, res);
       }
     } else if (r < 0.75) {
@@ -214,7 +214,7 @@ export function descendPath(s: LifeState, rng: Rng = Math.random, auto = false):
     } else if (r < 0.85) {
       const heal = Math.round(maxHp(s) * 0.25);
       s.hp = Math.min(maxHp(s), (s.hp ?? 0) + heal);
-      note(s, `${f}층 · 맑은 샘물을 마셨다. HP +${heal}`, 'good');
+      note(s, `${f}층 · 맑은 샘물을 마셨다. 체력 +${heal}`, 'good');
     } else {
       const m = rng() < 0.6 ? materialDrop(rng, f) : null;
       if (m) d.loot.push(m);
@@ -253,7 +253,7 @@ export function settleMob(s: LifeState, result: 'win' | 'lose' | 'fled', hpLeft:
   }
   s.hp = Math.max(1, Math.min(hpLeft, maxHp(s)));
   if (result === 'win') mobLoot(s, f, name, rng);
-  else note(s, `${f}층 · ${name}에게서 달아났다. (HP ${s.hp})`, 'bad');
+  else note(s, `${f}층 · ${name}에게서 달아났다. (체력 ${s.hp})`, 'bad');
   return 'continue';
 }
 
@@ -308,7 +308,7 @@ export function settleBoss(s: LifeState, result: 'win' | 'lose' | 'fled', hpLeft
   }
   if (result === 'fled') {
     s.hp = Math.max(1, hpLeft);
-    note(s, `${bf}층 보스 「${boss}」에게서 간신히 도망쳤다. (HP ${s.hp})`, 'bad');
+    note(s, `${bf}층 보스 「${boss}」에게서 간신히 도망쳤다. (체력 ${s.hp})`, 'bad');
     d.last = 'fled';
     return 'fled';
   }

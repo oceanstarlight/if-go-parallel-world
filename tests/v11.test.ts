@@ -35,10 +35,11 @@ describe('v1.1 능력치와 전투력', () => {
   it('마력과 행운이 전투력을 올린다', () => {
     const s = createLife(base, seededRng(1));
     const cp = combatPower(s);
-    s.stats.luck += 10;
-    expect(combatPower(s)).toBe(cp + 7);
-    s.stats.mana += 10;
-    expect(combatPower(s)).toBeGreaterThanOrEqual(cp + 16);
+    s.stats.luck += 20;
+    expect(combatPower(s)).toBeGreaterThan(cp);
+    const cp2 = combatPower(s);
+    s.stats.mana += 20;
+    expect(combatPower(s)).toBeGreaterThanOrEqual(cp2 + 11);
   });
 });
 

@@ -25,8 +25,8 @@ export function isCombat(eventId: string | null | undefined, c: Choice): boolean
   return !!eventId && !!BATTLE_ENEMY[eventId] && (stat === 'vit' || stat === 'mana');
 }
 
-/** 전투력 계수: 체력·마력이 주력, 행운은 급소를 노리는 감, 지성은 전술 */
-export const CP_WEIGHT = { vit: 1, mana: 1, main: 0.5, luck: 0.6, int: 0.25 } as const;
+/** 전투력 계수: 체력·마력이 주력, 지성은 치명타·마법 배율, 행운은 회피 */
+export const CP_WEIGHT = { vit: 1, mana: 1, main: 0.5, luck: 0.3, int: 0.5 } as const;
 
 export const CP_BOOST = 1.15;
 
@@ -37,11 +37,12 @@ export function combatPower(s: LifeState): number {
   const job = (jobById(s.jobId)?.combat ?? 0) * s.jobRank;
   const w = CP_WEIGHT;
   // ×1.15: 능력치에 비해 전투력이 낮게 느껴진다는 피드백으로 상향
-  return Math.round((vit * w.vit + mana * w.mana + w.main * Math.max(vit, mana) + luck * w.luck + int * w.int + gear + job) * CP_BOOST);
+  // 능력치는 200 기준이라 절반만 반영 (장비·직업은 그대로)
+  return Math.round(((vit * w.vit + mana * w.mana + w.main * Math.max(vit, mana) + luck * w.luck + int * w.int) / 2 + gear + job) * CP_BOOST);
 }
 
 /** 사건 전투의 적 전투력 (판정 난이도에서) */
-export const enemyPowerOfDc = (dc: number) => Math.round(20 + dc * 2.2);
+export const enemyPowerOfDc = (dc: number) => Math.round(20 + dc * 1.1);
 
 /** 던전 계층의 적 전투력 */
 export function floorPower(floor: number, boss = false): number {

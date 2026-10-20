@@ -114,7 +114,11 @@ describe('v0.7 던전', () => {
     s.age = 20;
     s.hp = 1;
     s.focus = 'train';
-    advanceYear(s, seededRng(10));
+    const rng = seededRng(10);
+    while (s.age < 21 && !s.death) {
+      s.pendingEventId = null;
+      advanceYear(s, rng);
+    }
     if (!s.death) expect(s.hp).toBe(maxHp(s));
   });
   it('100층 마왕을 쓰러뜨리면 명성과 막대한 부, 그리고 게임은 계속된다', () => {

@@ -24,7 +24,7 @@ const FOCI: Focus[] = ['train', 'study', 'social', 'explore'];
  * 한 생을 끝까지 자동으로 살아본다. 선택은 무작위.
  * houseId/cheatId 를 주지 않으면 운명 모드처럼 뽑는다.
  */
-export function simulateLife(seed: number, opt: { name?: string; houseId?: string; cheatId?: string; gender?: Gender } = {}): LifeState {
+export function simulateLife(seed: number, opt: { name?: string; houseId?: string; cheatId?: string; gender?: Gender; injuryCap?: number; hazard?: number } = {}): LifeState {
   const rng = seededRng(seed);
   const fate = rollFate(rng);
   const gender: Gender = opt.gender ?? (rng() < 0.5 ? 'm' : 'f');
@@ -36,13 +36,15 @@ export function simulateLife(seed: number, opt: { name?: string; houseId?: strin
     cheatId: opt.cheatId ?? fate.cheatId,
     upgrades: {},
   }, rng);
+  if (opt.injuryCap) s.injuryCap = opt.injuryCap;
+  if (opt.hazard) s.hazard = opt.hazard;
   for (let guard = 0; guard < 600 && !s.death; guard++) autoStep(s, rng);
   return s;
 }
 
 /**
  * 자동 플레이 한 걸음: 사건이 있으면 고를 수 있는 선택지 중 무작위, 없으면 한 해를 보낸다.
- * 가끔 방침을 바꾸고, 스트레스가 높으면 쉰다.
+ * 가끔 성장을 바꾸고, 스트레스가 높으면 쉰다.
  */
 export function autoStep(s: LifeState, rng: Rng) {
   const ev = currentEvent(s);
@@ -62,6 +64,10 @@ export function autoStep(s: LifeState, rng: Rng) {
   advanceYear(s, rng);
 }
 
+/** 동시대 환생자 난이도: 보통(두 번째 중상에 사망) · 어려움(급사는 그대로 죽음) */
+export const PEER_MID = { injuryCap: 2, hazard: 0.02 };
+export const PEER_HARD = { injuryCap: 1, hazard: 0.012 };
+
 /** 같은 해에 함께 환생한 네 사람 */
 export function contemporaries(seed: number, exclude: string): LifeState[] {
   const rng = seededRng(seed ^ 0x9e3779b9);
@@ -70,7 +76,8 @@ export function contemporaries(seed: number, exclude: string): LifeState[] {
   for (let i = 0; i < 4; i++) {
     const name = names.splice(Math.floor(rng() * names.length), 1)[0];
     // 이름이 성별을 정한다 (이름 목록이 성별로 나뉘어 있다)
-    out.push(simulateLife(Math.floor(rng() * 2 ** 31), { name, gender: FEMALE.has(name) ? 'f' : 'm' }));
+    // 둘은 보통 난이도(두 번째 중상에 사망), 둘은 어려운 난이도(급사는 그대로 죽음)
+    out.push(simulateLife(Math.floor(rng() * 2 ** 31), { name, gender: FEMALE.has(name) ? 'f' : 'm', ...(i < 2 ? PEER_MID : PEER_HARD) }));
   }
   return out;
 }

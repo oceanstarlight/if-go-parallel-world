@@ -118,4 +118,5 @@ export const ALL_GEAR = [...WEAPONS, ...ARMORS, ...POTIONS];
 export const gearByBase = (base: string) => ALL_GEAR.find((d) => d.base === base);
 
 /** 판매가 */
-export const sellPrice = (it: Item) => it.value;
+/** 판매가: 매력 흥정만큼 더 받는다 (dealRate = chaDeal) */
+export const sellPrice = (it: Item, dealRate = 0) => Math.round(it.value * (1 + dealRate));

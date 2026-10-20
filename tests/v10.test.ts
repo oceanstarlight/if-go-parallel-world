@@ -22,19 +22,24 @@ describe('v1.0 시간: 한 해 = 12달', () => {
       if (s.death) break;
     }
     expect(s.age).toBe(10);
-    expect(ticks).toBe(9 * MONTHS + 1); // 새해 첫 달에 나이를 먹는다
+    expect(ticks).toBe(10 * MONTHS); // 12월 다음 달(1월)로 넘어가며 나이를 먹는다
     // 한 해에 여러 사건이 일어날 수 있다 (연대기에 몇 월인지 남는다)
     expect(s.log.some((l) => (l.m ?? 0) > 1)).toBe(true);
   });
 
-  it('월급은 연봉을 12로 나눠 매달 들어온다', () => {
+  it('연봉은 1월에 한 번에 들어온다 (직업이 있는 성인만)', () => {
     const s = createLife(base, seededRng(3));
     applyEffect(s, { job: 'court' }, seededRng(4));
     s.age = 25;
     const g = s.gold!;
+    monthlyEconomy(s, 3, seededRng(5));
+    expect(s.gold).toBe(g);
     monthlyEconomy(s, 0, seededRng(5));
-    expect(s.gold! - g).toBe(30); // 서기관 연봉 360G
-    expect(s.lastPay).toBe(30);
+    expect(s.gold! - g).toBe(360); // 서기관 연봉 360G
+    s.age = 18;
+    const g2 = s.gold!;
+    monthlyEconomy(s, 0, seededRng(5));
+    expect(s.gold).toBe(g2); // 미성년은 연봉이 없다
   });
 });
 
@@ -62,11 +67,11 @@ describe('v1.0 중상 누적제', () => {
     }
   });
 
-  it('체력이 0이 되어도 중상이면 체력 10으로 살아난다', () => {
+  it('체력이 0이 되어도 중상이면 체력 20으로 살아난다', () => {
     const s = createLife(base, seededRng(8));
-    applyEffect(s, { stats: { vit: -200 }, zeroCause: 'illness' }, seededRng(9));
+    applyEffect(s, { stats: { vit: -400 }, zeroCause: 'illness' }, seededRng(9));
     expect(s.death).toBeNull();
-    expect(s.stats.vit).toBe(10);
+    expect(s.stats.vit).toBe(20);
   });
 });
 

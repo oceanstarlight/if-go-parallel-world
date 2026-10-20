@@ -26,7 +26,7 @@
 ```ts
 { id: 'n0_first_step', minAge: 1, maxAge: 2, once: true, text: '처음으로 두 발로 섰다! 세 걸음 만에 엉덩방아를 찧었다.', tone: 'good' },
 { id: 'n3_spouse_dinner', minAge: 20, maxAge: 30, cond: { hasRel: ['spouse'] }, text: '{spouse:와} 서툰 솜씨로 저녁을 차렸다.' },
-{ id: 'nj_mage_lecture', minAge: 25, maxAge: 70, cond: { jobs: ['mage'], minJobRank: 3 }, text: '3등급 모험가들을 상대로 강의를 했다. 반응이 뜨거웠다.', effect: { stats: { fame: 1 } } },
+{ id: 'nj_mage_lecture', minAge: 25, maxAge: 70, cond: { jobs: ['mage'], minJobRank: 3 }, text: '3등급 모험가들을 상대로 강의를 했다. 반응이 뜨거웠다.', effect: { stats: { fame: 2 } } },
 ```
 
 | 필드 | 설명 |
@@ -38,7 +38,7 @@
 | `cond` | 사건과 같은 조건: `jobs` `minJobRank` `houses` `gender`(`'m'` `'f'`) `hasRel` `flags` `stats` `owns` 등 |
 | `weight` | 뽑힐 가중치(기본 1). 흔한 일 1~2, 드문 일 0.3~0.5 |
 | `tone` | `good` `bad` `normal`(기본) |
-| `effect` | **아주 작게만**: 능력치 ±1~2, `mood`, `stress` ±5. 돈·인연·플래그·죽음은 쓰지 않는다(사건의 몫) |
+| `effect` | **아주 작게만**: 능력치 ±2~4 (능력치는 0~200), `mood`, `stress` ±5. 돈·인연·플래그·죽음은 쓰지 않는다(사건의 몫) |
 
 - 같은 기록은 8년 안에 다시 나오지 않는다. `once` 기록은 한 번만 나온다.
 - 기록이 남을 확률: 30세 이하 85%, 31~50세 55%, 51세 이상 35%.

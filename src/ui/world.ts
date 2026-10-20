@@ -1,8 +1,8 @@
 import type { Item, LifeState, StatKey } from '../types';
 import { STAT_NAMES } from '../data/stats';
 import { trinketSlots, wornTrinkets } from '../engine/trinket';
-import { MARKET, MARKET_CATS, marketPrice, owns, type MarketCat } from '../data/market';
-import { RARITY_NAME, biomeOf } from '../data/items';
+import { MARKET, MARKET_CATS, chaDeal, marketPrice, owns, type MarketCat } from '../data/market';
+import { RARITY_NAME, biomeOf, sellPrice } from '../data/items';
 import { combatPower } from '../engine/combat';
 import { DUNGEON_DEPTH, DUNGEON_MIN_AGE, canEnterDungeon, dungeonOpenAge, preview, startFloors } from '../engine/dungeon';
 import { bagCap, fmtGold, goldOf, innPrice, maxHp } from '../engine/economy';
@@ -18,7 +18,7 @@ export function hpBar(s: LifeState): string {
   const max = maxHp(s);
   const hp = Math.min(s.hp ?? max, max);
   const pct = Math.round((hp / max) * 100);
-  return `<span class="hpbar ${pct < 30 ? 'low' : ''}">${icon('heart')}<i><u style="width:${pct}%"></u></i><small>${hp}/${max}</small></span>`;
+  return `<span class="hpbar ${pct < 30 ? 'low' : ''}" title="체력 (현재 / 최대)">${icon('heart')}<i><u style="width:${pct}%"></u></i><small>${hp}/${max}</small></span>`;
 }
 
 /** 골드 · 전투력 · HP 요약 줄 */
@@ -77,7 +77,7 @@ export function viewDungeon(s: LifeState, duelHtml = ''): string {
     return `${head}${scene}
       <div class="dg-card">
         <p class="muted small">5층마다 보스가 있다. 보스를 쓰러뜨리면 그 층의 귀환 포탈이 열려, 다음에 거기서부터 시작할 수 있다.
-        HP는 한 해가 지나거나 회복약·여관으로 회복된다.</p>
+        체력은 한 해가 지나거나 회복약·여관으로 회복된다.</p>
         <h4>어디서부터 내려갈까?</h4>
         <div class="floor-grid">
           ${floors.map((f) => `<button class="floor" data-act="dive" data-arg="${f}">${f === 0 ? '입구 (1층~)' : `${f}층 포탈`}</button>`).join('')}
@@ -217,7 +217,7 @@ function stackBag(items: Item[]): [Item, number][] {
 function bagView(s: LifeState, inDive = false): string {
   const bag = [...(s.bag ?? [])].sort((a, b) => (a.kind === b.kind ? b.value - a.value : a.kind.localeCompare(b.kind)));
   const loot = bag.filter((x) => x.kind === 'loot');
-  const lootTotal = loot.reduce((a, x) => a + x.value, 0);
+  const lootTotal = loot.reduce((a, x) => a + sellPrice(x, chaDeal(s)), 0);
   const slot = (label: string, it: Item | null | undefined) =>
     `<div class="slot">${icon(label === '무기' ? 'sword' : 'shield')}<div><span class="muted small">${label}</span><strong class="r-${it?.rarity ?? 'common'}">${it ? esc(it.name) : '없음'}</strong>${it ? `<span class="small">${label === '무기' ? '공격력' : '방어력'} +${it.power}</span>` : ''}</div></div>`;
   const worn = wornTrinkets(s);
@@ -242,11 +242,11 @@ function bagView(s: LifeState, inDive = false): string {
       <li>
         <span class="m-icon r-${it.rarity}">${icon(KIND_ICON[it.kind])}${n > 1 ? `<b class="stack">×${n}</b>` : ''}</span>
         <div><strong class="r-${it.rarity}">${esc(it.name)}${n > 1 ? ` <span class="muted">×${n}</span>` : ''}</strong>
-          <span class="muted small">${RARITY_NAME[it.rarity]}${it.kind === 'weapon' ? ` · 공격력 +${it.power}` : it.kind === 'armor' ? ` · 방어력 +${it.power}` : it.kind === 'potion' ? ` · HP +${it.power >= 9999 ? '전부' : it.power}` : it.kind === 'trinket' ? ` · ${trinketText(it)}` : ''}</span></div>
+          <span class="muted small">${RARITY_NAME[it.rarity]}${it.kind === 'weapon' ? ` · 공격력 +${it.power}` : it.kind === 'armor' ? ` · 방어력 +${it.power}` : it.kind === 'potion' ? ` · 체력 +${it.power >= 9999 ? '전부' : it.power}` : it.kind === 'trinket' ? ` · ${trinketText(it)}` : ''}</span></div>
         <div class="bag-btns">
           ${it.kind === 'weapon' || it.kind === 'armor' || it.kind === 'trinket' ? `<button class="btn small primary" data-act="equip" data-arg="${it.uid}" ${it.kind === 'trinket' && worn.length >= slots ? 'disabled' : ''}>${it.kind === 'trinket' ? '차기' : '장착'}</button>` : ''}
           ${it.kind === 'potion' ? `<button class="btn small" data-act="drink-item" data-arg="${it.uid}">마시기</button>` : ''}
-          ${inDive ? '' : `<button class="btn small" data-act="sell" data-arg="${it.uid}">${fmtGold(it.value)}</button>`}
+          ${inDive ? '' : `<button class="btn small" data-act="sell" data-arg="${it.uid}">${fmtGold(sellPrice(it, chaDeal(s)))}</button>`}
         </div>
       </li>`).join('')}</ul>` : '<p class="muted">가방이 비었다. 던전에서 전리품을 모아 오자!</p>'}`;
 }
