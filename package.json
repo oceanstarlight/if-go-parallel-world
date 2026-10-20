@@ -18,6 +18,7 @@
   "dependencies": {
     "galmuri": "^2.40.3",
     "gsap": "^3.15.0",
+    "morphdom": "^2.7.4",
     "pixelarticons": "^2.4.1",
     "pixi-filters": "^6.1.5",
     "pixi.js": "^8.22.0"
