@@ -28,6 +28,14 @@ export interface Figure {
   bangs: Bangs;
   back: BackHair;
   beard: boolean;
+  /** 머리만 그린다 (몸·목 없이): 전투 스프라이트의 머리로 쓴다 */
+  headOnly?: boolean;
+}
+
+/** 턱 끝 줄 (머리만 잘라 쓸 때 목에 맞추는 기준) */
+export function figureChin(f: Pick<Figure, 'stage' | 'gender'>): number {
+  const g = f.stage === 'baby' ? 'baby' : f.stage === 'child' ? 'child' : f.gender;
+  return Math.max(...Object.keys(FACE[g]).map(Number));
 }
 
 const K = '#3a2440'; // 외곽선
@@ -156,7 +164,10 @@ const EYES = {
 class Canvas {
   readonly p = new Painter(32, 32);
   private mask = new Map<string, Set<number>>();
+  /** dy: 모든 점을 아래로 밀어 그린다 (머리 위로 솟는 귀·뿔 자리를 남길 때) */
+  constructor(private readonly dy = 0) {}
   put(x: number, y: number, c: string, part?: string) {
+    y += this.dy;
     if (x < 0 || y < 0 || x >= 32 || y >= 32) return;
     this.p.px(x, y, c);
     if (part) {
@@ -165,10 +176,10 @@ class Canvas {
     }
   }
   erase(part: string, x: number, y: number) {
-    this.mask.get(part)?.delete(y * 32 + x);
+    this.mask.get(part)?.delete((y + this.dy) * 32 + x);
   }
   has(part: string, x: number, y: number) {
-    return !!this.mask.get(part)?.has(y * 32 + x);
+    return !!this.mask.get(part)?.has((y + this.dy) * 32 + x);
   }
   fill(r: Rows, c: string | ((x: number, y: number) => string), part: string, dx = 0) {
     for (const [ys, [x0, x1]] of Object.entries(r)) {
@@ -231,12 +242,14 @@ export function drawFigure(f: Figure): Painter {
 
   // 2) 몸·옷
   const o = f.outfit;
-  cv.fill(body, (x, y) => (x >= 22 || y >= 30 ? o.shadow : x <= 8 && y <= 27 ? o.light : o.base), 'body');
-  drawOutfit(cv, f, body);
-  cv.outline('body', K);
+  if (!f.headOnly) {
+    cv.fill(body, (x, y) => (x >= 22 || y >= 30 ? o.shadow : x <= 8 && y <= 27 ? o.light : o.base), 'body');
+    drawOutfit(cv, f, body);
+    cv.outline('body', K);
+  }
 
   // 3) 목 (턱 바로 아래 두 줄은 그림자)
-  if (f.stage !== 'baby') {
+  if (f.stage !== 'baby' && !f.headOnly) {
     const [nx0, nx1] = f.gender === 'm' && f.stage !== 'child' ? [13, 18] : [14, 17];
     for (let y = chin + 1; y <= 25; y++) {
       for (let x = nx0; x <= nx1; x++) cv.put(x, y, y <= chin + 2 ? ss : sb, 'neck');
@@ -592,4 +605,210 @@ export function hairStyleOf(gender: 'm' | 'f', stage: Stage, rnd: () => number):
     bangs: pick<Bangs>(stage === 'elder' ? ['crop', 'side', 'center'] : ['spiky', 'crop', 'side', 'messy', 'center']),
     back: pick<BackHair>(['short', 'short', 'short', 'short', 'short', 'ponytail']),
   };
+}
+
+// ───────────────────────── 옆모습 (전투 스프라이트의 머리) ─────────────────────────
+// 정면 초상화와 같은 설정(머리색·앞머리·뒷머리·눈·출신 표식)으로, 오른쪽을 바라보는 옆얼굴을 그린다.
+
+/** 옆얼굴 윤곽: 이마 → 콧날(오른쪽 끝) → 입 → 턱 */
+const SIDE_FACE: Record<'f' | 'm' | 'child' | 'baby', Rows> = {
+  f: rows([[7, 8, 12, 21], [9, 11, 11, 22], [12, 12, 11, 23], [13, 13, 11, 22], [14, 15, 12, 22], [16, 16, 12, 21], [17, 17, 13, 21], [18, 18, 14, 20], [19, 19, 16, 19]]),
+  m: rows([[7, 8, 12, 21], [9, 11, 11, 22], [12, 12, 11, 23], [13, 13, 11, 22], [14, 16, 12, 22], [17, 17, 12, 21], [18, 18, 13, 21], [19, 19, 14, 20], [20, 20, 16, 19]]),
+  child: rows([[7, 8, 12, 21], [9, 12, 11, 22], [13, 13, 11, 22], [14, 15, 12, 21], [16, 16, 13, 21], [17, 17, 14, 20], [18, 18, 16, 19]]),
+  baby: rows([[6, 7, 12, 21], [8, 14, 10, 22], [15, 15, 11, 21], [16, 16, 12, 20], [17, 17, 14, 19]]),
+};
+
+/** 옆머리통 (뒤통수 + 정수리 + 목덜미) */
+const SIDE_CAP = rows([[1, 1, 10, 17], [2, 2, 8, 19], [3, 3, 7, 20], [4, 6, 6, 21], [7, 12, 5, 12], [13, 15, 6, 12], [16, 16, 7, 12]]);
+
+/** 옆에서 본 앞머리: [y, x0, x1] (이마 위로 늘어진 부분) */
+const SIDE_BANGS: Record<Bangs, [number, number, number][]> = {
+  straight: [[4, 15, 22], [5, 15, 23], [6, 15, 23], [7, 15, 23], [8, 16, 23], [9, 19, 23]],
+  center: [[4, 15, 22], [5, 15, 23], [6, 16, 23], [7, 17, 22], [8, 19, 22]],
+  side: [[4, 15, 23], [5, 15, 24], [6, 17, 24], [7, 19, 24], [8, 21, 23], [9, 22, 23]],
+  messy: [[4, 15, 23], [5, 15, 24], [6, 16, 23], [7, 17, 24], [8, 18, 18], [8, 21, 22], [9, 22, 22]],
+  swoop: [[4, 15, 23], [5, 15, 24], [6, 17, 25], [7, 20, 25], [8, 22, 24]],
+  spiky: [[3, 17, 23], [4, 15, 25], [5, 15, 23], [5, 24, 25], [6, 17, 24], [7, 19, 22], [3, 25, 26], [2, 26, 26]],
+  crop: [[4, 15, 22], [5, 15, 22], [6, 16, 21]],
+  tuft: [[1, 18, 18], [0, 19, 19], [1, 20, 20]],
+};
+
+/** 옆얼굴 머리. 몸 없이 머리만 32×32 에 그린다 */
+/** 옆얼굴은 머리 위로 솟는 귀·뿔·모자 자리를 위해 3줄 내려 그린다 */
+const SIDE_DY = 3;
+
+export function drawProfileHead(f: Figure): Painter {
+  const cv = new Canvas(SIDE_DY);
+  const g = f.stage === 'baby' ? 'baby' : f.stage === 'child' ? 'child' : f.gender;
+  const face = SIDE_FACE[g];
+  const chin = profileChin(f);
+  const [hl, hb, hs] = f.hair;
+  const [sl, sb, ss] = f.skin;
+  const hairOutline = darken(hs, 0.45);
+  const sw = f.sway;
+  const hairShade = (x: number, y: number) => (x <= 7 || y >= 14 ? hs : hb);
+
+  // 1) 뒷머리 (머리통 + 늘어진 머리)
+  if (f.back !== 'none') {
+    cv.fill(SIDE_CAP, hairShade, 'hair');
+    if (f.back === 'bob') cv.fill(rows([[13, 19, 5, 12], [20, 20, 6, 11]]), hairShade, 'hair');
+    if (f.back === 'long') cv.fill(rows([[8, 25, 4, 11], [26, 27, 5, 10]]), (x, y) => (x <= 6 || y >= 20 ? hs : hb), 'hair');
+    if (f.back === 'ponytail') {
+      cv.fill(rows([[6, 9, 2, 5], [10, 17, 2 + sw, 5 + sw], [18, 21, 3 + sw, 5 + sw]]), (x) => (x <= 3 + sw ? hs : hb), 'hair');
+      cv.put(6, 7, f.outfit.trim);
+      cv.put(6, 8, f.outfit.trim);
+    }
+    if (f.back === 'twin') {
+      cv.fill(rows([[8, 9, 3, 6], [10, 19, 3 + sw, 6 + sw], [20, 21, 4 + sw, 5 + sw]]), (x) => (x <= 4 + sw ? hs : hb), 'hair');
+      cv.put(7, 8, f.outfit.trim);
+      cv.put(7, 9, f.outfit.trim);
+    }
+    if (f.back === 'bun') {
+      cv.fill(rows([[2, 2, 5, 7], [3, 6, 3, 8], [7, 7, 4, 7]]), hb, 'hair');
+      cv.put(5, 3, hl);
+    }
+  } else {
+    // 아기: 솜털만
+    cv.fill(rows([[2, 2, 11, 17], [3, 5, 9, 19]]), hb, 'hair');
+  }
+
+  // 2) 얼굴
+  cv.fill(face, (x, y) => (y >= chin - 1 || x <= 13 ? ss : y <= 9 && x >= 18 ? sl : sb), 'face');
+  cv.put(22, 13, ss, 'face'); // 콧날 그림자
+  cv.outline('face', K, true);
+
+  // 3) 귀 (출신에 따라)
+  const ear = (pts: [number, number, string][]) => {
+    for (const [x, y, c] of pts) cv.put(x, y, c, 'ear');
+    // 머리카락 위에서도 보이게 외곽선을 덧그린다 (얼굴 쪽은 피한다)
+    cv.outline('ear', K, false, ['face']);
+  };
+  if (f.houseId === 'elf') {
+    // 뒤로 길게 뻗은 엘프 귀 (머리카락 위로 드러난다)
+    ear([[13, 12, sb], [13, 13, ss], [12, 11, sb], [12, 12, sb], [12, 13, ss], [11, 10, sl], [11, 11, sb], [11, 12, ss], [10, 9, sl], [10, 10, sb],
+      [9, 8, sl], [9, 9, sb], [8, 7, sl], [8, 8, sb], [7, 6, sl], [6, 5, sl]]);
+  } else if (f.houseId === 'mermaid') {
+    ear([[12, 11, '#8ef0f0'], [12, 12, '#2ab8c8'], [12, 13, '#2ab8c8'], [11, 10, '#8ef0f0'], [11, 11, '#2ab8c8'], [11, 12, '#16788e'], [10, 9, '#8ef0f0'], [10, 10, '#2ab8c8']]);
+  } else {
+    ear([[12, 11, sb], [13, 11, sb], [12, 12, sb], [13, 12, ss], [12, 13, sb], [13, 13, sb]]);
+  }
+
+  // 4) 눈·눈썹·입
+  const mood = f.dead ? 'neutral' : f.mood;
+  const fem = f.gender === 'f' && f.stage !== 'baby';
+  const eyeDark = darken(f.eye, 0.35);
+  const put = (x: number, y: number, c: string) => cv.put(x, y, c, 'feat');
+  if (f.blink || f.dead) {
+    for (let x = 19; x <= 21; x++) put(x, 11, K);
+  } else if (mood === 'happy') {
+    put(19, 11, K);
+    put(20, 10, K);
+    put(21, 11, K);
+  } else {
+    for (let x = 19; x <= 21; x++) put(x, 10, K);
+    if (fem) put(22, 9, K); // 속눈썹 꼬리
+    put(20, 11, eyeDark);
+    put(21, 11, '#ffffff'); // 눈동자 하이라이트
+    put(20, 12, f.eye);
+    if (fem || f.stage === 'child') put(21, 12, f.eye);
+  }
+  const brow = darken(hs, 0.15);
+  if (mood === 'angry') {
+    put(19, 8, brow);
+    put(20, 8, brow);
+    put(21, 9, brow);
+  } else if (mood === 'sad' || mood === 'afraid') {
+    put(19, 9, brow);
+    put(20, 8, brow);
+    put(21, 8, brow);
+  } else {
+    for (let x = 19; x <= 21; x++) put(x, 8, brow);
+  }
+  if (fem || f.stage === 'child' || f.stage === 'baby') {
+    put(19, 13, BLUSH);
+    put(20, 13, BLUSH);
+  }
+  const my = g === 'm' ? 16 : 15;
+  if (mood === 'afraid' || mood === 'angry') {
+    put(21, my, K);
+    if (mood === 'afraid') put(21, my + 1, K);
+  } else put(21, my, mood === 'sad' ? darken(MOUTH, 0.2) : MOUTH);
+  if (mood === 'happy') put(22, my - 1, MOUTH);
+  if (f.stage === 'elder') {
+    put(18, 14, ss);
+    put(19, 15, ss);
+  }
+
+  // 5) 앞머리 · 옆머리 (귀 앞으로 내린 머리)
+  for (const [y, x0, x1] of SIDE_BANGS[f.bangs]) {
+    for (let x = x0; x <= x1; x++) cv.put(x, y, x >= x1 - 1 || y >= 8 ? hs : hb, 'hair');
+  }
+  if (f.back !== 'none') {
+    const lockEnd = fem && (f.back === 'long' || f.back === 'bob' || f.back === 'twin') ? 17 : 12;
+    for (let y = 7; y <= lockEnd; y++) for (const x of [14, 15]) cv.put(x, y, x === 14 ? hs : hb, 'hair');
+    if (lockEnd > 12) cv.put(15, lockEnd + 1, hs, 'hair');
+  }
+  cv.outline('hair', hairOutline, true);
+  // 천사 고리 (광택)
+  for (const [x, y] of [[9, 3], [10, 3], [11, 2], [12, 2], [13, 2], [8, 4]] as const) if (cv.has('hair', x, y)) cv.put(x, y, hl, 'hair');
+
+  // 6) 출신 표식
+  const mark = (pts: [number, number, string][], outline = K) => {
+    for (const [x, y, c] of pts) cv.put(x, y, c, 'mark');
+    cv.outline('mark', outline, true);
+  };
+  switch (f.houseId) {
+    case 'beastkin':
+      // 머리 위로 솟은 고양이 귀 (앞쪽 귀는 안쪽이 분홍)
+      mark([[16, -3, hb], [16, -2, hb], [17, -2, hb], [15, -1, hb], [16, -1, '#ffb0c0'], [17, -1, hb], [15, 0, hb], [16, 0, '#ffb0c0'], [17, 0, hb], [18, 0, hb],
+        [10, -2, hs], [10, -1, hs], [11, -1, hs], [9, 0, hs], [10, 0, hs], [11, 0, hs]], hairOutline);
+      break;
+    case 'demon':
+      // 이마 위에서 뒤로 휘어 오르는 뿔
+      mark([[16, 1, '#fff0e0'], [15, 0, '#fff0e0'], [15, -1, '#e8d8c8'], [14, -2, '#c8b0a0'], [13, -3, '#8a6a5a']]);
+      break;
+    case 'sky':
+      for (let x = 8; x <= 17; x++) cv.put(x, -2, '#ffe070');
+      cv.put(7, -1, '#ffe070');
+      cv.put(18, -1, '#ffe070');
+      break;
+    case 'eastern':
+      for (const [x, y, c] of [[7, 3, '#c8a060'], [6, 2, '#c8a060'], [8, 4, '#ff6a8a'], [9, 4, '#ffb0c8'], [8, 5, '#ffb0c8']] as const) cv.put(x, y, c);
+      break;
+    case 'noble':
+      if (fem) {
+        for (let x = 14; x <= 18; x++) cv.put(x, 3, '#ffd85a');
+        cv.put(17, 2, '#ff5aa8');
+      }
+      break;
+    case 'witch':
+      if (f.stage !== 'baby') {
+        cv.fill(rows([[-3, -3, 5, 6], [-2, -2, 5, 8], [-1, -1, 6, 10], [0, 0, 7, 13], [1, 1, 8, 16], [2, 2, 9, 19], [3, 3, 3, 24]]), (_x, y) => (y === 2 ? '#c8a0ff' : '#3a2a6a'), 'mark');
+        cv.outline('mark', K, true);
+      }
+      break;
+    case 'dwarf':
+      if (fem) cv.put(9, 17, '#ffd05a');
+      break;
+  }
+
+  // 7) 수염
+  if (f.beard) {
+    cv.fill(rows([[16, 16, 18, 21], [17, 18, 15, 21], [19, chin + 1, 15, 20]]), (_x, y) => (y >= chin ? hs : hb), 'beard');
+    cv.put(21, 16, MOUTH);
+    cv.outline('beard', hairOutline, true);
+  }
+
+  // 8) 부상: 반창고
+  if (f.injured && !f.dead) {
+    cv.put(18, 13, '#ffffff');
+    cv.put(19, 13, '#ffffff');
+  }
+  return cv.p;
+}
+
+/** 옆얼굴의 턱 끝 줄 */
+export function profileChin(f: Pick<Figure, 'stage' | 'gender'>): number {
+  const g = f.stage === 'baby' ? 'baby' : f.stage === 'child' ? 'child' : f.gender;
+  return Math.max(...Object.keys(SIDE_FACE[g]).map(Number)) + SIDE_DY;
 }
