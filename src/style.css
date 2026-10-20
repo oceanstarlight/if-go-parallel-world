@@ -884,3 +884,15 @@ button.t-slot { cursor: pointer; }
 /* 가로로 넘치는 요소가 있어도 화면 전체가 옆으로 밀리지 않게 (sticky 를 깨지 않는 clip) */
 #app { overflow-x: clip; }
 .duel, .du-log, .dg-log { min-width: 0; overflow-wrap: anywhere; }
+
+/* ───── 로그인 ───── */
+.btn.login { display: flex; align-items: center; justify-content: center; gap: 10px; background: var(--panel); }
+.btn.login svg { width: 20px; height: 20px; flex: none; }
+.btn.login:disabled { opacity: 0.6; }
+.guest-link { display: block; margin: 20px auto 0; font-size: 12px; }
+.gate-note { margin: 12px 0 0; }
+.gate-error { color: var(--bad); }
+.account { margin: 18px 0 0; }
+.link.inline { margin: 0 0 0 6px; font-size: inherit; }
+.link:disabled { opacity: 0.5; }
+.modal h3 { line-height: 1.4; }

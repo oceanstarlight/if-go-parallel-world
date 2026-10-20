@@ -16,6 +16,7 @@
     "vitest": "^5.0.5"
   },
   "dependencies": {
+    "firebase": "^13.0.0",
     "galmuri": "^2.40.3",
     "gsap": "^3.15.0",
     "morphdom": "^2.7.4",

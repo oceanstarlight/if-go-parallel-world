@@ -19,13 +19,66 @@ function read<T>(key: string): T | null {
   }
 }
 
-function write(key: string, value: unknown) {
+let onSave: (() => void) | null = null;
+/** 저장될 때마다 알려 준다 (클라우드 동기화용) */
+export const setSaveListener = (fn: () => void) => { onSave = fn; };
+
+function writeRaw(key: string, raw: string | null) {
   try {
-    if (value === null) localStorage.removeItem(key);
-    else localStorage.setItem(key, JSON.stringify(value));
+    if (raw === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, raw);
   } catch {
     // 저장 불가 환경(시크릿 모드 등)에서는 조용히 무시
   }
+}
+
+function write(key: string, value: unknown) {
+  writeRaw(key, value === null ? null : JSON.stringify(value));
+  onSave?.();
+}
+
+/** 클라우드와 주고받는 원본 저장 (JSON 문자열 그대로) */
+export interface RawSave { meta: string | null; run: string | null }
+
+export function exportSave(): RawSave {
+  try {
+    return { meta: localStorage.getItem(META_KEY), run: localStorage.getItem(RUN_KEY) };
+  } catch {
+    return { meta: null, run: null };
+  }
+}
+
+/** 클라우드에서 받은 저장으로 덮어쓴다 (저장 알림은 내지 않는다) */
+export function importSave(save: RawSave) {
+  writeRaw(META_KEY, save.meta);
+  writeRaw(RUN_KEY, save.run);
+}
+
+/** 아직 아무것도 하지 않은 저장인가 */
+export function isBlankSave(save: RawSave): boolean {
+  if (save.run) return false;
+  if (!save.meta) return true;
+  try {
+    const m = JSON.parse(save.meta) as MetaSave;
+    return m.totalLives === 0 && m.soulStones === 0 && Object.keys(m.upgrades ?? {}).length === 0;
+  } catch {
+    return true;
+  }
+}
+
+/** 저장을 한 줄로 요약 (충돌 선택창에 보여 준다) */
+export function describeSave(save: RawSave): string {
+  if (isBlankSave(save)) return '기록 없음';
+  const parts: string[] = [];
+  try {
+    const m = save.meta ? (JSON.parse(save.meta) as MetaSave) : null;
+    if (m) parts.push(`${m.totalLives}번 환생`, `환생석 ${m.soulStones}`);
+    const r = save.run ? (JSON.parse(save.run) as LifeState) : null;
+    if (r) parts.push(`${r.name} ${r.age}세 진행 중`);
+  } catch {
+    // 깨진 저장은 그냥 요약만 줄인다
+  }
+  return parts.join(' · ') || '기록 있음';
 }
 
 export function freshMeta(): MetaSave {
