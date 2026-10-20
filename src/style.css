@@ -168,7 +168,7 @@ h4 { font-size: 13px; color: var(--muted); margin: 20px 0 6px; letter-spacing: 0
 .sheet-head .age { margin: 2px 0 0; }
 .sheet-head p { margin: 0; }
 .stats { margin-top: 18px; display: flex; flex-direction: column; gap: 6px; }
-.stat { display: grid; grid-template-columns: 36px 1fr 28px; align-items: center; gap: 8px; font-size: 13px; }
+.stat { display: grid; grid-template-columns: 44px 1fr 46px; align-items: center; gap: 8px; font-size: 13px; }
 .stat-name { color: var(--muted); }
 .stat-val { text-align: right; font-variant-numeric: tabular-nums; }
 .bar { height: 6px; background: #e6ecf8; border-radius: 3px; overflow: hidden; }
@@ -661,7 +661,7 @@ h4 { font-size: 13px; color: var(--muted); margin: 20px 0 6px; letter-spacing: 0
   .sheet-head .age { display: inline; margin-left: 6px; font-size: 13px; }
   .sheet-head p.small { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .stats { margin-top: 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
-  .stat { grid-template-columns: 28px 1fr 26px; gap: 5px; font-size: 12px; }
+  .stat { grid-template-columns: 38px 1fr 40px; gap: 5px; font-size: 12px; }
   .sheet-extra { display: none; }
   .quick, .town-nav { display: none; }
   .econ { margin-top: 4px; gap: 4px 10px; font-size: 12px; }
@@ -839,7 +839,7 @@ button.t-slot { cursor: pointer; }
   .view-life .sheet-top .portrait-host { width: 64px; }
   .view-life .sheet-head p.small { display: none; } /* 출신·권능은 정보 탭에서 */
   .view-life .stats { grid-template-columns: 1fr 1fr 1fr; gap: 2px 8px; margin-top: 4px; }
-  .view-life .stat { grid-template-columns: 24px 1fr 25px; gap: 3px; font-size: 11px; padding-top: 1px; padding-bottom: 1px; }
+  .view-life .stat { grid-template-columns: 34px 1fr 38px; gap: 3px; font-size: 11px; padding-top: 1px; padding-bottom: 1px; }
   .view-life .stat .bar { height: 4px; }
   .view-life .mind { margin-top: 4px; }
   .view-life .econ { margin-top: 2px; }
@@ -884,3 +884,13 @@ button.t-slot { cursor: pointer; }
 /* 가로로 넘치는 요소가 있어도 화면 전체가 옆으로 밀리지 않게 (sticky 를 깨지 않는 clip) */
 #app { overflow-x: clip; }
 .duel, .du-log, .dg-log { min-width: 0; overflow-wrap: anywhere; }
+
+/* 등급 능력치 */
+.fill-atk { background: #ff8a3c; }
+.fill-def { background: #7a8aa8; }
+.stat-val .grade { font-size: 0.78em; font-weight: 800; margin-right: 3px; padding: 0 3px; border-radius: 4px; background: #eef1ff; color: #4a62f0; }
+.stat-val .grade.g-S { background: #ffe8a8; color: #b06a00; }
+.stat-val .grade.g-A { background: #ffd8e4; color: #c02a60; }
+.stat-val .grade.g-B { background: #e0ecff; color: #2a5ad8; }
+.stat-val .grade.g-E, .stat-val .grade.g-F { background: #f0f0f4; color: #8a8aa0; }
+.stat-name .talent { font-style: normal; color: #e8a000; margin-left: 1px; font-size: 0.85em; }

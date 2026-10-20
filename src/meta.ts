@@ -50,6 +50,13 @@ export function loadRun(): LifeState | null {
     }
     s.statScale = 2;
   }
+  // v1.5 전 저장: 200 기준 → 280 기준, 공격력·방어력은 체력에서 나눠 갖는다
+  if (s && s.statScale === 2) {
+    for (const k of Object.keys(s.stats) as (keyof LifeState['stats'])[]) s.stats[k] = Math.min(280, Math.round(s.stats[k] * 1.4));
+    s.stats.atk ??= Math.round(s.stats.vit * 0.8);
+    s.stats.def ??= Math.round(s.stats.vit * 0.6);
+    s.statScale = 3;
+  }
   return s;
 }
 export const saveRun = (s: LifeState | null) => write(RUN_KEY, s);

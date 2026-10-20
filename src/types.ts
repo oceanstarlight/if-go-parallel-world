@@ -1,4 +1,5 @@
-export type StatKey = 'vit' | 'mana' | 'int' | 'cha' | 'fame' | 'luck';
+/** 등급 능력치 5개 (공격력·방어력·마력·체력·지능) + 숨은 보조 능력치 3개 (매력·명성·행운) */
+export type StatKey = 'atk' | 'def' | 'mana' | 'vit' | 'int' | 'cha' | 'fame' | 'luck';
 export type Stats = Record<StatKey, number>;
 
 export type Focus = 'train' | 'study' | 'social' | 'explore' | 'rest';
@@ -130,7 +131,13 @@ export interface LifeState {
   seenAt?: Record<string, number>;
   /** 올해 일어난 사건 수 */
   yearEvents?: number;
-  /** 능력치 기준 (2 = 200 기준. 없으면 v1.4 전 저장) */
+  /** 유년기 재능 점수 (12세가 끝나면 상위 1~2개가 각성) */
+  talentPts?: Partial<Record<StatKey, number>>;
+  /** 각성한 재능: 소년기에 두 배로 자란다 */
+  talents?: StatKey[];
+  /** 성인식 등급 (0=F … 6=S). 이후로는 +2등급까지만 오른다 */
+  grade18?: Partial<Record<StatKey, number>>;
+  /** 능력치 기준 (2 = 200 기준, 3 = 280 기준. 없으면 v1.4 전 저장) */
   statScale?: number;
   /** 중상 몇 번째에 죽는가 (기본 3. 동시대 환생자의 난이도용) */
   injuryCap?: number;

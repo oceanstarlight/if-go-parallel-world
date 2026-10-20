@@ -48,26 +48,26 @@ export const MARKET: MarketItem[] = [
   { id: 'library', cat: 'life', type: 'owned', name: '개인 서재', price: 2500, minAge: 12, desc: '학업 성장 ×1.2' },
   { id: 'dojo', cat: 'life', type: 'owned', name: '개인 수련장', price: 2500, minAge: 12, desc: '수련 성장 ×1.2' },
   { id: 'salon', cat: 'life', type: 'owned', name: '살롱', price: 3000, minAge: 16, desc: '교류 성장 ×1.2' },
-  { id: 'villa', cat: 'life', type: 'owned', name: '호숫가 별장', price: 20000, minAge: 20, desc: '매년 스트레스 -15, 매력 +10', effect: { stats: { cha: 10 } } },
-  { id: 'castle', cat: 'life', type: 'owned', name: '나만의 성', price: 300000, minAge: 20, desc: '명성 +60. 이세계 인생의 정점', effect: { stats: { fame: 60 }, flags: ['own_castle'] } },
+  { id: 'villa', cat: 'life', type: 'owned', name: '호숫가 별장', price: 20000, minAge: 20, desc: '매년 스트레스 -15, 매력 +10', effect: { stats: { cha: 14 } } },
+  { id: 'castle', cat: 'life', type: 'owned', name: '나만의 성', price: 300000, minAge: 20, desc: '명성 +60. 이세계 인생의 정점', effect: { stats: { fame: 84 }, flags: ['own_castle'] } },
 
   // 교육: 살 때마다 값이 오른다
-  { id: 'tutor', cat: 'study', type: 'service', name: '가정교사', price: 400, desc: '지성 +10' , effect: { stats: { int: 10 } } },
-  { id: 'sword_lesson', cat: 'study', type: 'service', name: '검술 도장', price: 400, desc: '체력 +10', effect: { stats: { vit: 10 } } },
-  { id: 'magic_lesson', cat: 'study', type: 'service', name: '마법 과외', price: 400, desc: '마력 +10', effect: { stats: { mana: 10 } } },
-  { id: 'etiquette', cat: 'study', type: 'service', name: '예절 수업', price: 300, desc: '매력 +10', effect: { stats: { cha: 10 } } },
+  { id: 'tutor', cat: 'study', type: 'service', name: '가정교사', price: 400, desc: '지성 +10' , effect: { stats: { int: 14 } } },
+  { id: 'sword_lesson', cat: 'study', type: 'service', name: '검술 도장', price: 400, desc: '체력 +10', effect: { stats: { vit: 14 } } },
+  { id: 'magic_lesson', cat: 'study', type: 'service', name: '마법 과외', price: 400, desc: '마력 +10', effect: { stats: { mana: 14 } } },
+  { id: 'etiquette', cat: 'study', type: 'service', name: '예절 수업', price: 300, desc: '매력 +10', effect: { stats: { cha: 14 } } },
 
   // 명성·신앙
-  { id: 'banquet', cat: 'fame', type: 'service', name: '연회 개최', price: 1500, minAge: 16, desc: '명성 +12, 매력 +4', effect: { stats: { fame: 12, cha: 4 }, mood: 'joy' } },
+  { id: 'banquet', cat: 'fame', type: 'service', name: '연회 개최', price: 1500, minAge: 16, desc: '명성 +12, 매력 +4', effect: { stats: { fame: 17, cha: 6 }, mood: 'joy' } },
   { id: 'donation', cat: 'fame', type: 'service', name: '신전 헌금', price: 500, desc: '업보 +8', effect: { karma: 8 } },
-  { id: 'statue', cat: 'fame', type: 'owned', name: '내 동상 세우기', price: 10000, minAge: 20, desc: '명성 +20. 광장에 내 동상이!', effect: { stats: { fame: 20 } } },
-  { id: 'title', cat: 'fame', type: 'owned', name: '작위 구입', price: 60000, minAge: 20, desc: '명성 +50. 돈으로 귀족이 된다', effect: { stats: { fame: 50 }, flags: ['noble_title'] } },
+  { id: 'statue', cat: 'fame', type: 'owned', name: '내 동상 세우기', price: 10000, minAge: 20, desc: '명성 +20. 광장에 내 동상이!', effect: { stats: { fame: 28 } } },
+  { id: 'title', cat: 'fame', type: 'owned', name: '작위 구입', price: 60000, minAge: 20, desc: '명성 +50. 돈으로 귀족이 된다', effect: { stats: { fame: 70 }, flags: ['noble_title'] } },
 
   // 영약
-  { id: 'charm', cat: 'elixir', type: 'owned', name: '행운의 부적', price: 3000, desc: '행운 +20', effect: { stats: { luck: 20 } } },
-  { id: 'vigor', cat: 'elixir', type: 'service', name: '활력의 영약', price: 6000, desc: '체력 +20', effect: { stats: { vit: 20 } } },
-  { id: 'wisdom', cat: 'elixir', type: 'service', name: '지혜의 영약', price: 6000, desc: '지성 +20', effect: { stats: { int: 20 } } },
-  { id: 'mana_elixir', cat: 'elixir', type: 'service', name: '마력의 영약', price: 6000, desc: '마력 +20', effect: { stats: { mana: 20 } } },
+  { id: 'charm', cat: 'elixir', type: 'owned', name: '행운의 부적', price: 3000, desc: '행운 +20', effect: { stats: { luck: 28 } } },
+  { id: 'vigor', cat: 'elixir', type: 'service', name: '활력의 영약', price: 6000, desc: '체력 +20', effect: { stats: { vit: 28 } } },
+  { id: 'wisdom', cat: 'elixir', type: 'service', name: '지혜의 영약', price: 6000, desc: '지성 +20', effect: { stats: { int: 28 } } },
+  { id: 'mana_elixir', cat: 'elixir', type: 'service', name: '마력의 영약', price: 6000, desc: '마력 +20', effect: { stats: { mana: 28 } } },
   { id: 'youth', cat: 'elixir', type: 'owned', name: '젊음의 영약', price: 50000, desc: '노화가 30% 느려진다' },
 ];
 

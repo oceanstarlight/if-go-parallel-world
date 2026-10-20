@@ -71,6 +71,7 @@ describe('드문 사슬도 끝까지 이어진다', () => {
     const s = createLife(base, seededRng(6));
     s.age = 30;
     s.flags.push('bankrupted');
+    s.stats.int = 150; // 상인은 지능 D 이상
     s.pendingEventId = 'bankrupt_bottom';
     choose(s, 0, seededRng(7));
     expect(s.jobId).toBe('merchant');

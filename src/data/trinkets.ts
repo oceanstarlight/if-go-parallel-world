@@ -16,6 +16,10 @@ export interface TrinketDef {
 }
 
 export const TRINKETS: TrinketDef[] = [
+  { base: 't_atk1', name: '늑대 송곳니 반지', stat: 'atk' },
+  { base: 't_atk2', name: '투사의 손목띠', stat: 'atk' },
+  { base: 't_def1', name: '거북 등껍질 부적', stat: 'def' },
+  { base: 't_def2', name: '수호의 은사슬', stat: 'def' },
   { base: 't_vit1', name: '곰 이빨 목걸이', stat: 'vit' },
   { base: 't_vit2', name: '강철 팔찌', stat: 'vit' },
   { base: 't_mana1', name: '달빛 펜던트', stat: 'mana' },
@@ -43,13 +47,13 @@ export const STORY_TRINKETS: TrinketDef[] = [
 const ALL = [...TRINKETS, ...STORY_TRINKETS];
 export const trinketDef = (base: string) => ALL.find((t) => t.base === base);
 
-const MAIN: Record<Rarity, [number, number]> = { common: [4, 6], rare: [8, 12], epic: [14, 18], legend: [22, 28] };
+const MAIN: Record<Rarity, [number, number]> = { common: [6, 8], rare: [11, 17], epic: [20, 25], legend: [31, 39] };
 const SUB: Record<Rarity, { n: number; range: [number, number] }> = {
-  common: { n: 0, range: [0, 0] }, rare: { n: 0, range: [0, 0] }, epic: { n: 1, range: [4, 8] }, legend: { n: 2, range: [6, 10] },
+  common: { n: 0, range: [0, 0] }, rare: { n: 0, range: [0, 0] }, epic: { n: 1, range: [6, 11] }, legend: { n: 2, range: [8, 14] },
 };
 const VALUE: Record<Rarity, number> = { common: 60, rare: 220, epic: 800, legend: 3000 };
 const PREFIX: Record<Rarity, string> = { common: '', rare: '빛나는 ', epic: '영웅의 ', legend: '전설의 ' };
-const STATS: StatKey[] = ['vit', 'mana', 'int', 'cha', 'fame', 'luck'];
+const STATS: StatKey[] = ['atk', 'def', 'mana', 'vit', 'int', 'cha', 'luck'];
 
 export function makeTrinket(def: TrinketDef, rarity: Rarity, rng: () => number = Math.random): Item {
   const roll = ([lo, hi]: [number, number]) => lo + Math.floor(rng() * (hi - lo + 1));

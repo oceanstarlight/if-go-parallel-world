@@ -25,19 +25,12 @@ describe('v1.3 던전', () => {
     expect(canEnterDungeon(s)).toBe(true);
   });
 
-  it('길목에서 마물을 만나면 멈춘다 (턴제 전투)', () => {
-    let mobs = 0;
-    for (let seed = 1; seed <= 20; seed++) {
-      const s = life();
-      s.age = 20;
-      s.hp = 9999;
-      beginDive(s, 0);
-      if (descendPath(s, seededRng(seed)) === 'mob') {
-        mobs++;
-        expect(s.dive?.mob?.name).toBeTruthy();
-      }
-    }
-    expect(mobs).toBeGreaterThan(0);
+  it('5계층마다 보스만: 내려가면 곧장 보스 방 앞', () => {
+    const s = life();
+    s.age = 20;
+    beginDive(s, 0);
+    expect(descendPath(s, seededRng(1))).toBe('boss');
+    expect(s.dive?.atBoss).toBe(true);
   });
 });
 
@@ -79,14 +72,14 @@ describe('v1.3 경제·체력', () => {
 });
 
 describe('v1.3 공격·마법 대칭', () => {
-  it('체력이 높으면 공격, 마력이 높으면 마법이 세다', () => {
+  it('공격력이 높으면 공격, 마력이 높으면 마법이 세다', () => {
     const s = life();
     s.equip = { weapon: null, armor: null, trinkets: [] };
-    s.stats.vit = 70;
-    s.stats.mana = 20;
+    s.stats.atk = 140;
+    s.stats.mana = 30;
     expect(attackMul(s)).toBeGreaterThan(magicMul(s));
-    s.stats.vit = 20;
-    s.stats.mana = 70;
+    s.stats.atk = 30;
+    s.stats.mana = 140;
     expect(magicMul(s)).toBeGreaterThan(attackMul(s));
   });
 });

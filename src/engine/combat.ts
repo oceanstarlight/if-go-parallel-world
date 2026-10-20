@@ -22,27 +22,27 @@ export const ENEMY_NAME: Record<string, string> = {
 /** 이 선택지가 전투인가 (전투 사건의 체력·마력 판정) */
 export function isCombat(eventId: string | null | undefined, c: Choice): boolean {
   const stat = c.check?.stat;
-  return !!eventId && !!BATTLE_ENEMY[eventId] && (stat === 'vit' || stat === 'mana');
+  return !!eventId && !!BATTLE_ENEMY[eventId] && (stat === 'vit' || stat === 'mana' || stat === 'atk');
 }
 
-/** 전투력 계수: 체력·마력이 주력, 지성은 치명타·마법 배율, 행운은 회피 */
-export const CP_WEIGHT = { vit: 1, mana: 1, main: 0.5, luck: 0.3, int: 0.5 } as const;
+/** 전투력 계수: 공격력·마력이 주력(높은 쪽 추가), 방어력·체력은 버티는 힘, 지능은 치명타·피해 계수 */
+export const CP_WEIGHT = { atk: 1, mana: 1, main: 0.5, def: 0.5, vit: 0.4, int: 0.5 } as const;
 
 export const CP_BOOST = 1.15;
 
 /** 내 전투력: 능력치 + 장비 + 직업 */
 export function combatPower(s: LifeState): number {
-  const { vit, mana, int, luck } = effStats(s);
+  const { atk, def, mana, vit, int } = effStats(s);
   const gear = (s.equip?.weapon?.power ?? 0) + (s.equip?.armor?.power ?? 0);
   const job = (jobById(s.jobId)?.combat ?? 0) * s.jobRank;
   const w = CP_WEIGHT;
   // ×1.15: 능력치에 비해 전투력이 낮게 느껴진다는 피드백으로 상향
-  // 능력치는 200 기준이라 절반만 반영 (장비·직업은 그대로)
-  return Math.round(((vit * w.vit + mana * w.mana + w.main * Math.max(vit, mana) + luck * w.luck + int * w.int) / 2 + gear + job) * CP_BOOST);
+  // 능력치는 280 기준이라 1/2.8 만 반영 (장비·직업은 그대로)
+  return Math.round(((atk * w.atk + mana * w.mana + w.main * Math.max(atk, mana) + def * w.def + vit * w.vit + int * w.int) / 2.8 + gear + job) * CP_BOOST);
 }
 
 /** 사건 전투의 적 전투력 (판정 난이도에서) */
-export const enemyPowerOfDc = (dc: number) => Math.round(20 + dc * 1.1);
+export const enemyPowerOfDc = (dc: number) => Math.round(20 + dc * 0.95);
 
 /** 던전 계층의 적 전투력 */
 export function floorPower(floor: number, boss = false): number {

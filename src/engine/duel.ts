@@ -55,18 +55,23 @@ export const MAGIC_COST = 15;
 const P_HIT = 0.22, E_HIT = 0.25, P_EXP = 0.7;
 const CRIT_MUL = 1.7;
 
-/** 치명타: 지성 (급소를 읽는다). 공격에만 붙는다 */
-export const critChance = (s: LifeState) => Math.min(0.4, 0.05 + statOf(s, 'int') * 0.0015);
-/** 회피·도주: 행운 */
-export const dodgeChance = (s: LifeState) => Math.min(0.25, 0.03 + statOf(s, 'luck') * 0.00075);
-export const fleeChance = (s: LifeState) => Math.min(0.9, 0.3 + statOf(s, 'luck') * 0.003);
+/** 치명타: 지능 (급소를 읽는다). 공격에만 붙는다 */
+export const critChance = (s: LifeState) => Math.min(0.4, 0.05 + statOf(s, 'int') * 0.0011);
+/** 회피·도주: 행운 (숨은 능력치) */
+export const dodgeChance = (s: LifeState) => Math.min(0.25, 0.03 + statOf(s, 'luck') * 0.00054);
+export const fleeChance = (s: LifeState) => Math.min(0.9, 0.3 + statOf(s, 'luck') * 0.0021);
+/** 피해량 계수: 지능 140 이면 ×1.0 */
+export const intMul = (s: LifeState) => 0.9 + statOf(s, 'int') / 1400;
+/** 방어력: 받는 피해를 일정 수치 줄인다 */
+export const guardFlat = (s: LifeState) => Math.floor(statOf(s, 'def') / 10);
 /**
- * 공격·마법 배율 (능력치 200 기준).
- *  - 공격: 체력 + 무기. 빗나갈 수 있지만 지성만큼 치명타. 체력 100 이면 ×1.0
- *  - 마법: 마력 × 지성. 마나를 쓰고 빗나가지 않는다. 마력 100 · 지성 100 이면 ×1.3 (같은 수치의 공격보다 30% 세다)
+ * 공격·마법 배율 (능력치 280 기준).
+ *  - 공격: 공격력 + 무기. 빗나갈 수 있지만 지능만큼 치명타. 공격력 140 이면 ×1.0
+ *  - 마법: 마력. 마나를 쓰고 빗나가지 않는다. 같은 수치의 공격보다 30% 세다
+ *  - 둘 다 지능의 피해량 계수를 받는다
  */
-export const attackMul = (s: LifeState) => 0.5 + statOf(s, 'vit') / 200 + (s.equip?.weapon?.power ?? 0) / 200;
-export const magicMul = (s: LifeState) => (0.5 + statOf(s, 'mana') / 200) * 1.3 * (0.95 + statOf(s, 'int') / 2000);
+export const attackMul = (s: LifeState) => (0.5 + statOf(s, 'atk') / 280 + (s.equip?.weapon?.power ?? 0) / 200) * intMul(s);
+export const magicMul = (s: LifeState) => (0.5 + statOf(s, 'mana') / 280) * 1.3 * intMul(s);
 
 export function startDuel(s: LifeState, kind: Duel['kind'], foe: string, ep: number): Duel {
   const hpMax = maxHp(s);
@@ -128,7 +133,7 @@ export function duelTurn(d: Duel, s: LifeState, action: DuelAction, rng: Rng): B
   const heavy = rng() < 0.2;
   const miss = rng() < dodgeChance(s);
   let dmg = miss ? 0 : eBase * spread(rng) * (heavy ? 1.6 : 1) * (guarding ? 0.35 : 1);
-  dmg = miss ? 0 : Math.max(1, Math.round(dmg));
+  dmg = miss ? 0 : Math.max(1, Math.round(dmg) - guardFlat(s));
   d.hp = Math.max(0, d.hp - dmg);
   blows.push({ from: 'e', dmg, crit: heavy, magic: false, miss, hpTo: d.hp / d.hpMax });
   d.log.push(miss ? `${d.foe}의 공격을 피했다!` : `${d.foe}의 ${heavy ? '강공격' : '공격'}! ${dmg} 피해${guarding ? ' (방어)' : ''}`);

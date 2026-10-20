@@ -30,7 +30,7 @@ describe('v0.6 타고난 특성', () => {
   it('특성이 시작 능력치와 불굴 목숨에 반영된다', () => {
     const a = createLife({ ...base, traits: [] }, seededRng(1));
     const b = createLife({ ...base, traits: ['gorgeous', 'plot_armor'] }, seededRng(1));
-    expect(b.stats.cha - a.stats.cha).toBe(20); // 능력치 200 기준
+    expect(b.stats.cha - a.stats.cha).toBe(28); // 능력치 280 기준
     expect(b.extraLives - a.extraLives).toBe(1);
   });
 });
@@ -53,8 +53,12 @@ describe('v0.6 스트레스 · 휴식 · 의지력', () => {
     const before = s.stress!;
     const willBefore = s.will!;
     s.focus = 'rest';
-    s.pendingEventId = null;
-    advanceYear(s, rng);
+    // 새해 정산이 한 번 지나갈 때까지
+    const age = s.age;
+    while (s.age === age) {
+      s.pendingEventId = null;
+      advanceYear(s, rng);
+    }
     expect(s.stress!).toBeLessThan(before);
     expect(s.will!).toBeGreaterThan(willBefore);
   });

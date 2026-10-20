@@ -22,7 +22,7 @@ describe('한 해 기록 (YEAR_NOTES)', () => {
       expect(n.cond?.maxAge, `${n.id}: 나이는 minAge/maxAge 로`).toBeUndefined();
       if (typeof n.text === 'string') expect(n.text.length, `${n.id} 문장이 너무 길다`).toBeLessThanOrEqual(90);
       // 효과는 작게: 능력치 ±2 이하
-      for (const v of Object.values(n.effect?.stats ?? {})) expect(Math.abs(v ?? 0), n.id).toBeLessThanOrEqual(4); // 능력치 200 기준
+      for (const v of Object.values(n.effect?.stats ?? {})) expect(Math.abs(v ?? 0), n.id).toBeLessThanOrEqual(6); // 능력치 280 기준
       expect(n.effect?.death, n.id).toBeUndefined();
     }
   });

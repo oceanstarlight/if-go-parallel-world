@@ -32,14 +32,14 @@ describe('v1.1 능력치와 전투력', () => {
   it('모든 능력치에 설명이 있다', () => {
     for (const k of STAT_KEYS) expect(STAT_INFO[k].length).toBeGreaterThan(0);
   });
-  it('마력과 행운이 전투력을 올린다', () => {
+  it('지능과 마력이 전투력을 올린다', () => {
     const s = createLife(base, seededRng(1));
     const cp = combatPower(s);
-    s.stats.luck += 20;
+    s.stats.int += 28;
     expect(combatPower(s)).toBeGreaterThan(cp);
     const cp2 = combatPower(s);
-    s.stats.mana += 20;
-    expect(combatPower(s)).toBeGreaterThanOrEqual(cp2 + 11);
+    s.stats.mana += 28;
+    expect(combatPower(s)).toBeGreaterThanOrEqual(cp2 + 10);
   });
 });
 

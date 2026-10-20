@@ -32,19 +32,19 @@ describe('v1.4 시간', () => {
   });
 });
 
-describe('v1.4 능력치 200', () => {
-  it('상한은 200', () => {
+describe('v1.4 능력치 상한', () => {
+  it('상한은 280', () => {
     const s = createLife(base, seededRng(5));
     applyEffect(s, { stats: { int: 999 } }, seededRng(6));
     expect(s.stats.int).toBe(STAT_MAX);
   });
 
-  it('체력 100 · 마력 100 · 지성 100 이면 마법이 공격보다 30% 세다', () => {
+  it('공격력과 마력이 같으면 마법이 공격보다 30% 세다', () => {
     const s = createLife(base, seededRng(7));
     s.equip = { weapon: null, armor: null, trinkets: [] };
-    s.stats.vit = 100;
-    s.stats.mana = 100;
-    s.stats.int = 100;
+    s.stats.atk = 140;
+    s.stats.mana = 140;
+    s.stats.int = 140;
     expect(magicMul(s) / attackMul(s)).toBeCloseTo(1.3, 2);
   });
 
