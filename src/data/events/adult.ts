@@ -438,4 +438,357 @@ export const ADULT: GameEvent[] = [
       { label: '홀로 여행을 떠난다', success: { text: '지팡이 하나 짚고, 아직 못 가본 땅을 향해 길을 나섰다. 인생은 여행이다!', effect: { stats: { luck: 5 } } } },
     ],
   },
+
+  // ───── 모험 (18~60세 · 누구에게나 · 반복) ─────
+  // 소규모 모험 위주. 큰 보상·죽음·직업 변경은 없다.
+  // 연결: 유적(소문→입구→보물창고) · 항해(출항→폭풍→섬) · 대상 호위(호위→신기루→도착) · 숲의 정령 · 괴수 발자국 · 숨겨진 문
+
+  // 유적 탐사
+  {
+    id: 'a_ex_ruin_rumor', title: '유적의 소문', weight: 1.5, focus: 'explore',
+    cond: { minAge: 18, maxAge: 58, notFlags: ['ex_ruin', 'ex_ruin_in'] },
+    text: '주점에서 나이 든 탐험가가 술잔을 흔들며 속삭인다. "산 너머 안개 속에 아무도 들어가 본 적 없는 유적이 있어."',
+    choices: [
+      { label: '지도를 얻어 낸다', check: { stat: 'cha', dc: 32 },
+        success: { text: '술 한 잔에 탐험가가 낡은 지도를 건넸다. "젊은이, 몸조심해."', effect: { flags: ['ex_ruin'], stats: { cha: 1, fame: 1 } }, tone: 'good' },
+        fail: { text: '탐험가는 코를 골며 잠들어 버렸다. 방향은 대충 들었지만 지도는 놓쳤다.', effect: { flags: ['ex_ruin'] } } },
+      { label: '흘려듣는다', success: { text: '술자리 허풍이려니 했다. 그래도 안개 낀 산이 자꾸 눈에 밟힌다.', effect: { stats: { int: 1 } } } },
+    ],
+  },
+  {
+    id: 'a_ex_ruin_gate', title: '안개 속 유적 입구', weight: 3, focus: 'explore',
+    cond: { minAge: 18, maxAge: 58, flags: ['ex_ruin'] },
+    text: '안개를 헤치고 도착한 곳에 이끼 낀 돌문이 우뚝 서 있다. 문 한가운데에 손바닥 모양의 홈이 파여 있다.',
+    choices: [
+      { label: '손을 대고 마력을 흘린다', check: { stat: 'mana', dc: 33 },
+        success: { text: '돌문이 우르릉 소리를 내며 열렸다! 서늘한 바람과 함께 길이 드러났다.', effect: { unflags: ['ex_ruin'], flags: ['ex_ruin_in'], stats: { mana: 2 } }, tone: 'good' },
+        fail: { text: '홈에서 불꽃이 튀어 손끝이 따끔했다. 문은 꼼짝도 하지 않는다. 오늘은 물러나자.', effect: { unflags: ['ex_ruin'], stats: { vit: -3 } } } },
+      { label: '문양을 그대로 베껴 온다', success: { text: '문양을 꼼꼼히 베껴 두었다. 훗날 학자들이 값을 쳐줄지도 모른다.', effect: { unflags: ['ex_ruin'], stats: { int: 2 }, gold: 30 } } },
+    ],
+  },
+  {
+    id: 'a_ex_ruin_vault', title: '유적의 작은 보물 방', weight: 4, focus: 'explore',
+    cond: { minAge: 18, maxAge: 58, flags: ['ex_ruin_in'] },
+    text: '복도 끝 방에는 먼지 쌓인 상자들이 줄줄이 놓여 있다. 한쪽 벽에는 오래된 벽화가 빛난다.',
+    choices: [
+      { label: '상자를 하나씩 연다', check: { stat: 'luck', dc: 34 },
+        success: { text: '세 번째 상자에서 은화 한 보따리와 옛 부적이 나왔다! 소소하지만 쏠쏠한 수확이다.', effect: { unflags: ['ex_ruin_in'], gold: 120, stats: { luck: 2, fame: 2 } }, tone: 'good' },
+        fail: { text: '상자는 대부분 텅 비어 있었다. 먼지만 잔뜩 뒤집어쓰고 돌아왔다.', effect: { unflags: ['ex_ruin_in'], stats: { vit: -2 } } } },
+      { label: '벽화를 해독한다', check: { stat: 'int', dc: 34 },
+        success: { text: '벽화는 옛 왕국의 별자리 지도였다. 학자들이 보면 눈이 휘둥그레질 발견이다.', effect: { unflags: ['ex_ruin_in'], stats: { int: 3, fame: 2 } }, tone: 'good' },
+        fail: { text: '아무리 봐도 알아볼 수 없는 문자뿐이었다. 그림이라도 예쁘니 위안이 된다.', effect: { unflags: ['ex_ruin_in'], stats: { int: 1 } } } },
+    ],
+  },
+
+  // 항해
+  {
+    id: 'a_ex_harbor_ship', title: '항구의 모집 공고', weight: 1.5, focus: 'explore',
+    cond: { minAge: 18, maxAge: 55, notFlags: ['ex_voyage'] },
+    text: '항구 게시판에 새 공고가 붙었다. "동쪽 군도로 떠날 선원 구함. 일당 후함, 파도는 보장 못 함."',
+    choices: [
+      { label: '선원으로 지원한다', check: { stat: 'vit', dc: 30 },
+        success: { text: '선장이 팔뚝을 한 번 보더니 "합격!"이라고 외쳤다. 돛이 펄럭이며 배가 항구를 떠났다.', effect: { flags: ['ex_voyage'], stats: { vit: 1 } }, tone: 'good' },
+        fail: { text: '밧줄 매듭 시험에서 세 번 연속 풀려 버렸다. 선장이 한숨을 쉬었다. "다음 배에 와라."', effect: { stats: { int: 1 } } } },
+      { label: '구경만 하고 돌아선다', success: { text: '갈매기 소리와 소금 냄새를 맡으며 한참 부두를 거닐었다.', effect: { mood: 'calm' } } },
+    ],
+  },
+  {
+    id: 'a_ex_sea_storm', title: '바다 위의 폭풍', weight: 4, focus: 'explore',
+    cond: { minAge: 18, maxAge: 55, flags: ['ex_voyage'] },
+    text: '출항 사흘째, 수평선이 새까맣게 변했다. 선장이 외친다. "돛을 접어라! 폭풍이다!"',
+    choices: [
+      { label: '돛 줄을 붙잡는다', check: { stat: 'vit', dc: 34 },
+        success: { text: '파도에 온몸이 흠뻑 젖었지만 돛을 지켜 냈다. 선원들이 환호하며 어깨를 두드렸다.', effect: { stats: { vit: 2, fame: 2 } }, tone: 'good' },
+        fail: { text: '파도에 휩쓸려 갑판을 데굴데굴 굴렀다. 멍투성이가 됐지만 배는 무사했다.', effect: { stats: { vit: -6 } } } },
+      { label: '선실에서 짐을 단속한다', success: { text: '굴러다니는 상자를 묶느라 정신없었지만, 덕분에 화물이 하나도 상하지 않았다.', effect: { stats: { int: 1 }, gold: 20 } } },
+    ],
+  },
+  {
+    id: 'a_ex_island_landing', title: '이름 없는 섬', weight: 4, focus: 'explore',
+    cond: { minAge: 18, maxAge: 55, flags: ['ex_voyage'] },
+    text: '폭풍이 지나가자 눈앞에 하얀 백사장의 작은 섬이 나타났다. 야자수 사이로 반짝이는 무언가가 보인다.',
+    choices: [
+      { label: '섬 안쪽을 탐사한다', check: { stat: 'luck', dc: 33 },
+        success: { text: '모래 속에서 오래된 도자기와 진주가 나왔다! 선장이 몫을 나눠 주었다.', effect: { unflags: ['ex_voyage'], gold: 150, stats: { luck: 2, fame: 2 } }, tone: 'good' },
+        fail: { text: '게 떼와 벌레만 잔뜩 만났다. 그래도 일몰 풍경만은 값을 매길 수 없었다.', effect: { unflags: ['ex_voyage'], stats: { vit: 1 }, mood: 'calm' } } },
+      { label: '해변에서 조개를 줍는다', success: { text: '조개 구이로 선원들과 연회를 열었다. 항해 중 가장 맛있는 식사였다.', effect: { unflags: ['ex_voyage'], stats: { cha: 2 }, mood: 'joy' } } },
+    ],
+  },
+
+  // 대상 호위
+  {
+    id: 'a_ex_caravan_guard', title: '대상단 호위', weight: 1.5, focus: 'explore',
+    cond: { minAge: 18, maxAge: 55, notFlags: ['ex_caravan'] },
+    text: '사막 건너 오아시스 도시로 가는 대상단이 호위를 모집한다. "낙타는 우리가, 모험은 당신이!"',
+    choices: [
+      { label: '호위를 맡는다', check: { stat: 'vit', dc: 30 },
+        success: { text: '대상 대장이 무기와 물통을 건넸다. 낙타 행렬이 모래 능선을 넘기 시작한다.', effect: { flags: ['ex_caravan'], stats: { vit: 1 } }, tone: 'good' },
+        fail: { text: '낙타가 당신만 보면 고개를 홱 돌린다. 호위보다 낙타 달래기가 힘들 것 같아 물러났다.', effect: { stats: { cha: -1 } } } },
+      { label: '정중히 사양한다', success: { text: '사막은 아직 무섭다. 대신 시장에서 모래 지도를 한 장 샀다.', effect: { gold: -5, stats: { int: 1 } } } },
+    ],
+  },
+  {
+    id: 'a_ex_oasis_mirage', title: '사막의 신기루', weight: 4, focus: 'explore',
+    cond: { minAge: 18, maxAge: 55, flags: ['ex_caravan'] },
+    text: '뜨거운 모래바람 너머로 푸른 호수와 야자수가 아른거린다. 낙타가 그쪽으로 걸음을 틀려 한다.',
+    choices: [
+      { label: '고삐를 당겨 막는다', check: { stat: 'int', dc: 32 },
+        success: { text: '"저건 신기루야!" 방위를 확인하자 정말 반대편에 진짜 오아시스가 있었다.', effect: { stats: { int: 2, fame: 2 } }, tone: 'good' },
+        fail: { text: '반쯤 속아 한참을 돌았다. 물이 바닥나 목이 바싹 말랐지만 대상단 덕에 살았다.', effect: { stats: { vit: -5 } } } },
+      { label: '대장에게 맡긴다', success: { text: '노련한 대장이 코웃음을 치며 길을 돌렸다. 역시 경험은 못 이긴다.', effect: { stats: { luck: 1 } } } },
+    ],
+  },
+  {
+    id: 'a_ex_caravan_arrive', title: '오아시스 도시 도착', weight: 4, focus: 'explore',
+    cond: { minAge: 18, maxAge: 55, flags: ['ex_caravan'] },
+    text: '황금빛 성벽과 시끌벅적한 시장이 시야에 들어왔다. 대상 대장이 웃으며 품삯 주머니를 던졌다.',
+    choices: [
+      { label: '시장을 마음껏 구경한다', success: { text: '향신료, 비단, 요상한 악기. 눈이 돌아갈 만큼 신기한 물건이 가득했다.', effect: { unflags: ['ex_caravan'], gold: 60, stats: { cha: 1, int: 1 }, mood: 'joy' } } },
+      { label: '대상단 일을 더 돕는다', check: { stat: 'cha', dc: 30 },
+        success: { text: '짐 정리를 도왔더니 대장이 수고비를 얹어 주었다. "다음에도 같이 가자!"', effect: { unflags: ['ex_caravan'], gold: 100, stats: { cha: 2, fame: 1 } }, tone: 'good' },
+        fail: { text: '짐을 정리하다 항아리를 깨뜨렸다. 품삯에서 약간 깎였다.', effect: { unflags: ['ex_caravan'], gold: 30 } } },
+    ],
+  },
+
+  // 숲의 정령
+  {
+    id: 'a_ex_spirit_path', title: '숲의 속삭임', weight: 1.5, focus: 'explore',
+    cond: { minAge: 18, maxAge: 60, notFlags: ['ex_spirit'] },
+    text: '약초를 캐러 숲에 들어갔는데 나무들이 바스락거리며 길을 알려 주는 것 같다. 반딧불이 앞서 날아간다.',
+    choices: [
+      { label: '반딧불을 따라간다', check: { stat: 'luck', dc: 30 },
+        success: { text: '이끼 낀 오솔길이 열렸다. 공기가 달콤해지고 숲 전체가 숨을 쉬는 듯하다.', effect: { flags: ['ex_spirit'], stats: { luck: 1, mana: 1 } }, tone: 'good' },
+        fail: { text: '반딧불이 갑자기 흩어져 버렸다. 길을 잃고 한참 헤맸다.', effect: { stats: { vit: -2 } } } },
+      { label: '길을 표시하고 돌아간다', success: { text: '나뭇가지에 리본을 묶어 놓았다. 내일 다시 오면 알 수 있겠지.', effect: { stats: { int: 1 } } } },
+    ],
+  },
+  {
+    id: 'a_ex_spirit_grove', title: '정령의 쉼터', weight: 4, focus: 'explore',
+    cond: { minAge: 18, maxAge: 60, flags: ['ex_spirit'] },
+    text: '오솔길 끝, 달빛이 고인 샘 위에서 작은 빛의 정령들이 춤추고 있다. 당신을 보고도 도망치지 않는다.',
+    choices: [
+      { label: '조용히 샘물을 마신다', success: { text: '차가운 물이 목을 타고 흐르자 온몸의 피로가 사라졌다. 정령들이 고개를 끄덕이는 듯했다.', effect: { unflags: ['ex_spirit'], stats: { vit: 2, mana: 2 }, stress: -15, mood: 'calm' }, tone: 'good' } },
+      { label: '정령에게 말을 걸어 본다', check: { stat: 'cha', dc: 32 },
+        success: { text: '정령이 당신 어깨에 앉아 속삭였다. 그 뒤로 숲길에서 이상하게 운이 따른다.', effect: { unflags: ['ex_spirit'], stats: { luck: 3, cha: 1 } }, tone: 'good' },
+        fail: { text: '정령들이 까르르 웃으며 흩어졌다. 샘은 그대로지만 마음은 간질간질했다.', effect: { unflags: ['ex_spirit'], mood: 'joy' } } },
+    ],
+  },
+
+  // 괴수 발자국
+  {
+    id: 'a_ex_giant_tracks', title: '거대한 발자국', weight: 1.5, focus: 'explore',
+    cond: { minAge: 18, maxAge: 55, notFlags: ['ex_beast'] },
+    text: '진흙 위에 사람 몸통만 한 발자국이 선명하다. 나뭇가지가 꺾이고 풀이 눌린 흔적이 숲 안쪽으로 이어진다.',
+    choices: [
+      { label: '흔적을 따라가 본다', check: { stat: 'int', dc: 30 },
+        success: { text: '발자국의 깊이와 간격으로 크기를 가늠했다. 큰 곰 비슷한 놈이다. 굴 근처까지 접근했다.', effect: { flags: ['ex_beast'], stats: { int: 2 } } },
+        fail: { text: '흔적이 갑자기 끊겼다. 숲을 두 바퀴 돌고 나서야 제자리로 돌아왔다.', effect: { stats: { vit: -2 } } } },
+      { label: '마을에 알린다', success: { text: '사냥꾼들이 고개를 끄덕이며 경계를 서기로 했다. 작은 사례금이 돌아왔다.', effect: { gold: 20, karma: 2 } } },
+    ],
+  },
+  {
+    id: 'a_ex_beast_den', title: '괴수의 굴 앞에서', weight: 4, focus: 'explore',
+    cond: { minAge: 18, maxAge: 55, flags: ['ex_beast'] },
+    text: '굴 입구에서 낮은 콧김 소리가 새어 나온다. 안쪽에 커다란 그림자가 웅크리고 있다.',
+    choices: [
+      { label: '먹이를 놓고 조용히 물러난다', check: { stat: 'luck', dc: 30 },
+        success: { text: '괴수는 고기 한 덩이를 물고 굴로 사라졌다. 알고 보니 새끼를 돌보는 어미였다. 평화로운 합의다.', effect: { unflags: ['ex_beast'], karma: 4, stats: { luck: 2 } }, tone: 'good' },
+        fail: { text: '괴수가 으르렁대며 나왔다! 필사적으로 도망쳐 간신히 따돌렸다.', effect: { unflags: ['ex_beast'], stats: { vit: -6 } } } },
+      { label: '횃불로 쫓아낸다', check: { stat: 'vit', dc: 34 },
+        success: { text: '횃불을 휘두르자 괴수가 겁을 먹고 산속 깊이 도망쳤다. 마을 사람들이 고마워했다.', effect: { unflags: ['ex_beast'], stats: { vit: 2, fame: 3 } }, tone: 'good' },
+        fail: { text: '앞머리가 훌러덩 그을렸다. 괴수는 코웃음을 치며 굴 안으로 들어가 버렸다.', effect: { unflags: ['ex_beast'], stats: { vit: -4, cha: -1 } } } },
+    ],
+  },
+
+  // 숨겨진 문
+  {
+    id: 'a_ex_hidden_door', title: '수상한 벽', weight: 1.5, focus: 'explore',
+    cond: { minAge: 18, maxAge: 60, notFlags: ['ex_hidden'] },
+    text: '오래된 여관 지하 창고에서 벽 한 곳만 공기가 다르다. 손을 대 보니 미세한 바람이 흘러나온다.',
+    choices: [
+      { label: '벽을 두드려 본다', check: { stat: 'int', dc: 30 },
+        success: { text: '탁, 탁, 텅! 속이 빈 소리가 났다. 돌 하나를 누르자 벽이 스르륵 열렸다.', effect: { flags: ['ex_hidden'], stats: { int: 1 } }, tone: 'good' },
+        fail: { text: '두드린 건 맞는데 주인에게 들켜 창고 정리를 도와야 했다.', effect: { stats: { vit: 1 } } } },
+      { label: '못 본 척한다', success: { text: '호기심은 고양이를 죽인다고 했다. 포도주 한 병만 슬쩍 챙기고 올라왔다.', effect: { gold: -3 } } },
+    ],
+  },
+  {
+    id: 'a_ex_secret_passage', title: '비밀 통로', weight: 4, focus: 'explore',
+    cond: { minAge: 18, maxAge: 60, flags: ['ex_hidden'] },
+    text: '벽 너머로 좁은 통로가 어둠 속으로 이어진다. 바닥에 오래된 발자국이 하나 찍혀 있다.',
+    choices: [
+      { label: '등불을 들고 걸어 들어간다', check: { stat: 'vit', dc: 30 },
+        success: { text: '통로 끝은 마을 밖 숲의 오래된 우물로 이어졌다! 밀수꾼들이 쓰던 길이었나 보다.', effect: { unflags: ['ex_hidden'], stats: { vit: 1, luck: 1, fame: 1 }, gold: 40 } },
+        fail: { text: '거미줄과 먼지 때문에 재채기가 멈추지 않았다. 결국 되돌아 나왔다.', effect: { unflags: ['ex_hidden'], stats: { vit: -2 } } } },
+      { label: '입구를 다시 막아 둔다', success: { text: '"비밀은 비밀로 두는 게 좋지." 벽을 원래대로 되돌렸다. 마음이 한결 편안해졌다.', effect: { unflags: ['ex_hidden'], karma: 2 } } },
+    ],
+  },
+
+  // 단발 모험
+  {
+    id: 'a_ex_canyon_bridge', title: '협곡의 흔들다리', weight: 1.5, focus: 'explore',
+    cond: { minAge: 18, maxAge: 58 },
+    text: '깊은 협곡 위에 낡은 밧줄 다리가 한 줄 걸려 있다. 건너편에 지름길이 보인다.',
+    choices: [
+      { label: '재빨리 건넌다', check: { stat: 'vit', dc: 30 },
+        success: { text: '다리가 출렁거렸지만 끝까지 해냈다. 건너편에서 바라본 풍경이 장관이었다.', effect: { stats: { vit: 2, luck: 1 }, mood: 'joy' } },
+        fail: { text: '발판 하나가 뚝 부러졌다! 아슬아슬하게 밧줄을 붙잡고 되돌아왔다.', effect: { stats: { vit: -4 }, mood: 'fear' } } },
+      { label: '돌아서 먼 길로 간다', success: { text: '이틀이나 더 걸렸지만 발은 땅에 닿아 있었다. 안전이 제일이다.', effect: { stats: { int: 1 } } } },
+    ],
+  },
+  {
+    id: 'a_ex_hot_spring', title: '숨겨진 온천', weight: 1.5, focus: 'explore',
+    cond: { minAge: 18, maxAge: 60 },
+    text: '산길을 오르는데 코끝에 유황 냄새가 스친다. 바위 사이로 김이 모락모락 피어오른다.',
+    choices: [
+      { label: '몸을 담근다', success: { text: '온몸의 근육이 사르르 풀렸다. 눈을 감자 산새 소리가 자장가처럼 들렸다.', effect: { stats: { vit: 2 }, stress: -20, mood: 'calm' }, tone: 'good' } },
+      { label: '주변을 둘러본다', check: { stat: 'luck', dc: 28 },
+        success: { text: '바위 틈에서 광석이 반짝였다. 작은 수정을 몇 개 주워 돌아왔다.', effect: { gold: 40, stats: { luck: 1 } } },
+        fail: { text: '온천물을 튀기려다 오히려 홀딱 젖어 버렸다. 그래도 개운하다.', effect: { stats: { vit: 1 } } } },
+    ],
+  },
+  {
+    id: 'a_ex_glacier', title: '빙하 횡단', weight: 1, focus: 'explore',
+    cond: { minAge: 18, maxAge: 52 },
+    text: '북쪽 산맥의 빙하가 햇빛에 눈부시게 빛난다. 건너편 마을로 가는 가장 빠른 길이다.',
+    choices: [
+      { label: '아이젠을 차고 걷는다', check: { stat: 'vit', dc: 33 },
+        success: { text: '얼음 갈라진 틈을 요리조리 피해 무사히 건넜다. 마을 사람들이 신기한 눈으로 쳐다봤다.', effect: { stats: { vit: 2, fame: 2 } }, tone: 'good' },
+        fail: { text: '미끄러져 한참을 데굴데굴 굴렀다. 엉덩이에 멍이 들었지만 뼈는 무사하다.', effect: { stats: { vit: -5 } } } },
+      { label: '안내인을 고용한다', success: { text: '안내인의 노련한 발걸음 덕에 순조로웠다. 길 위에서 들은 산 이야기가 재미났다.', effect: { gold: -20, stats: { int: 1 } } } },
+    ],
+  },
+  {
+    id: 'a_ex_shipwreck', title: '해안의 난파선', weight: 1.5, focus: 'explore',
+    cond: { minAge: 18, maxAge: 58 },
+    text: '썰물 때 드러난 모래톱 위에 오래된 난파선이 반쯤 묻혀 있다. 갑판 틈 사이로 무언가 반짝인다.',
+    choices: [
+      { label: '밀물 전에 뒤져 본다', check: { stat: 'luck', dc: 32 },
+        success: { text: '녹슨 상자에서 금속 장신구와 오래된 동전이 쏟아졌다! 파도가 밀려오기 직전 탈출 성공.', effect: { gold: 90, stats: { luck: 2, fame: 1 } }, tone: 'good' },
+        fail: { text: '밀물이 예상보다 빨랐다. 허리까지 젖은 채 빈손으로 도망쳐 나왔다.', effect: { stats: { vit: -3 } } } },
+      { label: '선체를 스케치한다', success: { text: '선체의 문양을 그림으로 남겼다. 어느 나라 배일까, 상상하는 것만으로 즐겁다.', effect: { stats: { int: 1, cha: 1 } } } },
+    ],
+  },
+  {
+    id: 'a_ex_balloon', title: '시험 비행 기구', weight: 1, focus: 'explore',
+    cond: { minAge: 18, maxAge: 55 },
+    text: '마법 공방 앞마당에서 거대한 열기구가 부풀어 오른다. 기술자가 외친다. "시험 비행 동승자 구함!"',
+    choices: [
+      { label: '동승한다', check: { stat: 'luck', dc: 32 },
+        success: { text: '구름 위로 올라서자 세상이 장난감처럼 작아졌다. 착륙은 조금 거칠었지만 평생 잊지 못할 경험이다.', effect: { stats: { luck: 2, fame: 2 }, mood: 'joy' }, tone: 'good' },
+        fail: { text: '바람이 변덕을 부려 엉뚱한 호수에 불시착했다. 흠뻑 젖었지만 모두 무사하다.', effect: { stats: { vit: -2 }, mood: 'joy' } } },
+      { label: '지상에서 구경만 한다', success: { text: '둥실 떠오르는 모습을 한참 올려다보았다. 언젠가는 나도 타 보고 싶다.', effect: { stats: { int: 1 } } } },
+    ],
+  },
+  {
+    id: 'a_ex_floating_market', title: '수상 시장', weight: 1.5,
+    cond: { minAge: 18, maxAge: 60 },
+    text: '새벽 안개 속에서 수십 척의 조각배가 물 위에 모여든다. 과일, 비단, 보석이 배에서 배로 오간다.',
+    choices: [
+      { label: '배를 타고 흥정한다', check: { stat: 'cha', dc: 30 },
+        success: { text: '흥정 끝에 희귀한 향료를 반값에 샀다. 되팔면 이득이 꽤 남을 것 같다.', effect: { gold: 60, stats: { cha: 2 } }, tone: 'good' },
+        fail: { text: '바가지를 쓰고 말았다. 노를 놓쳐 물에 빠질 뻔한 것은 덤이다.', effect: { gold: -20, stats: { cha: 1 } } } },
+      { label: '구경하며 간식을 먹는다', success: { text: '튀김과 단술을 맛보며 안개가 걷힐 때까지 시장 구경을 했다.', effect: { stats: { vit: 1 }, mood: 'joy' } } },
+    ],
+  },
+  {
+    id: 'a_ex_toll_gate', title: '산길의 통행료', weight: 1.5,
+    cond: { minAge: 18, maxAge: 58 },
+    text: '산길 한복판에 밧줄이 쳐져 있다. 허름한 차림의 사내가 손을 내밀었다. "통행료는 은화 두 닢이오."',
+    choices: [
+      { label: '통행료를 낸다', success: { text: '사내가 "고맙소" 하며 길을 터 주었다. 의외로 산적이 아니라 마을 주민이었다.', effect: { gold: -10, karma: 1 } } },
+      { label: '말솜씨로 깎아 본다', check: { stat: 'cha', dc: 30 },
+        success: { text: '이야기를 나누다 보니 사내가 오히려 간식을 나눠 줬다. 통행료는 면제!', effect: { stats: { cha: 2 }, mood: 'joy' } },
+        fail: { text: '말다툼 끝에 통행료는 세 닢으로 올랐다. 입이 방정이다.', effect: { gold: -15, stats: { cha: -1 } } } },
+      { label: '다른 길로 돌아간다', success: { text: '돌아가느라 한나절이 더 걸렸지만 길가의 야생 딸기를 실컷 따 먹었다.', effect: { stats: { vit: 1 } } } },
+    ],
+  },
+  {
+    id: 'a_ex_meteor_site', title: '별똥별 떨어진 자리', weight: 1,
+    cond: { minAge: 18, maxAge: 60 },
+    text: '어젯밤 하늘을 가른 별똥별이 근처 언덕에 떨어졌다는 소문이 돈다. 새벽부터 구경꾼이 줄을 섰다.',
+    choices: [
+      { label: '현장을 살펴본다', check: { stat: 'luck', dc: 32 },
+        success: { text: '움푹 파인 땅 속에서 따뜻한 푸른 돌 조각을 주웠다. 불을 가까이하면 은은히 빛난다.', effect: { gold: 70, stats: { mana: 2, luck: 1 } }, tone: 'good' },
+        fail: { text: '남은 건 그을린 땅과 인파뿐이었다. 그래도 하늘을 올려다볼 이유가 늘었다.', effect: { stats: { int: 1 } } } },
+      { label: '밤하늘을 기록한다', success: { text: '별의 위치를 그려 두었다. 학자들이 보면 흥미를 가질 만한 기록이다.', effect: { stats: { int: 2 } } } },
+    ],
+  },
+  {
+    id: 'a_ex_underground_river', title: '지하 강의 뗏목', weight: 1.5, focus: 'explore',
+    cond: { minAge: 18, maxAge: 55 },
+    text: '동굴 안쪽에서 물 흐르는 소리가 울린다. 어둠 속에서 누군가 버린 뗏목이 물결에 흔들리고 있다.',
+    choices: [
+      { label: '뗏목을 타고 내려간다', check: { stat: 'vit', dc: 32 },
+        success: { text: '물살이 빨라졌지만 노를 능숙하게 놀렸다. 끝에는 푸른 이끼로 빛나는 지하 정원이 펼쳐졌다!', effect: { stats: { vit: 2, fame: 2, luck: 1 } }, tone: 'good' },
+        fail: { text: '물살에 휩쓸려 뗏목이 뒤집혔다. 온몸이 물에 젖은 채 기어 나왔다.', effect: { stats: { vit: -4 } } } },
+      { label: '강가를 따라 걷는다', success: { text: '천장의 석순이 만들어 낸 풍경에 넋을 잃었다. 시간이 가는 줄 몰랐다.', effect: { stats: { int: 1 }, mood: 'calm' } } },
+    ],
+  },
+  {
+    id: 'a_ex_statue_puzzle', title: '조각상의 수수께끼', weight: 1.5, focus: 'study',
+    cond: { minAge: 18, maxAge: 60 },
+    text: '고대 광장의 석상 세 개가 서로 다른 방향을 가리키고 있다. 받침돌에는 이렇게 새겨져 있다. "진실을 가리키는 이는 하나."',
+    choices: [
+      { label: '수수께끼를 푼다', check: { stat: 'int', dc: 34 },
+        success: { text: '순서대로 돌리자 받침돌 아래에서 작은 서랍이 열렸다. 오래된 금화 몇 닢이 들어 있다!', effect: { gold: 80, stats: { int: 2, fame: 1 } }, tone: 'good' },
+        fail: { text: '아무리 돌려도 반응이 없다. 오히려 석상이 날 비웃는 듯하다.', effect: { stats: { int: 1 } } } },
+      { label: '그냥 지나친다', success: { text: '옛사람의 장난이려니 했다. 골치 아픈 수수께끼는 사양이다.', effect: { stress: -3 } } },
+    ],
+  },
+  {
+    id: 'a_ex_swamp_hut', title: '늪지의 오두막', weight: 1.5, focus: 'explore',
+    cond: { minAge: 18, maxAge: 58 },
+    text: '안개 낀 늪 한가운데에 오두막이 있고 굴뚝에서 연기가 솔솔 올라온다. 문 앞에 개구리 인형이 줄지어 놓여 있다.',
+    choices: [
+      { label: '문을 두드린다', check: { stat: 'cha', dc: 30 },
+        success: { text: '수상한 할머니가 약초차를 내주었다. 한 모금에 피로가 싹 풀렸다. "또 와도 좋다, 아해야."', effect: { stats: { vit: 2, mana: 1 }, stress: -10 }, tone: 'good' },
+        fail: { text: '문이 벌컥 열리며 개구리 합창이 쏟아졌다. 도망치듯 나왔지만 이상하게 웃음이 났다.', effect: { stats: { luck: 1 }, mood: 'joy' } } },
+      { label: '멀리서 지켜본다', success: { text: '연기 모양이 점점 개구리 형상으로 변했다. 역시 이곳은 수상쩍다.', effect: { stats: { int: 1 } } } },
+    ],
+  },
+  {
+    id: 'a_ex_giant_mushroom', title: '거대 버섯 숲', weight: 1, focus: 'explore',
+    cond: { minAge: 18, maxAge: 60 },
+    text: '비 온 뒤의 숲에 집채만 한 버섯이 우후죽순 솟아 있다. 갓 아래에서 은은한 빛이 새어 나온다.',
+    choices: [
+      { label: '갓 아래를 탐험한다', check: { stat: 'luck', dc: 30 },
+        success: { text: '버섯 포자가 반짝반짝 떠올라 숲 전체가 별밤처럼 빛났다. 희귀한 약초도 챙겼다.', effect: { gold: 50, stats: { luck: 2 }, mood: 'joy' }, tone: 'good' },
+        fail: { text: '포자를 들이마시고 재채기가 하루 종일 멈추지 않았다.', effect: { stats: { vit: -2 } } } },
+      { label: '그림으로 남긴다', success: { text: '스케치북이 금세 버섯으로 가득 찼다. 이 풍경은 오래도록 기억에 남을 것이다.', effect: { stats: { int: 1, cha: 1 } } } },
+    ],
+  },
+  {
+    id: 'a_ex_lighthouse', title: '외딴 등대', weight: 1.5,
+    cond: { minAge: 18, maxAge: 60 },
+    text: '절벽 위 외딴 등대지기가 손짓한다. "오늘 밤 안개가 짙어서 말이야, 불 지피는 걸 도와줄 사람 없나?"',
+    choices: [
+      { label: '밤새 불을 지킨다', check: { stat: 'vit', dc: 28 },
+        success: { text: '새벽녘, 안개 사이로 배들이 무사히 항구로 들어오는 것이 보였다. 등대지기가 따뜻한 차를 내밀었다.', effect: { stats: { vit: 1, fame: 1 }, karma: 4, mood: 'calm' }, tone: 'good' },
+        fail: { text: '꾸벅꾸벅 졸다 불이 약해졌지만, 등대지기가 재빨리 수습했다. 얼굴이 화끈거린다.', effect: { stats: { cha: -1 }, karma: 1 } } },
+      { label: '일몰만 구경한다', success: { text: '등대 위에서 본 석양은 말로 설명할 수 없는 색이었다.', effect: { mood: 'calm', stats: { luck: 1 } } } },
+    ],
+  },
+  {
+    id: 'a_ex_old_adventurer', title: '은퇴한 모험가', weight: 1.5, focus: 'social',
+    cond: { minAge: 18, maxAge: 60 },
+    text: '주점 한구석에서 팔뚝에 상처 투성이인 노인이 혼자 술잔을 기울인다. 모험담을 들려 달라는 아이들에게 둘러싸여 있다.',
+    choices: [
+      { label: '자리에 끼어 이야기를 듣는다', success: { text: '용 비늘을 닦던 이야기, 눈보라 속 탈출기. 노인의 이야기가 끝날 때쯤 소매에서 작은 부적이 굴러떨어졌다.', effect: { stats: { int: 1, cha: 1, luck: 1 }, mood: 'joy' }, tone: 'good' } },
+      { label: '한 수 가르쳐 달라고 청한다', check: { stat: 'cha', dc: 30 },
+        success: { text: '노인이 껄껄 웃으며 모험의 요령을 몇 가지 알려 주었다. "도망칠 때를 아는 게 제일 중요하지."', effect: { stats: { vit: 1, int: 2 } }, tone: 'good' },
+        fail: { text: '"젊은 놈이 건방지게!" 호통만 듣고 쫓겨났다. 그래도 배운 건 하나 있다. 노인에게는 예의를.', effect: { stats: { cha: 1 } } } },
+    ],
+  },
+  {
+    id: 'a_ex_stray_cart', title: '고장 난 마차', weight: 1.5,
+    cond: { minAge: 18, maxAge: 60 },
+    text: '길가에서 바퀴가 빠진 상인 마차가 서 있다. 상인이 땀을 뻘뻘 흘리며 손짓한다. "어이, 거기! 힘 좀 빌려주겠나?"',
+    choices: [
+      { label: '바퀴를 함께 끼운다', check: { stat: 'vit', dc: 28 },
+        success: { text: '영차! 바퀴가 철컥 들어맞았다. 상인이 감사의 뜻으로 신기한 과일 한 상자를 건넸다.', effect: { gold: 30, stats: { vit: 1 }, karma: 3 }, tone: 'good' },
+        fail: { text: '힘을 주다 허리를 삐끗했다. 결국 둘이 앉아 마차 고치는 법을 한참 토론했다.', effect: { stats: { vit: -2, int: 1 } } } },
+      { label: '지나가는 사람을 불러온다', success: { text: '마을에서 장정 두 명을 데려오자 순식간에 해결되었다. 상인이 연신 고개를 숙였다.', effect: { karma: 2, stats: { cha: 1 } } } },
+    ],
+  },
 ];

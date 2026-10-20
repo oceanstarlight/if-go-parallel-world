@@ -410,4 +410,250 @@ export const CHAIN_EVENTS: GameEvent[] = [
       { label: '시골로 은퇴한다', success: { text: '농지와 작은 집. 전설의 영웅은 이제 호박을 키운다.', effect: { job: 'farmer', own: 'land', stress: -40, mood: 'joy' }, tone: 'good' } },
     ],
   },
+
+  // ═════ 라이벌과의 십 년 (소년기 맹세 → 성장 → 재회 → 결전) ═════
+  {
+    id: 'rv_oath', title: '십 년 뒤의 약속', once: true, weight: 3,
+    cond: { minAge: 13, maxAge: 17, hasRel: ['rival'] },
+    text: '노을 진 언덕에서 {rival:이} 목검 끝을 당신에게 겨눴다. "오늘은 무승부로 해 두지. 십 년 뒤, 이 자리에서 진짜 승부다!"',
+    choices: [
+      { label: '"좋아, 약속이다!"', success: { text: '서로 목검을 부딪쳐 약속을 새겼다. 어쩐지 십 년 뒤가 벌써 기다려진다.', effect: { flags: ['rv_oath'], rel: { rival: 8 }, stats: { vit: 1 }, mood: 'joy' }, tone: 'good' } },
+      { label: '"그때까지 기억하면"', success: { text: '{rival:은} 코웃음을 쳤지만 목검을 거두며 슬쩍 웃었다. 잊지 못할 것 같은 얼굴이다.', effect: { flags: ['rv_oath'], stats: { luck: 1 } } } },
+      { label: '대답 없이 돌아선다', success: { text: '"도망치는 거냐!" {rival:의} 목소리가 노을 속에 울렸다. 이상하게 귀에 오래 남았다.', effect: { rel: { rival: -8 }, stats: { cha: 1 } } } },
+    ],
+  },
+  {
+    id: 'rv_rising', title: '들려오는 라이벌의 소문', once: true, weight: 6,
+    cond: { minAge: 19, maxAge: 32, hasRel: ['rival'], flags: ['rv_oath'] },
+    text: '장터에서 {rival:의} 소문이 들려온다. 요즘 눈에 띄게 이름을 날리고 있다고 한다. 가슴 한구석이 뜨끔하다.',
+    choices: [
+      { label: '지지 않으려 수련에 매달린다', check: { stat: 'vit', dc: 32 },
+        success: { text: '매일 새벽 땀을 쏟았다. 몸이 눈에 띄게 달라졌다. 십 년의 약속은 반드시 지킨다.', effect: { flags: ['rv_rising'], stats: { vit: 3, mana: 2 } }, tone: 'good' },
+        fail: { text: '무리하다 몸살이 났다. 그래도 {rival:에게} 질 수는 없다는 오기는 더 단단해졌다.', effect: { flags: ['rv_rising'], stats: { vit: -2, mana: 1 }, will: 5 } } },
+      { label: '정보를 모아 약점을 분석한다', check: { stat: 'int', dc: 32 },
+        success: { text: '{rival:의} 싸움 습관을 낱낱이 파악했다. 승부는 머리로 하는 거다.', effect: { flags: ['rv_rising'], stats: { int: 3, luck: 1 } }, tone: 'good' },
+        fail: { text: '정보가 잔뜩 모였지만 서로 앞뒤가 맞지 않았다. 결국 직접 겨뤄 보는 수밖에 없다.', effect: { flags: ['rv_rising'], stats: { int: 1 } } } },
+    ],
+  },
+  {
+    id: 'rv_reunion', title: '길 위의 재회', once: true, weight: 6,
+    cond: { minAge: 22, maxAge: 40, hasRel: ['rival'], flags: ['rv_rising'] },
+    text: '낯선 마을의 주점 문을 열자, 구석 자리에서 {rival:이} 술잔을 기울이고 있었다. 눈이 마주치자 입꼬리가 올라갔다.',
+    choices: [
+      { label: '합석해서 술잔을 부딪친다', success: { text: '서로의 십 년을 안주 삼아 밤새 떠들었다. "약속의 날, 잊지 마라." {rival:이} 먼저 일어섰다.', effect: { flags: ['rv_final'], rel: { rival: 12 }, stats: { cha: 1 }, mood: 'joy' }, tone: 'good' } },
+      { label: '눈인사만 하고 지나친다', success: { text: '"…기억하고 있었군." {rival:의} 중얼거림이 등 뒤로 들렸다. 굳이 말하지 않아도 알고 있다. 때가 되면 만날 것이다.', effect: { flags: ['rv_final'], stats: { luck: 1 } } } },
+    ],
+  },
+  {
+    id: 'rv_showdown', title: '십 년 만의 승부', once: true, weight: 7,
+    cond: { minAge: 25, maxAge: 48, hasRel: ['rival'], flags: ['rv_final'] },
+    text: '그 언덕에 다시 섰다. 노을도, 바람도 그날 그대로다. 맞은편에서 {rival:이} 목검 대신 진짜 검을 뽑았다. "자, 약속을 지킬 시간이다."',
+    choices: [
+      { label: '검으로 정면승부', check: { stat: 'vit', dc: 36 },
+        success: { text: '마지막 일합에 승부가 갈렸다. 쓰러진 {rival:이} 하늘을 보며 웃었다. "…십 년 걸려서 졌네."', effect: { unflags: ['rv_oath', 'rv_rising', 'rv_final'], rel: { rival: 25 }, stats: { fame: 6, vit: 2 } }, tone: 'milestone' },
+        fail: { text: '검이 허공을 날았다. 졌다. 그런데 {rival:이} 손을 내밀었다. "십 년 만에 이 정도라니, 다음 십 년이 기대되는데?"', effect: { unflags: ['rv_oath', 'rv_rising', 'rv_final'], rel: { rival: 15 }, stats: { vit: -5, fame: 2 }, will: 5 } } },
+      { label: '마법으로 승부', check: { stat: 'mana', dc: 36 },
+        success: { text: '언덕 위로 빛의 폭풍이 일었다. 먼지가 가라앉자 {rival:이} 검을 거두고 박수를 쳤다. "인정한다."', effect: { unflags: ['rv_oath', 'rv_rising', 'rv_final'], rel: { rival: 25 }, stats: { fame: 6, mana: 2 } }, tone: 'milestone' },
+        fail: { text: '마력이 빗나가 언덕 한쪽이 움푹 파였다. {rival:이} 배를 잡고 웃었다. "여전하군!"', effect: { unflags: ['rv_oath', 'rv_rising', 'rv_final'], rel: { rival: 15 }, stats: { mana: -2, fame: 2 } } } },
+      { label: '검을 내려놓고 악수를 청한다', success: { text: '"승부는 이미 십 년 동안 했잖아." {rival:은} 한참 침묵하다 손을 맞잡았다. 두 사람은 해가 질 때까지 언덕에서 나란히 앉아 있었다.', effect: { unflags: ['rv_oath', 'rv_rising', 'rv_final'], rel: { rival: 20 }, karma: 5, stats: { cha: 2 } }, tone: 'good' } },
+    ],
+  },
+
+  // ═════ 마을 열병과 약초꾼 (구한 노파 → 번지는 열병 → 월광초 → 감사) ═════
+  {
+    id: 'herb_granny', title: '쓰러진 약초꾼', once: true, weight: 3,
+    cond: { minAge: 12, maxAge: 60 },
+    text: '숲길에서 약초 바구니를 안은 노파가 주저앉아 있다. 발목이 퉁퉁 부었다. "아이고… 이 늙은이를 좀 부축해 주겠나?"',
+    choices: [
+      { label: '업고 마을까지 간다', check: { stat: 'vit', dc: 26 },
+        success: { text: '땀을 뻘뻘 흘리며 노파를 업어 날랐다. 노파가 등 뒤에서 껄껄 웃었다. "튼튼한 놈이구먼!"', effect: { flags: ['herb_granny'], karma: 5, stats: { vit: 1 } }, tone: 'good' },
+        fail: { text: '비틀거리다 둘이 함께 진흙탕에 쓰러졌다. 노파는 깔깔 웃으며 약초 반죽을 발라 주었다.', effect: { flags: ['herb_granny'], karma: 3, stats: { vit: -1 } } } },
+      { label: '근처 마을에 알린다', success: { text: '달려가 어른들을 데려왔다. 노파는 고맙다며 말린 약초 한 줌을 쥐여 주었다.', effect: { flags: ['herb_granny'], karma: 2, stats: { int: 1 } } } },
+      { label: '바쁘다며 지나친다', success: { text: '길을 서두르는 사이 노파의 한숨이 등에 걸렸다. 마음 한구석이 무겁다.', effect: { karma: -5 } } },
+    ],
+  },
+  {
+    id: 'herb_fever', title: '마을에 번진 열병', once: true, weight: 6,
+    cond: { minAge: 12, maxAge: 70, flags: ['herb_granny'] },
+    text: '며칠 뒤, 마을 사람들이 줄줄이 열병에 쓰러졌다. 약초꾼 노파가 병상을 둘러보며 중얼거렸다. "월광초가 있어야 해… 절벽 위에 딱 한 군데 피는데."',
+    choices: [
+      { label: '내가 가져오겠다고 나선다', success: { text: '"맡겨 주세요!" 노파가 지도를 그려 주었다. 오늘 밤 보름달이 뜬다.', effect: { flags: ['herb_need'], stats: { vit: 1 }, karma: 3 }, tone: 'good' } },
+      { label: '다른 약재를 구해 와 달라고 한다', success: { text: '시장을 뒤졌지만 구한 건 해열초뿐이었다. 효과는 있었지만 월광초를 대신하긴 어렵다.', effect: { flags: ['herb_need'], gold: -20 } } },
+    ],
+  },
+  {
+    id: 'herb_cliff', title: '절벽 위의 월광초', once: true, weight: 8, focus: 'explore',
+    cond: { minAge: 12, maxAge: 70, flags: ['herb_need'] },
+    text: '보름달 밤, 절벽 끝에 은빛 꽃이 반짝인다. 바람이 거세다. 한 발만 더 내딛으면 닿을 것 같은데.',
+    choices: [
+      { label: '밧줄을 묶고 내려간다', check: { stat: 'vit', dc: 30 },
+        success: { text: '손끝에 닿은 꽃잎이 따뜻했다. 한 아름 꺾어 안고 무사히 올라왔다!', effect: { flags: ['herb_cure'], unflags: ['herb_need'], stats: { vit: 2, fame: 2 } }, tone: 'good' },
+        fail: { text: '밧줄이 풀려 중간에 미끄러졌다. 멍투성이로 올라왔지만 꽃 몇 송이는 쥐고 있었다.', effect: { flags: ['herb_cure'], unflags: ['herb_need'], stats: { vit: -6 } } } },
+      { label: '운에 맡기고 가까운 곳을 뒤진다', check: { stat: 'luck', dc: 28 },
+        success: { text: '바위 틈에 숨은 월광초 군락을 발견했다! 달빛 아래 은빛으로 빛났다.', effect: { flags: ['herb_cure'], unflags: ['herb_need'], stats: { luck: 2, fame: 1 } }, tone: 'good' },
+        fail: { text: '밤새 뒤졌지만 풀뿌리뿐이었다. 해가 뜰 때까지 숨을 몰아쉬다 빈손으로 돌아왔다.', effect: { stats: { vit: -2 }, mood: 'gloom' } } },
+    ],
+  },
+  {
+    id: 'herb_thanks', title: '약초꾼의 선물', once: true, weight: 8,
+    cond: { minAge: 12, maxAge: 70, flags: ['herb_cure'] },
+    text: '월광초 달인 약을 마신 마을 사람들이 하나둘 자리에서 일어났다. 약초꾼 노파가 당신을 불러 세웠다.',
+    choices: [
+      { label: '약초 달이는 법을 배운다', success: { text: '"눈썰미가 좋구먼." 노파가 비법서를 건넸다. 약초 냄새가 옷에 배었다.', effect: { unflags: ['herb_granny', 'herb_cure'], stats: { int: 3, vit: 1 }, karma: 4 }, tone: 'good' } },
+      { label: '사례금을 받는다', success: { text: '마을 사람들이 십시일반 모은 은화 주머니가 당신 손에 쥐여졌다. 박수가 쏟아졌다.', effect: { unflags: ['herb_granny', 'herb_cure'], gold: 150, stats: { fame: 4 } }, tone: 'good' } },
+      { label: '사양하고 조용히 돌아간다', success: { text: '"할 일을 했을 뿐이에요." 노파가 빙긋 웃으며 주머니에 약초 한 줌을 몰래 넣어 주었다.', effect: { unflags: ['herb_granny', 'herb_cure'], karma: 8, stats: { luck: 2 } } } },
+    ],
+  },
+
+  // ═════ 옛 스승의 마지막 제자 (길 위의 노인 → 수련 → 시험 → 유산) ═════
+  {
+    id: 'sensei_roadside', title: '길가의 노인', once: true, weight: 3,
+    cond: { minAge: 14, maxAge: 40, notRel: ['mentor'] },
+    text: '나무 그늘에서 나이 든 방랑자가 막대기 하나로 땅에 묘한 문양을 그리고 있다. 눈이 마주치자 노인이 씩 웃었다. "자네, 재목이로군."',
+    choices: [
+      { label: '가르침을 청한다', success: { text: '"허허, 이 나이에 제자를 두게 될 줄은." 노인은 막대기를 건네며 스승이 되기로 했다.', effect: { addRel: 'mentor', flags: ['sensei_taught'], stats: { int: 1 } }, tone: 'good' } },
+      { label: '문양에 대해 물어본다', check: { stat: 'int', dc: 26 },
+        success: { text: '노인이 눈을 크게 떴다. "그걸 알아보다니!" 곧바로 수업이 시작되었다.', effect: { addRel: 'mentor', flags: ['sensei_taught'], stats: { int: 2 } }, tone: 'good' },
+        fail: { text: '엉뚱한 대답을 했지만 노인은 껄껄 웃으며 수염을 쓰다듬었다. "그래도 용기는 가상하군."', effect: { addRel: 'mentor', flags: ['sensei_taught'] } } },
+      { label: '목례만 하고 지나간다', success: { text: '노인은 아무 말 없이 다시 땅에 문양을 그렸다. 인연이 닿지 않은 것뿐이다.', effect: { stats: { luck: 1 } } } },
+    ],
+  },
+  {
+    id: 'sensei_training', title: '스승의 수련', once: true, weight: 6,
+    cond: { minAge: 14, maxAge: 50, hasRel: ['mentor'], flags: ['sensei_taught'] },
+    text: '{mentor:은} 잔소리 하나 없이 하루 종일 같은 동작만 시켰다. 사흘째, 팔은 후들거리고 머릿속은 하얘졌다.',
+    choices: [
+      { label: '입 다물고 끝까지 따른다', check: { stat: 'vit', dc: 28 },
+        success: { text: '나흘째 새벽, 동작이 몸에 스며든 것을 느꼈다. {mentor:이} 말없이 고개를 끄덕였다.', effect: { flags: ['sensei_ready'], rel: { mentor: 15 }, stats: { vit: 3 } }, tone: 'good' },
+        fail: { text: '중간에 팔이 풀려 주저앉았다. {mentor:은} 혀를 차면서도 물 한 바가지를 건넸다. "내일 다시."', effect: { rel: { mentor: 5 }, stats: { vit: 1 }, will: 3 } } },
+      { label: '왜 이 동작인지 묻는다', check: { stat: 'int', dc: 28 },
+        success: { text: '"그걸 묻는 자는 드물지." {mentor:이} 원리를 하나하나 풀어 주었다. 동작이 의미를 갖자 몸이 달라졌다.', effect: { flags: ['sensei_ready'], rel: { mentor: 12 }, stats: { int: 3 } }, tone: 'good' },
+        fail: { text: '"묻기 전에 몸이 알게 하게." 호통과 함께 다시 동작을 반복했다.', effect: { rel: { mentor: 3 }, stats: { int: 1 } } } },
+    ],
+  },
+  {
+    id: 'sensei_trial', title: '스승의 시험', once: true, weight: 7,
+    cond: { minAge: 15, maxAge: 55, hasRel: ['mentor'], flags: ['sensei_ready'] },
+    text: '{mentor:이} 낡은 나무 막대기를 하나 던졌다. "마지막 시험일세. 이 막대로 저 바위를 갈라 보게."',
+    choices: [
+      { label: '숨을 고르고 힘을 모은다', check: { stat: 'vit', dc: 32 },
+        success: { text: '막대가 바위에 닿는 순간, 소리 없이 바위가 둘로 갈라졌다! {mentor:이} 이를 드러내며 활짝 웃었다.', effect: { flags: ['sensei_heir'], unflags: ['sensei_ready'], stats: { vit: 3, fame: 2 } }, tone: 'milestone' },
+        fail: { text: '막대만 부러졌다. {mentor:이} 박장대소했다. "부러진 막대로도 한번 해 보겠나?"', effect: { unflags: ['sensei_ready'], flags: ['sensei_taught'], stats: { vit: -2 } } } },
+      { label: '바위의 결을 읽는다', check: { stat: 'int', dc: 32 },
+        success: { text: '바위에 난 가는 금을 따라 가볍게 막대를 얹었다. 바위가 스르륵 갈라졌다. {mentor:이} 눈을 크게 떴다.', effect: { flags: ['sensei_heir'], unflags: ['sensei_ready'], stats: { int: 3, fame: 2 } }, tone: 'milestone' },
+        fail: { text: '결을 잘못 읽어 막대가 튕겨 나왔다. 이마에 혹이 하나 났다. 처음부터 다시.', effect: { unflags: ['sensei_ready'], flags: ['sensei_taught'], stats: { int: 1, vit: -1 } } } },
+    ],
+  },
+  {
+    id: 'sensei_legacy', title: '마지막 가르침', once: true, weight: 8,
+    cond: { minAge: 15, maxAge: 65, hasRel: ['mentor'], flags: ['sensei_heir'] },
+    text: '{mentor:이} 보따리를 풀어 낡은 책 한 권과 막대기를 건넸다. "나는 이제 길을 떠나려 하네. 자네가 내 마지막 제자야."',
+    choices: [
+      { label: '책을 받고 가르침을 잇겠다 약속한다', success: { text: '책 첫 장에는 이렇게 적혀 있었다. "길은 멈춘 자에게는 닿지 않는다." {mentor:은} 웃으며 어깨를 두드렸다.', effect: { unflags: ['sensei_heir', 'sensei_taught'], stats: { int: 4, vit: 2, fame: 3 }, karma: 5 }, tone: 'milestone' } },
+      { label: '"저와 함께 계시면 안 될까요?"', check: { stat: 'cha', dc: 28 },
+        success: { text: '{mentor:은} 한참 고민하다 고개를 끄덕였다. "허허, 마지막 한 철만 더 신세 지겠네."', effect: { unflags: ['sensei_heir', 'sensei_taught'], rel: { mentor: 20 }, stats: { cha: 2, int: 2 } }, tone: 'good' },
+        fail: { text: '"붙잡아 주는 마음만 받겠네." {mentor:은} 부드럽게 웃으며 길을 떠났다. 막대기 하나가 손에 남았다.', effect: { unflags: ['sensei_heir', 'sensei_taught'], stats: { int: 2, cha: 1 }, mood: 'calm' } } },
+    ],
+  },
+
+  // ═════ 고향 축제 지키기 (위기 → 준비 → 비바람 → 성대한 마무리) ═════
+  {
+    id: 'fest_crisis', title: '축제 준비위원 모집', once: true, weight: 3,
+    cond: { minAge: 14, maxAge: 55 },
+    text: '촌장이 광장에서 한숨을 쉰다. "올해 축제는 일손이 없어서 접어야 할 판이야. 누가 나서 줄 사람 없나?"',
+    choices: [
+      { label: '내가 맡겠다고 손을 든다', success: { text: '"오오, 장하다!" 촌장이 두 손을 꼭 잡았다. 광장이 갑자기 활기를 띠었다.', effect: { flags: ['fest_host'], karma: 3, stats: { cha: 1 } }, tone: 'good' } },
+      { label: '다른 일꾼을 추천한다', success: { text: '추천한 이는 처음엔 고개를 저었지만 결국 팔을 걷었다. 축제는 어떻게든 열릴 것 같다.', effect: { stats: { cha: 1 } } } },
+      { label: '못 들은 척한다', success: { text: '축제는 소박하게 열렸다. 올해는 어쩐지 노래도 평소보다 작았다.', effect: { karma: -2, mood: 'gloom' } } },
+    ],
+  },
+  {
+    id: 'fest_prepare', title: '축제 준비', once: true, weight: 7,
+    cond: { minAge: 14, maxAge: 56, flags: ['fest_host'] },
+    text: '등불, 천막, 음식 재료, 무대. 해야 할 일이 산더미다. 마을 사람들이 눈을 반짝이며 지시를 기다린다.',
+    choices: [
+      { label: '일을 나눠 맡기고 진두지휘한다', check: { stat: 'cha', dc: 30 },
+        success: { text: '일정이 착착 맞아떨어졌다. 마을 사람들이 "반장님!"이라며 따랐다. 광장이 화려하게 꾸며졌다.', effect: { flags: ['fest_ready'], stats: { cha: 2, fame: 2 } }, tone: 'good' },
+        fail: { text: '중복 주문, 엇갈린 일정. 엉망이 되었지만 사람들이 서로 도와 어찌어찌 마무리했다.', effect: { flags: ['fest_ready'], stats: { cha: -1 }, stress: 8 } } },
+      { label: '친구를 불러 함께 만든다', cond: { hasRel: ['friend'] }, success: { text: '{friend:이} 팔을 걷어붙이고 달려왔다. 둘이 하니 일이 반으로 줄고 웃음은 두 배가 되었다.', effect: { flags: ['fest_ready'], rel: { friend: 12 }, stats: { cha: 1 } }, tone: 'good' } },
+      { label: '창의적인 장식에 집중한다', check: { stat: 'int', dc: 28 },
+        success: { text: '마을 아이들과 종이 용을 만들었다. 광장 위로 거대한 용이 둥실 떠올랐다!', effect: { flags: ['fest_ready'], stats: { int: 2, fame: 2 } }, tone: 'good' },
+        fail: { text: '용은 만들었는데 날지 않는다. 대신 어른들이 떠받쳐 들고 행진하는 이상한 풍경이 되었다.', effect: { flags: ['fest_ready'], stats: { int: 1 } } } },
+    ],
+  },
+  {
+    id: 'fest_storm', title: '축제 날의 소나기', once: true, weight: 8,
+    cond: { minAge: 14, maxAge: 56, flags: ['fest_ready'] },
+    text: '축제 당일, 해질녘에 먹구름이 몰려왔다. 우르릉 천둥과 함께 굵은 빗방울이 광장에 쏟아진다. 등불이 하나둘 꺼진다!',
+    choices: [
+      { label: '마법으로 빗줄기를 밀어낸다', check: { stat: 'mana', dc: 32 },
+        success: { text: '광장 위로 투명한 지붕이 펼쳐졌다. 비는 사방으로 흩어지고, 등불이 다시 환하게 켜졌다!', effect: { flags: ['fest_grand'], unflags: ['fest_ready'], stats: { mana: 2, fame: 4 } }, tone: 'milestone' },
+        fail: { text: '마력이 터져 비가 엉뚱하게 사람들에게 쏟아졌다. 흠뻑 젖은 사람들이 어이없게 웃었다.', effect: { flags: ['fest_grand'], unflags: ['fest_ready'], stats: { mana: 1 }, mood: 'joy' } } },
+      { label: '모두 천막 아래로 모아 노래를 시작한다', check: { stat: 'cha', dc: 30 },
+        success: { text: '선창을 하자 광장 가득 합창이 울려 퍼졌다. 빗소리가 반주가 되었다. 오늘만큼은 최고의 축제다.', effect: { flags: ['fest_grand'], unflags: ['fest_ready'], stats: { cha: 3, fame: 3 } }, tone: 'milestone' },
+        fail: { text: '목소리가 갈라져 노래는 중구난방이 되었다. 그래도 서로 어깨를 두드리며 비 속에서 춤췄다.', effect: { flags: ['fest_grand'], unflags: ['fest_ready'], stats: { cha: 1 }, mood: 'joy' } } },
+      { label: '아쉽지만 축제를 접자고 한다', success: { text: '모두 서운해하며 흩어졌다. 비가 그친 뒤에야 광장에 남은 등불 하나가 외로이 빛났다.', effect: { unflags: ['fest_ready', 'fest_host'], stress: 10, mood: 'gloom' } } },
+    ],
+  },
+  {
+    id: 'fest_finale', title: '불꽃 속의 마무리', once: true, weight: 9,
+    cond: { minAge: 14, maxAge: 56, flags: ['fest_grand'] },
+    text: '비가 그치자 하늘에 무지개가 걸렸다. 촌장이 마지막 불꽃을 쏘아 올리며 외쳤다. "올해 축제의 주인공은 바로 이 아이다!"',
+    choices: [
+      { label: '손을 흔들며 인사한다', success: { text: '광장이 박수로 가득 찼다. 마을 사람들이 어깨를 들썩이며 당신의 이름을 불렀다.', effect: { unflags: ['fest_grand', 'fest_host'], stats: { fame: 5, cha: 2 }, karma: 5, mood: 'joy' }, tone: 'milestone' } },
+      { label: '공을 마을 사람들에게 돌린다', success: { text: '"여러분 덕분이에요!" 마을 전체가 서로를 얼싸안았다. 이 축제는 오래도록 기억될 것이다.', effect: { unflags: ['fest_grand', 'fest_host'], stats: { cha: 3 }, karma: 8, mood: 'joy' }, tone: 'good' } },
+    ],
+  },
+
+  // ═════ 늑대에게 잡혀간 아이 (비명 → 추적 → 늑대와 전투 → 아이의 보답) ═════
+  {
+    id: 'wolf_child_cry', title: '마을 어귀의 비명', once: true, weight: 3,
+    cond: { minAge: 12, maxAge: 50 },
+    text: '마을 어귀에서 아이 엄마가 주저앉아 울부짖는다. "우리 아이가… 늑대가 물고 숲으로 갔어요!"',
+    choices: [
+      { label: '곧장 숲으로 달려간다', success: { text: '"제가 찾아올게요!" 말이 끝나기도 전에 몸이 먼저 달렸다. 발자국이 숲 안쪽으로 이어진다.', effect: { flags: ['wolf_chase'], stats: { vit: 1 }, karma: 4 }, tone: 'good' } },
+      { label: '마을 사람들을 모아 함께 간다', check: { stat: 'cha', dc: 26 },
+        success: { text: '횃불과 쇠스랑을 든 장정들이 모였다. 그러나 숲이 가까워지자 모두 멈춰 섰다. "여기서부터는 자네가 앞서게."', effect: { flags: ['wolf_chase'], stats: { cha: 2 }, karma: 3 } },
+        fail: { text: '다들 우물쭈물하는 사이 시간이 흘렀다. 결국 혼자 앞서 달릴 수밖에 없었다.', effect: { flags: ['wolf_chase'], stats: { cha: -1 } } } },
+      { label: '무서워 모른 척한다', success: { text: '떨리는 다리를 붙잡고 집으로 돌아왔다. 그날 밤 내내 엄마의 울음소리가 귓가를 맴돌았다.', effect: { karma: -8, mood: 'gloom' } } },
+    ],
+  },
+  {
+    id: 'wolf_child_trace', title: '숲속의 발자국', once: true, weight: 9, focus: 'explore',
+    cond: { minAge: 12, maxAge: 50, flags: ['wolf_chase'] },
+    text: '어두운 숲, 꺾인 가지와 작은 신발 한 짝. 멀리서 낮은 으르렁 소리와 아이의 훌쩍임이 들려온다.',
+    choices: [
+      { label: '흔적을 하나하나 짚어 따라간다', check: { stat: 'int', dc: 26 },
+        success: { text: '진흙에 찍힌 발자국의 방향을 정확히 읽어 냈다. 바위 굴 입구까지 한걸음에 닿았다.', effect: { flags: ['wolf_found'], unflags: ['wolf_chase'], stats: { int: 2 } }, tone: 'good' },
+        fail: { text: '길을 헤매느라 시간을 허비했다. 그러나 아이의 울음소리가 이정표가 되어 주었다.', effect: { flags: ['wolf_found'], unflags: ['wolf_chase'], stats: { vit: -2 } } } },
+      { label: '아이의 울음소리를 따라 달린다', check: { stat: 'vit', dc: 26 },
+        success: { text: '덤불을 헤치고 곧장 달려 굴 앞에 닿았다. 숨은 가쁘지만 시간은 벌었다.', effect: { flags: ['wolf_found'], unflags: ['wolf_chase'], stats: { vit: 2 } }, tone: 'good' },
+        fail: { text: '가시덤불에 걸려 구르면서도 굴 앞에 닿았다. 온몸이 긁혔다.', effect: { flags: ['wolf_found'], unflags: ['wolf_chase'], stats: { vit: -3 } } } },
+    ],
+  },
+  {
+    id: 'wolf_child_battle', title: '늑대 두목과의 대치', once: true, weight: 10,
+    cond: { minAge: 12, maxAge: 50, flags: ['wolf_found'] },
+    text: '굴 안쪽, 아이가 웅크린 채 떨고 있다. 그 앞을 거대한 은빛 늑대가 가로막았다. 눈이 마주치자 으르렁 소리가 굴을 울렸다.',
+    choices: [
+      { label: '검으로 정면 돌파', check: { stat: 'vit', dc: 30 },
+        success: { text: '일격에 늑대가 물러났다. 아이가 달려와 당신 다리를 꼭 안았다. 훌쩍이던 얼굴이 활짝 웃었다. 아이가 목에 걸린 은빛 펜던트를 쥐여 주었다. 「마력이 깃든 펜던트」다!', effect: { flags: ['wolf_saved'], unflags: ['wolf_found'], stats: { mana: 5, fame: 4 }, mood: 'joy' }, tone: 'milestone' },
+        fail: { text: '늑대의 돌진에 나가떨어졌다. 정신을 차렸을 때, 굴 안에는 아이도 늑대도 없었다. 아이의 행방은 묘연하다.', effect: { unflags: ['wolf_found'], stats: { vit: -8 }, stress: 100, zeroCause: 'bandits', mood: 'gloom' }, tone: 'bad' } },
+      { label: '마법으로 늑대를 제압', check: { stat: 'mana', dc: 30 },
+        success: { text: '푸른 마법진이 굴을 비추자 늑대가 낑 소리를 내며 뒤로 물러났다. 아이가 달려와 품에 안겼다. 눈물 맺힌 얼굴로 웃으며 은빛 펜던트를 내밀었다. 「마력이 깃든 펜던트」다!', effect: { flags: ['wolf_saved'], unflags: ['wolf_found'], stats: { mana: 5, fame: 4 }, mood: 'joy' }, tone: 'milestone' },
+        fail: { text: '마력이 빗나가 굴 천장이 무너져 내렸다. 흙먼지가 가라앉았을 때 아이의 모습은 어디에도 없었다. 아이의 행방은 묘연하다.', effect: { unflags: ['wolf_found'], stats: { mana: -2, vit: -6 }, stress: 100, zeroCause: 'bandits', mood: 'gloom' }, tone: 'bad' } },
+      { label: '시선을 끌어 아이만 탈출시킨다', check: { stat: 'luck', dc: 30 },
+        success: { text: '돌멩이를 던져 늑대의 시선을 돌렸다. 그 틈에 아이가 쪼르르 달려 나왔다. 아이가 웃으며 은빛 펜던트를 쥐여 주었다. 늑대는 낑낑대며 굴 안쪽으로 물러났다.', effect: { flags: ['wolf_saved'], unflags: ['wolf_found'], stats: { mana: 5, luck: 1, fame: 3 }, mood: 'joy' }, tone: 'milestone' },
+        fail: { text: '늑대가 돌멩이에 속지 않았다. 순식간에 아이를 물고 숲 깊은 곳으로 사라졌다. 아이의 행방은 묘연하다.', effect: { unflags: ['wolf_found'], stress: 100, mood: 'gloom' }, tone: 'bad' } },
+    ],
+  },
+  {
+    id: 'wolf_child_thanks', title: '아이의 꽃다발', once: true, weight: 10,
+    cond: { minAge: 12, maxAge: 55, flags: ['wolf_saved'] },
+    text: '며칠 뒤, 문 앞에 작은 꽃다발이 놓여 있다. 삐뚤빼뚤한 글씨의 쪽지도 있다. "구해 줘서 고마워요! 커서 저도 영웅이 될래요!"',
+    choices: [
+      { label: '꽃다발을 소중히 간직한다', success: { text: '창가에 꽂아 둔 꽃이 시들 때까지 한참을 바라보았다. 그 아이의 웃음이 마음속에 오래도록 남았다.', effect: { unflags: ['wolf_saved'], stress: -30, karma: 5, mood: 'joy' }, tone: 'good' } },
+      { label: '아이를 찾아가 모험 이야기를 들려준다', success: { text: '아이의 눈이 반짝반짝 빛났다. 어느새 동네 아이들이 모여들어 늑대 굴 이야기를 졸라 댔다.', effect: { unflags: ['wolf_saved'], stats: { cha: 2, fame: 2 }, stress: -20, mood: 'joy' }, tone: 'good' } },
+    ],
+  },
 ];
