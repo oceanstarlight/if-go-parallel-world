@@ -1,5 +1,5 @@
 // 로그인(Google · GitHub)과 클라우드 저장 (Firebase Auth + Firestore).
-// 설정이 없으면 cloudEnabled 가 false 이고, 게임은 지금처럼 localStorage 만 쓴다.
+// 설정이 없으면 cloudEnabled 가 false: 로그인 화면은 보이지만 로그인은 안내만 하고, 게임은 localStorage 로만 동작한다.
 // firebase SDK 는 필요할 때 불러와서 첫 화면이 무거워지지 않게 한다.
 import type { FirebaseApp } from 'firebase/app';
 import type { Auth, User } from 'firebase/auth';
@@ -249,6 +249,7 @@ export function connectAuth() {
 
 /** 로그인. 실패하면 보여 줄 문구를, 성공이거나 사용자가 닫았으면 null */
 export async function signIn(p: Provider): Promise<string | null> {
+  if (!cloudEnabled) return '로그인 기능을 준비 중이에요. 지금은 게스트로 즐겨 주세요.';
   try {
     const { auth } = await sdk();
     const { GoogleAuthProvider, GithubAuthProvider, signInWithPopup } = await import('firebase/auth');

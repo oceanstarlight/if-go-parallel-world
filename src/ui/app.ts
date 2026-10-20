@@ -121,8 +121,8 @@ const FOCI: Focus[] = ['train', 'study', 'social', 'explore', 'rest'];
 export async function mount(root: HTMLElement) {
   const choice = getChoice();
   const app: App = {
-    // 로그인을 쓸 수 있고 아직 고른 적이 없는 첫 방문이면 로그인 화면부터
-    screen: cloudEnabled && choice === null ? 'gate' : 'title',
+    // 아직 고른 적이 없는 첫 방문이면 로그인 화면부터 (Firebase 설정이 없어도 화면은 보인다)
+    screen: choice === null ? 'gate' : 'title',
     meta: loadMeta(),
     life: loadRun(),
     setup: { name: '', cheatId: 'growth', fated: true },
@@ -889,7 +889,6 @@ const SYNC_TEXT: Record<SyncState, string> = { idle: '', saving: '저장 중…'
 
 /** 타이틀 아래 작은 계정 줄 */
 function accountRow(c: CloudView): string {
-  if (!cloudEnabled) return '';
   if (c.user) {
     return `<p class="account small muted">${esc(c.user.name)} 님 · ${SYNC_TEXT[c.sync] || '연결됨'}
       <button class="link inline" data-act="logout" ${c.busy ? 'disabled' : ''}>로그아웃</button></p>`;
