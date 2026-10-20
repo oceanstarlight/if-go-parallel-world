@@ -1,6 +1,6 @@
 # Current — 작업 현황
 
-> 이 문서는 진행 상황을 추적한다. 상세 기획은 [`docs/DESIGN.md`](docs/DESIGN.md)를 본다.
+> 이 문서는 진행 상황을 추적한다. 상세 기획은 [`docs/DESIGN.md`](docs/DESIGN.md), 사건 카드 작성 규칙은 [`docs/EVENTS_GUIDE.md`](docs/EVENTS_GUIDE.md)를 본다.
 
 ## 확정된 결정
 
