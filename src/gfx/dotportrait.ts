@@ -28,6 +28,14 @@ export interface Figure {
   bangs: Bangs;
   back: BackHair;
   beard: boolean;
+  /** 머리만 그린다 (몸·목 없이): 전투 스프라이트의 머리로 쓴다 */
+  headOnly?: boolean;
+}
+
+/** 턱 끝 줄 (머리만 잘라 쓸 때 목에 맞추는 기준) */
+export function figureChin(f: Pick<Figure, 'stage' | 'gender'>): number {
+  const g = f.stage === 'baby' ? 'baby' : f.stage === 'child' ? 'child' : f.gender;
+  return Math.max(...Object.keys(FACE[g]).map(Number));
 }
 
 const K = '#3a2440'; // 외곽선
@@ -231,12 +239,14 @@ export function drawFigure(f: Figure): Painter {
 
   // 2) 몸·옷
   const o = f.outfit;
-  cv.fill(body, (x, y) => (x >= 22 || y >= 30 ? o.shadow : x <= 8 && y <= 27 ? o.light : o.base), 'body');
-  drawOutfit(cv, f, body);
-  cv.outline('body', K);
+  if (!f.headOnly) {
+    cv.fill(body, (x, y) => (x >= 22 || y >= 30 ? o.shadow : x <= 8 && y <= 27 ? o.light : o.base), 'body');
+    drawOutfit(cv, f, body);
+    cv.outline('body', K);
+  }
 
   // 3) 목 (턱 바로 아래 두 줄은 그림자)
-  if (f.stage !== 'baby') {
+  if (f.stage !== 'baby' && !f.headOnly) {
     const [nx0, nx1] = f.gender === 'm' && f.stage !== 'child' ? [13, 18] : [14, 17];
     for (let y = chin + 1; y <= 25; y++) {
       for (let x = nx0; x <= nx1; x++) cv.put(x, y, y <= chin + 2 ? ss : sb, 'neck');

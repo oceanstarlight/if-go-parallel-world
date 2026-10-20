@@ -1,6 +1,6 @@
 import type { LifeState } from '../types';
 import { Painter, bayer, grayscale, hashStr, lighten, mix, seeded } from './painter';
-import { type BackHair, type Bangs, drawFigure, hairStyleOf } from './dotportrait';
+import { type BackHair, type Bangs, type Figure, drawFigure, hairStyleOf } from './dotportrait';
 import { genderOfName } from '../data/names';
 
 export type Mood = 'neutral' | 'happy' | 'sad' | 'angry' | 'afraid';
@@ -207,13 +207,22 @@ export function lookOf(spec: PortraitSpec): Look {
   return { gender, bangs, back, hair, eye, skin, style, beard, job, outfit };
 }
 
+/** 초상화·전투 스프라이트가 함께 쓰는 도트 지도 인물 설정 */
+export function figureOf(spec: PortraitSpec, o: { blink?: boolean; sway?: number; mood?: Figure['mood']; headOnly?: boolean } = {}): Figure {
+  const { hair, eye, skin, beard, job, outfit, gender, bangs, back } = lookOf(spec);
+  return {
+    gender, stage: spec.stage, houseId: spec.houseId, job, jobRank: spec.jobRank,
+    mood: o.mood ?? spec.mood ?? 'neutral', blink: !!o.blink, dead: spec.dead, injured: !!spec.injured, sway: o.sway ?? 0,
+    hair, skin, eye, outfit, bangs, back, beard, headOnly: o.headOnly,
+  };
+}
+
 /**
  * blink: 눈 감은 프레임, sway: 머리카락 흔들림 프레임(0/1)
  */
 export function drawPortrait(spec: PortraitSpec, blink = false, sway = 0): Painter {
   const house = spec.houseId;
-  const look = lookOf(spec);
-  const { hair, eye, skin, beard, job, outfit } = look;
+  const { eye } = lookOf(spec);
   const rnd = seeded(spec.seed + 7);
 
   // 1) 배경: 파스텔 원형 그라데이션 + 반짝이
@@ -256,11 +265,7 @@ export function drawPortrait(spec: PortraitSpec, blink = false, sway = 0): Paint
   }
 
   // 2-1) 인물: 32×32 도트 지도 레이어를 2배로 키운다
-  const small = drawFigure({
-    gender: look.gender, stage: spec.stage, houseId: house, job, jobRank: spec.jobRank,
-    mood: spec.mood ?? 'neutral', blink, dead: spec.dead, injured: !!spec.injured, sway: sw,
-    hair, skin, eye, outfit, bangs: look.bangs, back: look.back, beard,
-  });
+  const small = drawFigure(figureOf(spec, { blink, sway: sw }));
   for (let y = 0; y < 32; y++) {
     for (let x = 0; x < 32; x++) {
       const c = small.get(x, y);
