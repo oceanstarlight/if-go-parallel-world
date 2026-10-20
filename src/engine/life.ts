@@ -3,11 +3,12 @@ import type {
 } from '../types';
 import { rollTraits, traitById } from '../data/traits';
 import { BATTLE_ENEMY, ENEMY_NAME, battleOdds, isCombat } from './combat';
-import { maxHp, monthlyEconomy, starterKit, yearEndEconomy } from './economy';
+import { clampHp, maxHp, monthlyEconomy, starterKit, yearEndEconomy } from './economy';
 import { bump, rec } from './record';
 import { statOf, trinketSlots } from './trinket';
 import { pickNote } from './notes';
 import { makeTrinket, randomTrinket, trinketDef } from '../data/trinkets';
+import { gearByBase, makeItem } from '../data/items';
 import { deathById } from '../data/deaths';
 import { OWNED_FOCUS } from '../data/market';
 import { inBranch } from '../data/branches';
@@ -89,7 +90,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 export const traitsOf = (s: LifeState): Trait[] =>
   (s.traits ?? []).map(traitById).filter((t): t is Trait => !!t);
 
-/** 기분별 방침 성장 배율 (Long Live the Queen 방식) */
+/** 기분별 성장 배율 (Long Live the Queen 방식) */
 export const MOOD_MUL: Record<MoodKey, Partial<Record<Focus, number>>> = {
   calm: {},
   joy: { social: 1.5, explore: 1.2 },
@@ -100,9 +101,10 @@ export const MOOD_MUL: Record<MoodKey, Partial<Record<Focus, number>>> = {
 
 /** 스트레스가 이 이상이면 성장이 떨어진다 */
 export const STRESS_HIGH = 60;
+/** 능력치 상한 */
+export const STAT_MAX = 200;
 /** 이 이상이면 과로로 쓰러질 수 있다 */
 export const STRESS_DANGER = 85;
-const randInt = (rng: Rng, lo: number, hi: number) => lo + Math.floor(rng() * (hi - lo + 1));
 
 /** 소수 성장값을 확률적으로 반올림한다 (1.4 → 40% 확률로 2) */
 const stochastic = (v: number, rng: Rng) => Math.floor(v) + (rng() < v - Math.floor(v) ? 1 : 0);
@@ -113,15 +115,15 @@ export function createLife(opt: NewLifeOptions, rng: Rng = Math.random): LifeSta
   const stats = { vit: 10, mana: 10, int: 10, cha: 10, fame: 0, luck: 10 };
   for (const k of STAT_KEYS) {
     stats[k] = (house.stats[k] ?? stats[k]) + (cheat.stats?.[k] ?? 0);
-    if (k !== 'fame') stats[k] += 2 * (opt.upgrades.echo ?? 0);
+    if (k !== 'fame') stats[k] += 4 * (opt.upgrades.echo ?? 0);
   }
-  stats.luck += 5 * (opt.upgrades.fortune ?? 0);
-  for (const k of STAT_KEYS) stats[k] = clamp(stats[k], 0, 100);
+  stats.luck += 10 * (opt.upgrades.fortune ?? 0);
+  for (const k of STAT_KEYS) stats[k] = clamp(stats[k], 0, STAT_MAX);
 
   const traitIds = opt.traits ?? rollTraits(rng);
   const traits = traitIds.map(traitById).filter((t): t is Trait => !!t);
   for (const t of traits) for (const [k, v] of Object.entries(t.stats ?? {})) stats[k as StatKey] += v;
-  for (const k of STAT_KEYS) stats[k] = clamp(stats[k], 0, 100);
+  for (const k of STAT_KEYS) stats[k] = clamp(stats[k], 0, STAT_MAX);
 
   const s: LifeState = {
     name: opt.name,
@@ -162,6 +164,7 @@ export function createLife(opt: NewLifeOptions, rng: Rng = Math.random): LifeSta
   };
   s.hp = maxHp(s);
   s.month = 0;
+  s.statScale = 2;
   rec(s);
   s.goals = pickGoals(s, rng);
   if ((opt.lifeNo ?? 1) > 1) {
@@ -179,21 +182,26 @@ export function createLife(opt: NewLifeOptions, rng: Rng = Math.random): LifeSta
 
 function log(s: LifeState, text: string, tone: LifeState['log'][number]['tone'] = 'normal') {
   // 새해 첫 달(0)의 일은 1월로 적는다
-  s.log.push({ age: s.age, m: Math.max(1, s.month ?? 0), text, tone });
+  s.log.push({ age: s.age, m: (s.month ?? 0) + 1, text, tone });
 }
 
 // ───────────────────────── 성장 ─────────────────────────
 
+/**
+ * 성장별 한 해 성장량 (능력치 200 기준). 매달 1/12 씩 나눠서 오른다.
+ * 수련은 체력만, 학업은 지성·마력. 마력은 수련으로 오르지 않는다.
+ */
 const FOCUS_GAINS: Record<Focus, Partial<Record<StatKey, [number, number]>>> = {
-  train: { vit: [1, 3], mana: [0, 2] },
-  study: { int: [1, 3], mana: [0, 2] },
-  social: { cha: [1, 3], fame: [0, 2] },
-  explore: { luck: [1, 3] },
+  train: { vit: [6, 9] },
+  study: { int: [4, 7], mana: [3, 6] },
+  social: { cha: [4, 7], fame: [2, 4] },
+  explore: { luck: [5, 8] },
   rest: {},
 };
 
 function ageMul(age: number) {
-  if (age < 6) return 0.6;
+  if (age < 6) return 0.5;
+  if (age < 13) return 0.75;
   if (age <= 40) return 1;
   if (age <= 60) return 0.5;
   return 0.25;
@@ -201,30 +209,35 @@ function ageMul(age: number) {
 
 export function gainStat(s: LifeState, k: StatKey, amount: number, rng: Rng) {
   // 높을수록 오르기 어렵다
-  const dim = amount > 0 ? Math.max(0.1, 1 - s.stats[k] / 115) : 1;
+  const dim = amount > 0 ? Math.max(0.1, 1 - s.stats[k] / 225) : 1;
   let mul = amount > 0 ? cheatById(s.cheatId).growthMul?.[k] ?? 1 : 1;
   if (amount > 0) for (const t of traitsOf(s)) mul *= t.growthMul?.[k] ?? 1;
-  s.stats[k] = clamp(s.stats[k] + stochastic(amount * dim * mul, rng), 0, 100);
+  s.stats[k] = clamp(s.stats[k] + stochastic(amount * dim * mul, rng), 0, STAT_MAX);
 }
 
-function grow(s: LifeState, rng: Rng) {
+/** 한 달 성장: 고른 성장의 한 해치를 12로 나눠 매달 조금씩 */
+function growMonth(s: LifeState, rng: Rng) {
   // 요양 중에는 성장이 반으로 준다
-  const m = ageMul(s.age) * ((s.recover ?? 0) > 0 ? 0.5 : 1);
+  const m = ageMul(s.age) * ((s.recover ?? 0) > 0 ? 0.5 : 1) / MONTHS;
   if (s.age < 3) {
-    gainStat(s, 'vit', 1, rng);
-    gainStat(s, pick(STAT_KEYS.filter((k) => k !== 'fame'), rng), 1, rng);
+    gainStat(s, 'vit', 3 * m, rng);
+    gainStat(s, pick(STAT_KEYS.filter((k) => k !== 'fame'), rng), 3 * m, rng);
   } else if (s.focus === 'rest') {
-    // 휴식: 성장은 없지만 몸이 조금 회복된다
-    if (rng() < 0.5) gainStat(s, 'vit', 1, rng);
+    // 휴식: 몸이 조금 회복된다
+    gainStat(s, 'vit', 1.5 * m, rng);
   } else {
     const fm = focusMul(s, s.focus);
     for (const [k, [lo, hi]] of Object.entries(FOCUS_GAINS[s.focus])) {
-      gainStat(s, k as StatKey, randInt(rng, lo, hi) * m * fm, rng);
+      gainStat(s, k as StatKey, (lo + rng() * (hi - lo)) * m * fm, rng);
     }
     if (s.focus === 'explore') {
-      gainStat(s, pick(['vit', 'mana', 'int', 'cha'] as StatKey[], rng), randInt(rng, 1, 3) * m * fm, rng);
+      gainStat(s, pick(['vit', 'mana', 'int', 'cha'] as StatKey[], rng), (2 + rng() * 4) * m * fm, rng);
     }
   }
+}
+
+/** 한 해 성장: 출신·직업의 덤과 노화 */
+function grow(s: LifeState, rng: Rng) {
   for (const [k, v] of Object.entries(houseById(s.houseId).growth ?? {})) {
     if (rng() < 0.5) gainStat(s, k as StatKey, v, rng);
   }
@@ -236,12 +249,12 @@ function grow(s: LifeState, rng: Rng) {
   }
   // 노화 (엘프·불로 체질은 느리다)
   const am = agingMul(s);
-  if (s.age >= 40 && rng() < 0.6 * am) s.stats.vit = Math.max(1, s.stats.vit - 1);
-  if (s.age >= 60 && rng() < am) s.stats.vit = Math.max(1, s.stats.vit - 1);
-  if (s.age >= 70 && rng() < 0.5 * am) s.stats.vit = Math.max(1, s.stats.vit - 1);
+  if (s.age >= 40 && rng() < 0.6 * am) s.stats.vit = Math.max(1, s.stats.vit - 2);
+  if (s.age >= 60 && rng() < am) s.stats.vit = Math.max(1, s.stats.vit - 2);
+  if (s.age >= 70 && rng() < 0.5 * am) s.stats.vit = Math.max(1, s.stats.vit - 2);
 }
 
-/** 방침 성장 배율: 특성 × 기분 × 스트레스 */
+/** 성장 배율: 특성 × 기분 × 스트레스 */
 export function focusMul(s: LifeState, f: Focus): number {
   let mul = 1;
   for (const t of traitsOf(s)) mul *= t.focusMul?.[f] ?? 1;
@@ -276,7 +289,7 @@ function updateMind(s: LifeState, rng: Rng) {
 /** 과로: 스트레스가 위험 수준이면 쓰러질 수 있다 */
 function overwork(s: LifeState, rng: Rng): boolean {
   if ((s.stress ?? 0) < STRESS_DANGER || rng() > 0.3) return false;
-  s.stats.vit = Math.max(0, s.stats.vit - 12);
+  s.stats.vit = Math.max(0, s.stats.vit - 24);
   s.stress = Math.max(0, (s.stress ?? 0) - 25);
   s.mood = 'gloom';
   if (s.stats.vit <= 0) {
@@ -284,7 +297,7 @@ function overwork(s: LifeState, rng: Rng): boolean {
     if (kill(s, 'overwork')) log(s, '다시는 일어나지 못했다.', 'death');
     flushInjury(s);
   } else {
-    log(s, '과로로 쓰러졌다! 한 달 내내 앓아누웠다. 가끔은 쉬어야 한다. (체력 -12)', 'bad');
+    log(s, '과로로 쓰러졌다! 한 달 내내 앓아누웠다. 가끔은 쉬어야 한다. (체력 -24)', 'bad');
   }
   return true;
 }
@@ -305,7 +318,7 @@ export function naturalDeathChance(s: LifeState): number {
   if (age < 55) return 0;
   const t = (age - 55) / 40;
   const grim = s.flags.includes('grim_win') ? 0.5 : 1;
-  return clamp((0.004 + t * t * 0.35) * (1.3 - s.stats.vit / 100) * grim, 0, 1);
+  return clamp((0.004 + t * t * 0.35) * (1.3 - s.stats.vit / 200) * grim, 0, 1);
 }
 
 // ───────────────────────── 죽음 ─────────────────────────
@@ -314,6 +327,7 @@ export function naturalDeathChance(s: LifeState): number {
 const REAL_DEATH = new Set(['old_age', 'gallows', 'dungeon', 'abyss']);
 /** 중상이 이 횟수에 이르면 죽는다 */
 export const MAX_INJURY = 3;
+const HAZARDS = ['illness', 'plague', 'carriage', 'bandits', 'duel', 'famine', 'war'];
 /** 중상 뒤 요양 기간 (달) */
 const RECOVER_MONTHS = 12;
 
@@ -329,11 +343,11 @@ export function kill(s: LifeState, causeId: string): boolean {
   if (s.death) return true;
   if (causeId !== 'old_age' && s.extraLives > 0) {
     s.extraLives--;
-    s.stats.vit = Math.max(s.stats.vit, 25);
+    s.stats.vit = Math.max(s.stats.vit, 50);
     log(s, '눈앞이 하얘졌다… 그런데 불굴의 육체가 발동! "아직 안 끝났어!" 당신은 벌떡 일어났다.', 'good');
     return false;
   }
-  if (!sureDeath && !REAL_DEATH.has(causeId) && (s.injuries ?? 0) < MAX_INJURY - 1) {
+  if (!sureDeath && !REAL_DEATH.has(causeId) && (s.injuries ?? 0) < (s.injuryCap ?? MAX_INJURY) - 1) {
     injure(s, causeId);
     return false;
   }
@@ -345,7 +359,7 @@ export function kill(s: LifeState, causeId: string): boolean {
 /** 중상: 체력·돈을 잃고 1년간 요양한다 */
 function injure(s: LifeState, causeId: string) {
   s.injuries = (s.injuries ?? 0) + 1;
-  s.stats.vit = s.stats.vit <= 0 ? 10 : Math.max(5, s.stats.vit - 10);
+  s.stats.vit = s.stats.vit <= 0 ? 20 : Math.max(10, s.stats.vit - 20);
   const lost = (s.gold ?? 0) > 0 ? Math.round((s.gold ?? 0) * 0.2) : 0;
   s.gold = (s.gold ?? 0) - lost;
   s.stress = clamp((s.stress ?? 0) + 25, 0, 100);
@@ -367,7 +381,7 @@ function flushInjury(s: LifeState) {
   s.pendingInjury = null;
   const n = s.injuries ?? 1;
   const last = n >= MAX_INJURY - 1;
-  log(s, `…눈을 떠 보니 침대 위였다. 「${deathById(causeId).name}」 직전에서 살아났다! 중상 ${n}/${MAX_INJURY} — 1년간 요양해야 한다. (체력 -10${Number(lost) ? `, 치료비 ${Number(lost).toLocaleString('ko-KR')}G` : ''})${last ? ' 다음에 또 이런 일이 생기면 정말 끝이다…' : ''}`, 'bad');
+  log(s, `…눈을 떠 보니 침대 위였다. 「${deathById(causeId).name}」 직전에서 살아났다! 중상 ${n}/${MAX_INJURY} — 1년간 요양해야 한다. (체력 -20${Number(lost) ? `, 치료비 ${Number(lost).toLocaleString('ko-KR')}G` : ''})${last ? ' 다음에 또 이런 일이 생기면 정말 끝이다…' : ''}`, 'bad');
 }
 
 // ───────────────────────── 판정 / 효과 ─────────────────────────
@@ -375,17 +389,22 @@ function flushInjury(s: LifeState) {
 export function successChance(s: LifeState, check: Check): number {
   const bonus = (cheatById(s.cheatId).checkBonus?.[check.stat] ?? 0)
     + traitsOf(s).reduce((a, t) => a + (t.checkBonus?.[check.stat] ?? 0), 0);
-  const raw = 50 + (statOf(s, check.stat) - check.dc) * 3 + (statOf(s, 'luck') - 20) * 0.3 + bonus;
+  const raw = 50 + (statOf(s, check.stat) - check.dc) * 1.5 + (statOf(s, 'luck') - 40) * 0.15 + bonus;
   return clamp(Math.round(raw), 5, 95);
 }
 
 export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
+  applyEffectRaw(s, e, rng);
+  clampHp(s);
+}
+
+function applyEffectRaw(s: LifeState, e: Effect | undefined, rng: Rng) {
   if (!e) return;
   if (e.stats) {
     for (const [k, v] of Object.entries(e.stats)) {
       // 사건의 직접 보상은 체감 없이 반영 (배율만 적용)
       const mul = v > 0 ? cheatById(s.cheatId).growthMul?.[k as StatKey] ?? 1 : 1;
-      s.stats[k as StatKey] = clamp(s.stats[k as StatKey] + Math.round(v * Math.min(mul, 1.3)), 0, 100);
+      s.stats[k as StatKey] = clamp(s.stats[k as StatKey] + Math.round(v * Math.min(mul, 1.3)), 0, STAT_MAX);
     }
   }
   if (e.karma) s.karma = clamp(s.karma + e.karma, -100, 100);
@@ -426,7 +445,8 @@ export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
   if (e.will) s.will = clamp((s.will ?? 50) + e.will, 0, 100);
   if (e.extraLives) s.extraLives = Math.max(0, s.extraLives + e.extraLives);
   const g0 = s.gold ?? 0;
-  if (e.gold) s.gold = (s.gold ?? 0) + e.gold;
+  // 잃는 돈은 가진 만큼만 (빚을 지는 사건만 마이너스가 된다)
+  if (e.gold) s.gold = e.gold < 0 && !e.debt ? Math.max(Math.min(g0, 0), g0 + e.gold) : g0 + e.gold;
   if (e.goldPct && (s.gold ?? 0) > 0) {
     const delta = (s.gold ?? 0) * e.goldPct;
     s.gold = Math.round((s.gold ?? 0) + (delta > 0 ? Math.min(delta, e.goldCap ?? Infinity) : delta));
@@ -435,6 +455,7 @@ export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
   if ((s.gold ?? 0) > g0) rec(s).earned += (s.gold ?? 0) - g0;
   if (e.own && !(s.owned ?? []).includes(e.own)) s.owned = [...(s.owned ?? []), e.own];
   if (e.trinket) gainTrinket(s, e.trinket, rng);
+  if (e.item) gainItem(s, e.item);
   if (e.caught) {
     s.caught = (s.caught ?? 0) + 1;
     if ((s.gold ?? 0) > 0) s.gold = 0;
@@ -447,6 +468,15 @@ export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
 }
 
 /** 사건 보상 장신구: 빈 칸이 있으면 바로 차고, 없으면 가방에 넣는다 */
+function gainItem(s: LifeState, t: NonNullable<Effect['item']>) {
+  const def = gearByBase(t.base);
+  if (!def) return;
+  const it = makeItem(def, t.rarity ?? 'common');
+  if (t.name) it.name = t.name;
+  s.bag = [...(s.bag ?? []), it];
+  log(s, `「${it.name}」을(를) 가방에 넣었다.`, 'good');
+}
+
 function gainTrinket(s: LifeState, t: NonNullable<Effect['trinket']>, rng: Rng) {
   const rarity = t.rarity ?? 'rare';
   const def = t.base ? trinketDef(t.base) : undefined;
@@ -580,7 +610,24 @@ function startYear(s: LifeState, rng: Rng) {
     kill(s, 'old_age');
     return;
   }
-  yearNote(s, rng);
+  // 어려운 삶: 해마다 병·사고의 위험 (동시대 환생자 시뮬레이션)
+  if (s.hazard && s.age >= 3 && rng() < s.hazard) {
+    const cause = pick(HAZARDS, rng);
+    log(s, '갑작스러운 불운이 덮쳤다…', 'bad');
+    if (kill(s, cause)) return;
+    flushInjury(s);
+  }
+  s.yearMark = Math.floor(rng() * 4);
+}
+
+/** 던전에 다시 들어갈 수 있게 되면 한 번만 알린다 (12세 · 2년 쿨다운 · 출입 금지가 풀릴 때) */
+function dungeonReady(s: LifeState) {
+  const open = Math.max(12, s.dgBanUntil ?? 0, s.dgNextAge ?? 0);
+  if (s.dgNotified || s.age < open) return;
+  s.dgNotified = true;
+  const first = !(s.record?.dives);
+  s.toast = first ? '던전에 들어갈 수 있는 나이가 되었다!' : '던전에 다시 도전할 수 있다!';
+  log(s, first ? '마을 어른들이 「이제 던전에 들어가도 된다」며 등을 두드려 주었다. (던전 개방)' : '몸도 마음도 준비됐다. 던전에 다시 도전할 수 있다! (던전 2년마다 1회)', 'milestone');
 }
 
 /** 한 해 기록: 나이·직업에 맞는 삶의 한 장면을 연대기에 남긴다 */
@@ -603,11 +650,19 @@ function monthlyEventChance(s: LifeState): number {
 /** 한 달을 보낸다. 선택이 필요한 사건이 생기면 거기서 멈춘다 (canAdvance 가 false) */
 export function advanceMonth(s: LifeState, rng: Rng = Math.random) {
   if (!canAdvance(s)) return;
-  const month = s.month ?? 0;
+  // s.month 는 지금 살고 있는 달 (0 = 1월). 12월 다음 달로 넘어가며 해가 바뀐다
+  const month = ((s.month ?? 0) + 1) % MONTHS;
   if (month === 0) {
+    endYear(s, rng);
     startYear(s, rng);
     if (s.death) return;
   }
+  s.month = month;
+  // 체력이 가득한 채로 자라면 늘어난 최대 체력만큼 함께 찬다 (던전 밖)
+  const full = !s.dive && (s.hp ?? maxHp(s)) >= maxHp(s);
+  if (s.age > 0 || month > 0) growMonth(s, rng);
+  if (full) s.hp = maxHp(s);
+  clampHp(s);
   const money = monthlyEconomy(s, month, rng);
   if (money) log(s, money, 'normal');
   if ((s.trauma ?? 0) > 0) {
@@ -622,19 +677,21 @@ export function advanceMonth(s: LifeState, rng: Rng = Math.random) {
     s.recover = (s.recover ?? 0) - 1;
     if (s.recover === 0) log(s, '긴 요양이 끝났다. 다시 걸을 수 있다!', 'good');
   }
-  s.month = (month + 1) % MONTHS;
-  // 이정표는 조건이 맞으면 바로, 나머지는 달마다 확률로
-  const milestone = MILESTONES.find((e) => eligible(s, e));
+  // 그해의 기록·이정표는 1~4월 중 정해 둔 달에 (꼭 1월일 필요는 없다)
+  if (month === (s.yearMark ?? 0)) {
+    yearNote(s, rng);
+    dungeonReady(s);
+  }
+  const milestone = month >= (s.yearMark ?? 0) ? MILESTONES.find((e) => eligible(s, e)) : undefined;
   const ev = milestone ?? (rng() < monthlyEventChance(s) ? pickEvent(s, rng) : null);
   if (ev) startEvent(s, ev, rng);
-  if (s.month === 0) endYear(s, rng);
 }
 
 /** 한 해 마무리: 생활비·빚 이자, 아무 일 없던 해에는 한 줄 */
 function endYear(s: LifeState, rng: Rng) {
   const money = yearEndEconomy(s, rng);
   if (money) log(s, money, (s.gold ?? 0) < 0 ? 'bad' : 'normal');
-  // 사건도, 한 해 기록도 없던 해에만 방침 문장 한 줄
+  // 사건도, 한 해 기록도 없던 해에만 성장 문장 한 줄
   if ((s.yearEvents ?? 0) > 0 || s.death || s.notesAt && Object.values(s.notesAt).includes(s.age)) return;
   if ((s.stress ?? 0) >= STRESS_HIGH && s.focus !== 'rest' && rng() < 0.5) {
     log(s, pick(TIRED_LINES, rng), 'bad');

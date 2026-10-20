@@ -35,9 +35,9 @@ export const ARMORS: ItemDef[] = [
 ];
 
 export const POTIONS: ItemDef[] = [
-  { base: 'p1', name: '회복약', kind: 'potion', power: 60, price: 25 },
-  { base: 'p2', name: '상급 회복약', kind: 'potion', power: 200, price: 120 },
-  { base: 'p3', name: '엘릭서', kind: 'potion', power: 9999, price: 600 },
+  { base: 'p1', name: '회복약', kind: 'potion', power: 50, price: 25 },
+  { base: 'p2', name: '상급 회복약', kind: 'potion', power: 100, price: 40 },
+  { base: 'p3', name: '엘릭서', kind: 'potion', power: 9999, price: 500 },
 ];
 
 /** 던전 지대 (20층씩) */
@@ -118,4 +118,5 @@ export const ALL_GEAR = [...WEAPONS, ...ARMORS, ...POTIONS];
 export const gearByBase = (base: string) => ALL_GEAR.find((d) => d.base === base);
 
 /** 판매가 */
-export const sellPrice = (it: Item) => it.value;
+/** 판매가: 매력 흥정만큼 더 받는다 (dealRate = chaDeal) */
+export const sellPrice = (it: Item, dealRate = 0) => Math.round(it.value * (1 + dealRate));

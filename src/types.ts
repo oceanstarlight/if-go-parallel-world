@@ -2,7 +2,7 @@ export type StatKey = 'vit' | 'mana' | 'int' | 'cha' | 'fame' | 'luck';
 export type Stats = Record<StatKey, number>;
 
 export type Focus = 'train' | 'study' | 'social' | 'explore' | 'rest';
-/** 기분: 방침별 성장 배율과 초상화 표정에 반영된다 */
+/** 기분: 성장별 성장 배율과 초상화 표정에 반영된다 */
 export type MoodKey = 'calm' | 'joy' | 'gloom' | 'anger' | 'fear';
 export type RelKey = 'friend' | 'rival' | 'mentor' | 'spouse';
 
@@ -94,9 +94,9 @@ export interface LifeState {
   mood?: MoodKey;
   /** 의지력 0~100. 숙명을 거스르는 선택에 쓴다 */
   will?: number;
-  /** 방침 고정: 켜면 매년 방침을 묻지 않고 같은 방침으로 넘어간다 */
+  /** 성장 고정: 켜면 매년 성장을 묻지 않고 같은 성장으로 넘어간다 */
   focusLocked?: boolean;
-  /** 직전 해의 방침 (같은 방침을 반복하면 스트레스가 더 쌓인다) */
+  /** 직전 해의 성장 (같은 성장을 반복하면 스트레스가 더 쌓인다) */
   prevFocus?: Focus;
   /** 전설이 된 전생들 (생성 시 메타에서 복사) */
   legends?: Legend[];
@@ -130,6 +130,14 @@ export interface LifeState {
   seenAt?: Record<string, number>;
   /** 올해 일어난 사건 수 */
   yearEvents?: number;
+  /** 능력치 기준 (2 = 200 기준. 없으면 v1.4 전 저장) */
+  statScale?: number;
+  /** 중상 몇 번째에 죽는가 (기본 3. 동시대 환생자의 난이도용) */
+  injuryCap?: number;
+  /** 해마다 갑작스러운 불운(병·사고)을 겪을 확률 (동시대 환생자의 난이도용) */
+  hazard?: number;
+  /** 올해 기록·이정표가 나오는 달 (0~3 = 1~4월) */
+  yearMark?: number;
   /** 올해 수입 (해가 끝나면 lastIncome 으로) */
   yearIncome?: number;
   /** 이번 달 들어온 돈 (UI 팝업용) */
@@ -142,6 +150,12 @@ export interface LifeState {
   dgFallen?: boolean;
   /** 이 나이부터 던전에 다시 들어갈 수 있다 */
   dgBanUntil?: number;
+  /** 이 나이부터 던전에 다시 들어갈 수 있다 (2년에 한 번) */
+  dgNextAge?: number;
+  /** 던전에 다시 들어갈 수 있다고 알렸다 */
+  dgNotified?: boolean;
+  /** UI 에 한 번 띄울 알림 */
+  toast?: string | null;
   /** 던전의 악몽: 남은 달 동안 스트레스가 100으로 묶인다 */
   trauma?: number;
   /** 방금 입은 중상 (사건 결과 문장 뒤에 알린다) */
@@ -183,6 +197,12 @@ export interface Dive {
   last?: 'cleared' | 'fled' | null;
   /** 쓰러져서 모든 것을 잃었다 (지상으로 돌아갈 일만 남았다) */
   fallen?: boolean;
+  /** 이번 구간에서 지나온 마지막 층 (마물과 싸우느라 멈췄던 곳) */
+  cursor?: number;
+  /** 길을 막은 마물 (턴제 전투 대기) */
+  mob?: { floor: number; name: string; ep: number } | null;
+  /** 보스 방 앞에 섰다 (가방을 점검하고 도전) */
+  atBoss?: boolean;
 }
 
 /** 다음 생에 전해지는 전생의 이야기 */
@@ -267,6 +287,10 @@ export interface Effect {
   own?: string;
   /** 장신구를 얻는다: 원형 id(TRINKETS) 또는 주 능력치, 희귀도 */
   trinket?: { base?: string; stat?: StatKey; rarity?: Rarity };
+  /** 장비·물약을 가방에 넣는다 (base: src/data/items.ts, name 으로 이름만 바꿀 수 있다) */
+  item?: { base: string; rarity?: Rarity; name?: string };
+  /** gold 가 음수일 때 가진 돈보다 많이 잃어 빚이 될 수 있다 (빚 투자 같은 사건만) */
+  debt?: boolean;
 }
 
 export interface Outcome {
@@ -307,7 +331,7 @@ export interface GameEvent {
   /** 한 삶에서 한 번만 */
   once?: boolean;
   weight?: number;
-  /** 해당 방침일 때 가중치 ×3 */
+  /** 해당 성장일 때 가중치 ×3 */
   focus?: Focus;
   /** 인생 트리의 가지 노드. 그 가지에 있을 때만 일어난다 */
   branch?: string;
@@ -411,7 +435,7 @@ export interface Trait {
   stats?: Partial<Stats>;
   checkBonus?: Partial<Stats>;
   growthMul?: Partial<Stats>;
-  /** 방침별 성장 배율 */
+  /** 성장별 성장 배율 */
   focusMul?: Partial<Record<Focus, number>>;
   stressMul?: number;
   will?: number;

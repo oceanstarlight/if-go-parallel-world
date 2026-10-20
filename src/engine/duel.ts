@@ -16,7 +16,7 @@ export type DuelAction = 'attack' | 'magic' | 'guard' | 'flee';
 export type DuelResult = 'win' | 'lose' | 'fled';
 
 export interface Duel {
-  kind: 'event' | 'boss';
+  kind: 'event' | 'boss' | 'mob';
   /** 상대 이름 */
   foe: string;
   cp: number;
@@ -55,15 +55,22 @@ export const MAGIC_COST = 15;
 const P_HIT = 0.22, E_HIT = 0.25, P_EXP = 0.7;
 const CRIT_MUL = 1.7;
 
-export const critChance = (s: LifeState) => Math.min(0.45, 0.05 + statOf(s, 'luck') * 0.003);
-export const dodgeChance = (s: LifeState) => Math.min(0.25, 0.03 + statOf(s, 'luck') * 0.0015);
-export const fleeChance = (s: LifeState) => Math.min(0.9, 0.3 + statOf(s, 'luck') * 0.006);
-/** 마법 배율: 마력이 높을수록 강하다 */
-export const magicMul = (s: LifeState) => 0.9 + statOf(s, 'mana') / 50;
+/** 치명타: 지성 (급소를 읽는다). 공격에만 붙는다 */
+export const critChance = (s: LifeState) => Math.min(0.4, 0.05 + statOf(s, 'int') * 0.0015);
+/** 회피·도주: 행운 */
+export const dodgeChance = (s: LifeState) => Math.min(0.25, 0.03 + statOf(s, 'luck') * 0.00075);
+export const fleeChance = (s: LifeState) => Math.min(0.9, 0.3 + statOf(s, 'luck') * 0.003);
+/**
+ * 공격·마법 배율 (능력치 200 기준).
+ *  - 공격: 체력 + 무기. 빗나갈 수 있지만 지성만큼 치명타. 체력 100 이면 ×1.0
+ *  - 마법: 마력 × 지성. 마나를 쓰고 빗나가지 않는다. 마력 100 · 지성 100 이면 ×1.3 (같은 수치의 공격보다 30% 세다)
+ */
+export const attackMul = (s: LifeState) => 0.5 + statOf(s, 'vit') / 200 + (s.equip?.weapon?.power ?? 0) / 200;
+export const magicMul = (s: LifeState) => (0.5 + statOf(s, 'mana') / 200) * 1.3 * (0.95 + statOf(s, 'int') / 2000);
 
 export function startDuel(s: LifeState, kind: Duel['kind'], foe: string, ep: number): Duel {
   const hpMax = maxHp(s);
-  const mpMax = 30 + statOf(s, 'mana');
+  const mpMax = 30 + Math.round(statOf(s, 'mana') / 2);
   return {
     kind, foe, cp: combatPower(s), ep,
     hp: Math.max(1, Math.min(s.hp ?? hpMax, hpMax)), hpMax,
@@ -90,8 +97,8 @@ export function duelTurn(d: Duel, s: LifeState, action: DuelAction, rng: Rng): B
     const magic = action === 'magic';
     if (magic) d.mp -= MAGIC_COST;
     const miss = !magic && rng() < 0.06;
-    const crit = !miss && rng() < critChance(s);
-    let dmg = miss ? 0 : pBase * spread(rng) * (magic ? magicMul(s) : 1) * (crit ? CRIT_MUL : 1) * (d.counter ? 1.5 : 1);
+    const crit = !miss && !magic && rng() < critChance(s);
+    let dmg = miss ? 0 : pBase * spread(rng) * (magic ? magicMul(s) : attackMul(s)) * (crit ? CRIT_MUL : 1) * (d.counter ? 1.5 : 1);
     dmg = miss ? 0 : Math.max(1, Math.round(dmg));
     d.eHp = Math.max(0, d.eHp - dmg);
     blows.push({ from: 'p', dmg, crit, magic, miss, hpTo: d.eHp / d.eMax });
@@ -133,8 +140,9 @@ export function duelTurn(d: Duel, s: LifeState, action: DuelAction, rng: Rng): B
   return blows;
 }
 
-/** 자동 전투 (테스트·밸런스 확인용): 마나가 있으면 마법, 아니면 공격 */
+/** 자동 전투 (테스트·밸런스 확인용): 더 센 쪽(공격/마법)을 쓴다 */
 export function autoDuel(d: Duel, s: LifeState, rng: Rng): DuelResult {
-  for (let i = 0; i < 60 && !d.result; i++) duelTurn(d, s, d.mp >= MAGIC_COST && statOf(s, 'mana') > statOf(s, 'vit') ? 'magic' : 'attack', rng);
+  const magicBetter = magicMul(s) > attackMul(s) * (1 + critChance(s) * 0.7);
+  for (let i = 0; i < 60 && !d.result; i++) duelTurn(d, s, magicBetter && d.mp >= MAGIC_COST ? 'magic' : 'attack', rng);
   return d.result ?? 'lose';
 }

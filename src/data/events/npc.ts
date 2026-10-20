@@ -18,9 +18,9 @@ export const NPC_EVENTS: GameEvent[] = [
         : `빗자루 소리와 함께 익숙한 목소리가 들렸다. "어? 너 또 태어났구나! 전생에서도 ${past(s, 'lulu')}번이나 만났잖아~" 마녀 루루가 손을 흔든다.`,
     choices: [
       {
-        label: '일으켜 준다', check: { stat: 'cha', dc: 12 },
-        success: { text: '"고마워! 답례로 이거 줄게♪" 루루가 반짝이는 물약을 건넸다. 마셔보니 몸이 가볍다!', effect: { meet: 'lulu', stats: { luck: 5, vit: 3 } }, tone: 'good' },
-        fail: { text: '일으키다 같이 넘어졌다. 루루가 깔깔 웃으며 사탕 하나를 쥐여주고 날아갔다.', effect: { meet: 'lulu', stats: { luck: 2 } } },
+        label: '일으켜 준다', check: { stat: 'cha', dc: 24 },
+        success: { text: '"고마워! 답례로 이거 줄게♪" 루루가 반짝이는 물약을 건넸다. 마셔보니 몸이 가볍다!', effect: { meet: 'lulu', stats: { luck: 10, vit: 6 } }, tone: 'good' },
+        fail: { text: '일으키다 같이 넘어졌다. 루루가 깔깔 웃으며 사탕 하나를 쥐여주고 날아갔다.', effect: { meet: 'lulu', stats: { luck: 4 } } },
       },
       {
         label: '모른 척 지나간다',
@@ -33,9 +33,9 @@ export const NPC_EVENTS: GameEvent[] = [
     cond: { minAge: 10, maxAge: 80, test: (s) => past(s, 'lulu') >= 3 },
     text: (s) => `"${past(s, 'lulu')}번째 생에서도 만나다니, 우리 운명인가 봐!" 마녀 루루가 비밀 물약 세 병을 꺼냈다. "단골 특별 서비스♪ 하나만 골라!"`,
     choices: [
-      { label: '젊음의 물약', success: { text: '한 모금 마시자 몸에 활력이 넘쳤다! "피부 좋아졌다~"', effect: { meet: 'lulu', stats: { vit: 15 } }, tone: 'good' } },
-      { label: '지혜의 물약', success: { text: '머릿속이 맑아졌다. 마법 공식이 술술 이해된다!', effect: { meet: 'lulu', stats: { int: 10, mana: 8 } }, tone: 'good' } },
-      { label: '행운의 물약', success: { text: '마시는 순간 네잎클로버가 발밑에 피어났다!', effect: { meet: 'lulu', stats: { luck: 15 } }, tone: 'good' } },
+      { label: '젊음의 물약', success: { text: '한 모금 마시자 몸에 활력이 넘쳤다! "피부 좋아졌다~"', effect: { meet: 'lulu', stats: { vit: 30 } }, tone: 'good' } },
+      { label: '지혜의 물약', success: { text: '머릿속이 맑아졌다. 마법 공식이 술술 이해된다!', effect: { meet: 'lulu', stats: { int: 20, mana: 16 } }, tone: 'good' } },
+      { label: '행운의 물약', success: { text: '마시는 순간 네잎클로버가 발밑에 피어났다!', effect: { meet: 'lulu', stats: { luck: 30 } }, tone: 'good' } },
     ],
   },
 
@@ -49,13 +49,13 @@ export const NPC_EVENTS: GameEvent[] = [
         : `"오, 또 보네! 이번이 ${past(s, 'grim') + 1}번째 생인가?" 사신 그림이 체스판을 펼치며 해골 이를 딱딱거렸다. "지난번 판, 복수전이다!"`,
     choices: [
       {
-        label: '체스로 승부한다', check: { stat: 'int', dc: 38 },
-        success: { text: '체크메이트! 사신이 머리(뼈)를 긁적였다. "졌다, 졌어! 약속대로 좀 더 천천히 데리러 올게."', effect: { meet: 'grim', flags: ['grim_win'], stats: { fame: 3 } }, tone: 'good' },
-        fail: { text: '"체크메이트~" 사신이 즐겁게 웃었다. "괜찮아, 아직은 안 데려가. 아마도?"', effect: { meet: 'grim', stats: { luck: -2 } } },
+        label: '체스로 승부한다', check: { stat: 'int', dc: 76 },
+        success: { text: '체크메이트! 사신이 머리(뼈)를 긁적였다. "졌다, 졌어! 약속대로 좀 더 천천히 데리러 올게."', effect: { meet: 'grim', flags: ['grim_win'], stats: { fame: 6 } }, tone: 'good' },
+        fail: { text: '"체크메이트~" 사신이 즐겁게 웃었다. "괜찮아, 아직은 안 데려가. 아마도?"', effect: { meet: 'grim', stats: { luck: -4 } } },
       },
       {
         label: '차만 마신다',
-        success: { text: '사신이 끓인 차는 의외로 맛있었다. "인생 어땠어?" 둘은 해가 질 때까지 수다를 떨었다.', effect: { meet: 'grim', karma: 5, stats: { cha: 2 } } },
+        success: { text: '사신이 끓인 차는 의외로 맛있었다. "인생 어땠어?" 둘은 해가 질 때까지 수다를 떨었다.', effect: { meet: 'grim', karma: 5, stats: { cha: 4 } } },
       },
     ],
   },
@@ -63,16 +63,16 @@ export const NPC_EVENTS: GameEvent[] = [
   // ───── 고양이 상인 모모 ─────
   {
     id: 'npc_momo', title: '고양이 상인 모모', once: true, weight: 1.4,
-    cond: { minAge: 12, maxAge: 80, maxStats: { luck: 99 } },
+    cond: { minAge: 12, maxAge: 80, maxStats: { luck: 198 } },
     text: (s) =>
       past(s, 'momo') < 2
         ? '고양이 귀 상인 모모가 보따리를 펼쳤다. "손님, 운명의 뽑기 한 판 어떠냥? 꽝은… 아마 없다냥!"'
         : `"앗, 단골손님이다냥! 벌써 ${past(s, 'momo')}번째 생이냥?" 모모가 반짝이는 황금 캡슐을 흔들었다. "단골한테는 확률 업 이벤트다냥!"`,
     choices: [
       {
-        label: '뽑기를 돌린다', check: { stat: 'luck', dc: 30 },
-        success: { text: '번쩍! 황금 캡슐이 열리며 전설급 아이템이 튀어나왔다. "대, 대박이다냥!!"', effect: { meet: 'momo', flags: ['momo_jackpot'], stats: { fame: 5, luck: 5, mana: 5, vit: 5 } }, tone: 'good' },
-        fail: { text: '캡슐에서 나온 건… 고양이 발바닥 스티커. "꽝도 소중한 추억이다냥~"', effect: { meet: 'momo', stats: { cha: 1 } } },
+        label: '뽑기를 돌린다', check: { stat: 'luck', dc: 60 },
+        success: { text: '번쩍! 황금 캡슐이 열리며 전설급 아이템이 튀어나왔다. "대, 대박이다냥!!"', effect: { meet: 'momo', flags: ['momo_jackpot'], stats: { fame: 10, luck: 10, mana: 10, vit: 10 } }, tone: 'good' },
+        fail: { text: '캡슐에서 나온 건… 고양이 발바닥 스티커. "꽝도 소중한 추억이다냥~"', effect: { meet: 'momo', stats: { cha: 2 } } },
       },
       {
         label: '구경만 한다',

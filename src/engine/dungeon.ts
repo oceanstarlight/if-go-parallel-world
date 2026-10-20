@@ -20,8 +20,14 @@ export const DUNGEON_BAN_YEARS = 10;
 /** 처음 쓰러진 뒤 악몽에 시달리는 기간 (달) */
 export const TRAUMA_MONTHS = 36;
 
+/** 던전은 2년에 한 번 (돈 → 장비 → 던전을 끝없이 되풀이하지 못하게) */
+export const DUNGEON_COOLDOWN = 2;
+
+/** 다시 들어갈 수 있는 나이 */
+export const dungeonOpenAge = (s: LifeState) => Math.max(DUNGEON_MIN_AGE, s.dgBanUntil ?? 0, s.dgNextAge ?? 0);
+
 export const canEnterDungeon = (s: LifeState) =>
-  !s.death && !s.pendingEventId && s.age >= DUNGEON_MIN_AGE && s.age >= (s.dgBanUntil ?? 0);
+  !s.death && !s.pendingEventId && s.age >= dungeonOpenAge(s);
 
 /** 시작할 수 있는 계층 (입구 + 클리어한 5층 단위 지점) */
 export function startFloors(s: LifeState): number[] {
@@ -35,6 +41,8 @@ export function beginDive(s: LifeState, start: number) {
   const floor = allowed.includes(start) ? start : 0;
   s.hp = Math.min(s.hp ?? maxHp(s), maxHp(s));
   s.dive = { floor, loot: [], log: [], gold: 0, last: null };
+  s.dgNextAge = s.age + DUNGEON_COOLDOWN;
+  s.dgNotified = false;
   rec(s).dives++;
   note(s, floor ? `${floor}층의 귀환 포탈로 내려왔다. 서늘한 공기가 감돈다.` : '던전 입구에 섰다. 횃불이 일렁인다.', 'milestone');
 }
@@ -135,16 +143,15 @@ function fall(s: LifeState, floor: number) {
     [`${floor}층에서 쓰러졌다… 정신을 차려 보니 지상의 진료소였다. 누군가 끌고 나와 준 모양이다.`, 'death'],
     [`장비·소지품 ${lostItems}개와 ${fmtGold(lostGold)}를 모두 잃었다.${lostTrinkets ? ` 차고 있던 장신구 ${lostTrinkets}개도 사라졌다${worn.length ? ` (${worn.length}개는 무사)` : ''}.` : ''} 3년간 악몽에 시달리고, ${s.dgBanUntil}세까지 던전에 들어갈 수 없다. 다음에 또 쓰러지면… 정말 끝이다.`, 'bad'],
   ];
-  s.log.push({ age: s.age, m: Math.max(1, s.month ?? 0), text: `던전 ${floor}층에서 쓰러졌다! 목숨은 건졌지만 장비·소지품과 ${fmtGold(lostGold)}를 모두 잃었다.${lostTrinkets ? ` 장신구도 ${lostTrinkets}개 잃었다.` : ''} 3년간 악몽에 시달린다. (${s.dgBanUntil}세까지 던전 출입 불가 · 다음엔 진짜 죽음)`, tone: 'bad' });
+  s.log.push({ age: s.age, m: (s.month ?? 0) + 1, text: `던전 ${floor}층에서 쓰러졌다! 목숨은 건졌지만 장비·소지품과 ${fmtGold(lostGold)}를 모두 잃었다.${lostTrinkets ? ` 장신구도 ${lostTrinkets}개 잃었다.` : ''} 3년간 악몽에 시달린다. (${s.dgBanUntil}세까지 던전 출입 불가 · 다음엔 진짜 죽음)`, tone: 'bad' });
 }
 
 export type DescendResult = 'cleared' | 'fled' | 'dead' | 'conquered' | 'fallen';
 
-/** 5층을 내려간다 */
 /** 5층을 내려간다: 앞의 4층 + 보스까지 자동으로 (자동 플레이·시뮬레이션용) */
 export function descend(s: LifeState, rng: Rng = Math.random): DescendResult {
-  const r = descendPath(s, rng);
-  return r === 'boss' ? bossAuto(s, rng) : r;
+  const r = descendPath(s, rng, true);
+  return r === 'boss' ? bossAuto(s, rng) : r === 'mob' ? 'fled' : r;
 }
 
 /** 지금 구간의 보스 */
@@ -153,52 +160,101 @@ export function bossAhead(s: LifeState) {
   return { floor, name: bossOf(floor), ep: floorPower(floor, true) };
 }
 
-/** 앞의 4층을 지나 보스 앞까지 간다. 보스 앞에 서면 'boss' (턴제 전투는 UI 가 맡는다) */
-export function descendPath(s: LifeState, rng: Rng = Math.random): DescendResult | 'boss' {
+/** 길에서 마물과 마주칠 확률 (나머지는 함정·보물상자·샘물·조용한 통로) */
+export const MOB_CHANCE = 0.2;
+
+/**
+ * 앞의 4층을 한 층씩 지나간다.
+ *  - 마물(20%)을 만나면 'mob' 을 돌려주고 멈춘다 → 턴제 전투 후 settleMob, 다시 descendPath 로 이어 간다
+ *  - auto 면 마물도 승률로 바로 처리한다 (자동 플레이·시뮬레이션)
+ *  - 4층을 다 지나면 보스 방 앞에서 'boss' (가방을 점검하고 도전한다)
+ */
+export function descendPath(s: LifeState, rng: Rng = Math.random, auto = false): DescendResult | 'boss' | 'mob' {
   const d = s.dive;
   if (!d || s.death || d.fallen || d.floor >= DUNGEON_DEPTH) return 'fled';
+  if (d.atBoss) return 'boss';
+  if (d.mob) return 'mob';
   const cp = combatPower(s);
-  for (let f = d.floor + 1; f <= d.floor + 4; f++) {
+  for (let f = (d.cursor ?? d.floor) + 1; f <= d.floor + 4; f++) {
+    d.cursor = f;
     rec(s).maxFloor = Math.max(rec(s).maxFloor, f);
     const b = biomeOf(f);
     const r = rng();
-    if (r < 0.55) {
+    if (r < MOB_CHANCE) {
       const mon = b.monsters[Math.floor(rng() * b.monsters.length)];
       const ep = floorPower(f);
+      if (!auto) {
+        d.mob = { floor: f, name: mon, ep };
+        note(s, `${f}층 · ${mon}이(가) 길을 막았다!`, 'bad');
+        return 'mob';
+      }
       const p = winChance(cp, ep) / 100;
       if (rng() < p) {
-        // 마물은 가끔(6%) 장신구를 떨어뜨린다
-        const it = rng() < 0.06 ? trinketDrop(rng, f, false) : rng() < 0.75 ? materialDrop(rng, f) : null;
-        if (it) d.loot.push(it);
+        mobLoot(s, f, mon, rng);
         const res = hurt(s, ep * 0.12 * (1.2 - p), f);
-        bump(rec(s).slain, mon);
-        note(s, `${f}층 · ${mon} 처치!${it ? ` 「${it.name}」 획득.` : ''}`, 'good');
         if (res !== 'ok') return finish(s, res);
       } else {
         const res = hurt(s, ep * 0.32, f);
-        note(s, `${f}층 · ${mon}에게 크게 당했다! 간신히 도망쳤다. (HP ${s.hp})`, 'bad');
+        note(s, `${f}층 · ${mon}에게 크게 당했다! 간신히 도망쳤다. (체력 ${s.hp})`, 'bad');
         if (res !== 'ok') return finish(s, res);
       }
-    } else if (r < 0.7) {
-      if (rng() * 100 < 35 + statOf(s, 'luck') / 2) note(s, `${f}층 · 발밑의 함정을 아슬아슬하게 피했다.`);
+    } else if (r < 0.45) {
+      if (rng() * 100 < 35 + statOf(s, 'luck') / 4) note(s, `${f}층 · 발밑의 함정을 아슬아슬하게 피했다.`);
       else {
         const res = hurt(s, floorPower(f) * 0.2, f);
-        note(s, `${f}층 · 함정에 걸렸다! (HP ${s.hp})`, 'bad');
+        note(s, `${f}층 · 함정에 걸렸다! (체력 ${s.hp})`, 'bad');
         if (res !== 'ok') return finish(s, res);
       }
-    } else if (r < 0.87) {
+    } else if (r < 0.75) {
       const g = Math.round(f * 8 * (0.5 + rng()));
       d.gold += g;
-      const gear = rng() < 0.18 ? gearDrop(rng, f, false) : null;
+      const gear = rng() < 0.15 ? gearDrop(rng, f, false) : null;
       if (gear) d.loot.push(gear);
       note(s, `${f}층 · 보물상자 발견! ${fmtGold(g)}${gear ? `와 「${gear.name}」` : ''}을(를) 챙겼다.`, 'good');
-    } else {
+    } else if (r < 0.85) {
       const heal = Math.round(maxHp(s) * 0.25);
       s.hp = Math.min(maxHp(s), (s.hp ?? 0) + heal);
-      note(s, `${f}층 · 맑은 샘물을 마셨다. HP +${heal}`, 'good');
+      note(s, `${f}층 · 맑은 샘물을 마셨다. 체력 +${heal}`, 'good');
+    } else {
+      const m = rng() < 0.6 ? materialDrop(rng, f) : null;
+      if (m) d.loot.push(m);
+      note(s, `${f}층 · 조용한 통로를 지났다.${m ? ` 바닥에서 「${m.name}」을(를) 주웠다.` : ''}`);
     }
   }
+  d.atBoss = true;
+  note(s, `${d.floor + 5}층 · 보스 「${bossOf(d.floor + 5)}」의 방 앞에 섰다. 숨을 고르자.`, 'milestone');
   return 'boss';
+}
+
+/** 마물을 쓰러뜨린 전리품 */
+function mobLoot(s: LifeState, f: number, mon: string, rng: Rng) {
+  const d = s.dive!;
+  // 마물은 가끔(6%) 장신구를 떨어뜨린다
+  const it = rng() < 0.06 ? trinketDrop(rng, f, false) : rng() < 0.8 ? materialDrop(rng, f) : null;
+  if (it) d.loot.push(it);
+  bump(rec(s).slain, mon);
+  note(s, `${f}층 · ${mon} 처치!${it ? ` 「${it.name}」 획득.` : ''}`, 'good');
+}
+
+/** 턴제 마물전이 끝났다. 'continue' 면 계속 내려갈 수 있다 */
+export function settleMob(s: LifeState, result: 'win' | 'lose' | 'fled', hpLeft: number, rng: Rng = Math.random): DescendResult | 'continue' {
+  const d = s.dive;
+  if (!d?.mob) return 'continue';
+  const { floor: f, name } = d.mob;
+  d.mob = null;
+  if (result === 'lose') {
+    s.hp = 0;
+    const res = knockout(s, f);
+    if (res === 'saved') {
+      d.last = 'fled';
+      return 'fled';
+    }
+    return finish(s, res);
+  }
+  s.hp = Math.max(1, Math.min(hpLeft, maxHp(s)));
+  if (result === 'win') mobLoot(s, f, name, rng);
+  else note(s, `${f}층 · ${name}에게서 달아났다. (체력 ${s.hp})`, 'bad');
+  return 'continue';
 }
 
 /** 보스를 쓰러뜨렸다: 전리품, 귀환 포탈, 기록 */
@@ -213,6 +269,8 @@ function winBoss(s: LifeState, rng: Rng): DescendResult {
   gainStat(s, 'vit', 1, rng);
   gainStat(s, 'mana', 1, rng);
   d.floor = bf;
+  d.cursor = undefined;
+  d.atBoss = false;
   s.dgBest = Math.max(s.dgBest ?? 0, bf);
   bump(rec(s).bosses, boss);
   rec(s).maxFloor = Math.max(rec(s).maxFloor, bf);
@@ -250,7 +308,7 @@ export function settleBoss(s: LifeState, result: 'win' | 'lose' | 'fled', hpLeft
   }
   if (result === 'fled') {
     s.hp = Math.max(1, hpLeft);
-    note(s, `${bf}층 보스 「${boss}」에게서 간신히 도망쳤다. (HP ${s.hp})`, 'bad');
+    note(s, `${bf}층 보스 「${boss}」에게서 간신히 도망쳤다. (체력 ${s.hp})`, 'bad');
     d.last = 'fled';
     return 'fled';
   }

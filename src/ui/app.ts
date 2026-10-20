@@ -29,12 +29,12 @@ import { econRow, viewDungeon, viewTown } from './world';
 import type { MarketCat } from '../data/market';
 import { branchPaths } from '../data/branches';
 import { BATTLE_ENEMY, CP_WEIGHT, ENEMY_NAME, battleOdds, combatPower, isCombat } from '../engine/combat';
-import { MAGIC_COST, autoDuel, critChance, duelTurn, fleeChance, magicMul, startDuel, type Duel, type DuelAction } from '../engine/duel';
-import { beginDive, bossAhead, canEnterDungeon, descendPath, endDiveOnDeath, retreat, settleBoss } from '../engine/dungeon';
-import { buy as marketBuy, drink, drinkBest, equip, fmtGold, innRest, payLabel, repairItems, sell, sellAllLoot, unequipTrinket } from '../engine/economy';
+import { MAGIC_COST, attackMul, autoDuel, critChance, duelTurn, fleeChance, magicMul, startDuel, type Duel, type DuelAction } from '../engine/duel';
+import { beginDive, bossAhead, canEnterDungeon, descendPath, endDiveOnDeath, retreat, settleBoss, settleMob } from '../engine/dungeon';
+import { clampHp, maxHp, buy as marketBuy, drink, drinkBest, equip, fmtGold, innRest, payLabel, repairItems, sell, sellAllLoot, unequipTrinket } from '../engine/economy';
 import { statOf, trinketBonus } from '../engine/trinket';
 import { rec } from '../engine/record';
-import { bossEnemy } from '../gfx/mapping';
+import { bossEnemy, mobEnemy } from '../gfx/mapping';
 import { biomeOf } from '../data/items';
 import { ENEMY_HP as BOSS_HP } from '../gfx/mapping';
 
@@ -73,7 +73,7 @@ interface App {
   /** 사용자가 접어둔 사건 (같은 사건이면 다시 자동으로 올리지 않는다) */
   dismissedEvent: string | null;
   oracle: Oracle | null;
-  /** 방침을 고르지 않고 한 해를 넘기려 했다 (방침 카드를 강조) */
+  /** 성장을 고르지 않고 한 해를 넘기려 했다 (성장 카드를 강조) */
   focusNudge: boolean;
   /** 시간 흐름: 일시 정지 · 한 해의 길이(초) */
   paused: boolean;
@@ -84,6 +84,13 @@ interface App {
   statInfo: StatKey | 'cp' | null;
   /** 진행 중인 턴제 전투 */
   duel: DuelState | null;
+  /** 던전 입장 안내창 */
+  dgConfirm: boolean;
+  /** 능력치 변화 잔상: 누적 변화량과 남은 틱 */
+  ghost: Partial<Record<StatKey, { d: number; ttl: number }>>;
+  statSnap: Partial<Record<StatKey, number>> | null;
+  /** 마지막으로 알린 스트레스 단계 (0 · 80 · 90 · 100) */
+  stressTier: number;
   townTab: 'shop' | 'bag';
   townCat: MarketCat;
   music: Music;
@@ -113,6 +120,10 @@ export async function mount(root: HTMLElement) {
     monthFrac: 0,
     statInfo: null,
     duel: null,
+    dgConfirm: false,
+    ghost: {},
+    statSnap: null,
+    stressTier: 0,
     townTab: 'shop',
     townCat: 'weapon',
     music: new Music(),
@@ -128,7 +139,12 @@ export async function mount(root: HTMLElement) {
       // 도트 캔버스가 붙는 자리는 속을 건드리지 않는다
       onBeforeElChildrenUpdated: (from, to) => !((from as HTMLElement).dataset?.gfx && (to as HTMLElement).dataset?.gfx),
       // 입력 중인 칸은 그대로 둔다
-      onBeforeElUpdated: (from) => !(from === document.activeElement && from.tagName === 'INPUT'),
+      onBeforeElUpdated: (from, to) => {
+        if (from === document.activeElement && from.tagName === 'INPUT') return false;
+        // 캔버스 크기에서 정한 장면 높이(--ch)는 다시 그려도 유지
+        if (from.classList.contains('scene-host') && from.getAttribute('style')) to.setAttribute('style', from.getAttribute('style')!);
+        return true;
+      },
     });
     syncGfx(app, root); // 캔버스가 붙어 높이가 정해진 뒤에 스크롤
     app.music.setMood(moodFor(app.screen));
@@ -142,8 +158,12 @@ export async function mount(root: HTMLElement) {
       return;
     }
     const pending = act(app, action, arg);
+    afterStep(app);
     render();
-    pending?.then(render);
+    pending?.then(() => {
+      afterStep(app);
+      render();
+    });
   };
 
   root.addEventListener('click', (ev) => {
@@ -208,6 +228,7 @@ export async function mount(root: HTMLElement) {
       if (app.monthFrac >= 1) {
         app.monthFrac = Math.min(0.99, app.monthFrac - 1);
         advanceMonth(s);
+        tickGhost(app);
         afterStep(app);
         render();
         popPay(root, s);
@@ -319,7 +340,7 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
     case 'focus': {
       const s = app.life;
       if (!s) break;
-      // 방침은 언제든 바꿀 수 있다. 시간은 저절로 흐른다
+      // 성장은 언제든 바꿀 수 있다. 시간은 저절로 흐른다
       s.focus = arg as Focus;
       app.tab = 'none';
       afterStep(app);
@@ -408,10 +429,24 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
     }
     // ───── 던전 (시간이 흐르지 않는다) ─────
     case 'dungeon':
-      if (app.life && (app.life.dive || canEnterDungeon(app.life))) {
+      if (!app.life) break;
+      // 원정 중이 아니고 들어갈 수 있으면 먼저 안내창
+      if (!app.life.dive && canEnterDungeon(app.life) && app.screen !== 'dungeon') {
+        app.dgConfirm = true;
+        break;
+      }
+      app.screen = 'dungeon';
+      app.tab = 'none';
+      break;
+    case 'dungeon-enter':
+      app.dgConfirm = false;
+      if (app.life) {
         app.screen = 'dungeon';
         app.tab = 'none';
       }
+      break;
+    case 'dg-cancel':
+      app.dgConfirm = false;
       break;
     case 'dive':
       if (app.life && canEnterDungeon(app.life) && !app.life.dive) beginDive(app.life, Number(arg));
@@ -421,13 +456,26 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
       const s = app.life;
       if (!s?.dive || app.duel) break;
       const res = descendPath(s);
-      if (res !== 'boss') {
-        // 보스 앞까지 못 가고 끝났다 (쓰러짐·죽음)
-        if (res === 'dead') endDiveOnDeath(s);
-        afterStep(app);
-        break;
-      }
       afterStep(app);
+      if (res === 'mob') {
+        // 길을 막은 마물과 턴제 전투
+        const m = s.dive!.mob!;
+        const d = startDuel(s, 'mob', m.name, m.ep);
+        if (!app.gfx) {
+          const r = settleMob(s, autoDuel(d, s, Math.random), d.hp);
+          if (r === 'dead') endDiveOnDeath(s);
+          afterStep(app);
+          break;
+        }
+        return openDuel(app, d, { kind: 'mob' }, mobEnemy(m.floor), statOf(s, 'mana') > statOf(s, 'vit'));
+      }
+      // 보스 방 앞에 서면 멈춘다 (가방을 점검하고 「보스에게 도전」)
+      if (res === 'dead') endDiveOnDeath(s);
+      break;
+    }
+    case 'boss': {
+      const s = app.life;
+      if (!s?.dive?.atBoss || app.duel) break;
       const boss = bossAhead(s);
       const d = startDuel(s, 'boss', boss.name, boss.ep);
       if (!app.gfx) {
@@ -437,7 +485,7 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
         afterStep(app);
         break;
       }
-      return openDuel(app, d, { kind: 'boss' }, bossEnemy(boss.floor), s.stats.mana > s.stats.vit);
+      return openDuel(app, d, { kind: 'boss' }, bossEnemy(boss.floor), statOf(s, 'mana') > statOf(s, 'vit'));
     }
     case 'duel': {
       const du = app.duel;
@@ -453,7 +501,7 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
         }
         // 보스에게 지면: 한 번 쓰러진 적이 있으면 진짜 죽음
         const anim = du.d.result === 'win' ? 'win' : du.d.result === 'fled' ? 'fled'
-          : du.ctx.kind === 'boss' && s.dgFallen && s.extraLives <= 0 ? 'died' : 'lose';
+          : du.ctx.kind !== 'event' && s.dgFallen && s.extraLives <= 0 ? 'died' : 'lose';
         return (g ? g.closeBattle(anim) : Promise.resolve()).then(() => {
           du.busy = false;
           du.done = true;
@@ -467,8 +515,12 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
       if (!du || !s || !du.done || !du.d.result) break;
       app.duel = null;
       if (du.ctx.kind === 'event') {
-        s.hp = Math.max(1, du.d.hp);
+        // 사건 전투가 끝나면 체력은 다시 차오른다 (던전 안에서만 깎인 채로 남는다)
+        s.hp = maxHp(s);
         choose(s, du.ctx.choice, Math.random, du.d.result === 'win');
+      } else if (du.ctx.kind === 'mob') {
+        const r = settleMob(s, du.d.result, du.d.hp);
+        if (r === 'dead') endDiveOnDeath(s);
       } else {
         const r = settleBoss(s, du.d.result, du.d.hp);
         if (r === 'dead') endDiveOnDeath(s);
@@ -492,7 +544,17 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
     case 'town':
     case 'town-tab':
       // 상점·가방은 각각의 버튼으로 바로 간다 (어디서 누르든 해당 탭만 켜진다)
-      if (app.life && !app.life.dive && !app.life.death) {
+      // 원정 중에는 가방만: 상점에는 갈 수 없다
+      if (app.life?.dive && !app.life.death) {
+        if (arg === 'shop') app.notice = '던전 원정 중에는 상점에 갈 수 없다. 귀환하자.';
+        app.screen = 'town';
+        app.townTab = 'bag';
+        app.tab = 'none';
+        app.dgConfirm = false;
+        break;
+      }
+      if (app.life && !app.life.death) {
+        app.dgConfirm = false;
         app.screen = 'town';
         app.townTab = arg === 'bag' ? 'bag' : 'shop';
         app.tab = 'none';
@@ -502,6 +564,7 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
       app.townCat = arg as MarketCat;
       break;
     case 'mbuy':
+      if (app.life?.dive) break;
       if (app.life) app.notice = marketBuy(app.life, arg!).msg;
       afterStep(app);
       break;
@@ -526,6 +589,7 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
       afterStep(app);
       break;
     case 'inn':
+      if (app.life?.dive) break;
       if (app.life) app.notice = innRest(app.life).msg;
       afterStep(app);
       break;
@@ -553,6 +617,9 @@ function birth(app: App) {
     houseId: rollHouse(Math.random, app.meta.unlocked),
     cheatId: fated ? rollCheat() : app.setup.cheatId,
   };
+  app.ghost = {};
+  app.statSnap = null;
+  app.stressTier = 0;
   app.life = createLife({
     ...origin,
     name,
@@ -572,7 +639,45 @@ function birth(app: App) {
 }
 
 function afterStep(app: App) {
-  if (app.life) saveRun(app.life);
+  const s = app.life;
+  if (!s) return;
+  clampHp(s);
+  // 스트레스 경고: 단계가 올라갈 때 한 번씩
+  const tier = STRESS_TIERS.filter(([t]) => (s.stress ?? 0) >= t).pop();
+  if ((tier?.[0] ?? 0) > app.stressTier && !s.death) app.notice = tier![1];
+  app.stressTier = tier?.[0] ?? 0;
+  // 한 번만 뜨는 알림 (던전 개방 등)
+  if (s.toast) {
+    app.notice = s.toast;
+    s.toast = null;
+  }
+  // 능력치 변화 → 잔상 (겹치면 누적하고 4틱 다시 센다)
+  if (app.statSnap) {
+    for (const k of STAT_KEYS) {
+      const dv = statOf(s, k) - (app.statSnap[k] ?? statOf(s, k));
+      if (!dv) continue;
+      const g = app.ghost[k];
+      const d = (g?.d ?? 0) + dv;
+      if (d) app.ghost[k] = { d, ttl: GHOST_TICKS };
+      else delete app.ghost[k];
+    }
+  }
+  app.statSnap = Object.fromEntries(STAT_KEYS.map((k) => [k, statOf(s, k)]));
+  saveRun(s);
+}
+
+const STRESS_TIERS: [number, string][] = [
+  [80, '머리가 아프다…'],
+  [90, '휴식이 필요해… 성장을 「휴식」으로 바꾸자.'],
+  [100, '스트레스가 너무 높다! 이대로면 쓰러진다.'],
+];
+
+const GHOST_TICKS = 4;
+function tickGhost(app: App) {
+  for (const k of STAT_KEYS) {
+    const g = app.ghost[k];
+    if (g && --g.ttl <= 0) delete app.ghost[k];
+  }
 }
 
 // ───────────────────────── 화면 ─────────────────────────
@@ -595,6 +700,7 @@ function view(app: App): string {
     <main class="screen view-${app.screen} ${app.duel ? 'dueling' : ''}">${body}</main>
     ${underbar(app)}
     ${app.notice ? `<div class="toast">${esc(app.notice)}</div>` : ''}
+    ${app.dgConfirm ? dungeonConfirm() : ''}
   `;
 }
 
@@ -607,7 +713,9 @@ function underbar(app: App): string {
     const s = app.life;
     let center = `<button class="ub-main" data-act="go" data-arg="life"><span>인생</span></button>`;
     if (s.death) center = `<button class="ub-main danger" data-act="see-grave"><span>묘비로</span></button>`;
-    else if (app.screen === 'dungeon' && !app.duel && s.dive && !s.dive.fallen && s.dive.floor < 100) center = `<button class="ub-main pulse" data-act="descend"><span>하강</span><small>5층</small></button>`;
+    else if (app.screen === 'dungeon' && !app.duel && s.dive?.atBoss) center = `<button class="ub-main danger" data-act="boss"><span>보스</span><small>도전</small></button>`;
+    else if (app.screen === 'dungeon' && !app.duel && s.dive && !s.dive.fallen && s.dive.floor < 100) center = `<button class="ub-main pulse" data-act="descend"><span>하강</span><small>${(s.dive.cursor ?? s.dive.floor) > s.dive.floor ? '계속' : '5층'}</small></button>`;
+    else if (app.screen === 'town' && s.dive) center = `<button class="ub-main" data-act="dungeon"><span>던전</span></button>`;
     const inDive = !!s.dive;
     const inShop = app.screen === 'town' && app.townTab === 'shop';
     const inBag = app.screen === 'town' && app.townTab === 'bag';
@@ -618,7 +726,7 @@ function underbar(app: App): string {
         ${item('dungeon', '', 'sword', '던전', true)}
         ${center}
         ${item('retreat', '', 'door-closed', '귀환')}
-        ${item('town', 'bag', 'backpack', '가방', false, 'disabled')}
+        ${item('town', 'bag', 'backpack', '가방', app.screen === 'town')}
       </nav>`;
     }
     return `
@@ -642,7 +750,7 @@ function underbar(app: App): string {
     return `
       <nav class="underbar">
         ${item('dungeon', '', 'sword', '던전', false, busy || s.age < 12 ? 'disabled' : '')}
-        ${item('tab', 'action', ev ? 'warning-diamond' : 'target', ev ? '사건' : '방침', tab === 'action')}
+        ${item('tab', 'action', ev ? 'warning-diamond' : 'target', ev ? '사건' : '성장', tab === 'action')}
         ${center}
         ${item('town', 'shop', 'store', '상점', false, busy ? 'disabled' : '')}
         ${item('tab', 'menu', 'menu', '정보', tab === 'menu')}
@@ -845,8 +953,8 @@ function viewLife(app: App): string {
   const stats = STAT_KEYS.map((k) => `
     <button class="stat ${app.statInfo === k ? 'on' : ''}" data-act="stat" data-arg="${k}" title="${STAT_NAMES[k]}: 누르면 설명">
       <span class="stat-name">${STAT_NAMES[k]}</span>
-      <div class="bar"><div class="fill fill-${k}" style="width:${s.stats[k]}%"></div>${bonus[k] ? `<div class="fill-bonus" style="left:${s.stats[k]}%;width:${statOf(s, k) - s.stats[k]}%"></div>` : ''}</div>
-      <span class="stat-val ${bonus[k] ? 'boosted' : ''}" ${bonus[k] ? `title="원래 ${s.stats[k]} + 장신구 ${bonus[k]}"` : ''}>${statOf(s, k)}</span>
+      <div class="bar"><div class="fill fill-${k}" style="width:${s.stats[k] / 2}%"></div>${bonus[k] ? `<div class="fill-bonus" style="left:${s.stats[k] / 2}%;width:${Math.min(200, statOf(s, k)) / 2 - s.stats[k] / 2}%"></div>` : ''}</div>
+      <span class="stat-val ${bonus[k] ? 'boosted' : ''}" ${bonus[k] ? `title="원래 ${s.stats[k]} + 장신구 ${bonus[k]}"` : ''}>${statOf(s, k)}${app.ghost[k] ? `<i class="ghost ${app.ghost[k]!.d > 0 ? 'up' : 'down'}">${app.ghost[k]!.d > 0 ? '+' : ''}${app.ghost[k]!.d}</i>` : ''}</span>
     </button>`).join('');
 
   const rels = (['friend', 'rival', 'mentor', 'spouse'] as RelKey[]).map((k) => relLine(s, k)).join('');
@@ -880,7 +988,7 @@ function viewLife(app: App): string {
     panel = `
       <div class="event-card ${swipe ? 'swipeable' : ''}" ${swipe ? `data-swipe="choose" data-left="${esc(fill(choices[0].label, s))}" data-right="${esc(fill(choices[1].label, s))}"` : ''}>
         ${swipe ? '<div class="swipe-label"></div>' : ''}
-        <p class="eyebrow">${s.age}세 ${Math.max(1, s.month ?? 0)}월의 사건 · 시간이 멈췄다</p>
+        <p class="eyebrow">${s.age}세 ${(s.month ?? 0) + 1}월의 사건 · 시간이 멈췄다</p>
         <h3>${esc(fill(ev.title, s))}</h3>
         <p class="event-text">${esc(fill(ev.text, s))}</p>
         ${swipe ? '<p class="swipe-guide"><b class="l">← 왼쪽</b> · 카드를 밀어서 선택 · <b class="r">오른쪽 →</b></p>' : ''}
@@ -906,8 +1014,8 @@ function viewLife(app: App): string {
     const young = s.age < 2;
     panel = `
       <div class="focus-card">
-        <p class="eyebrow">방침</p>
-        ${young ? '' : '<p class="muted small focus-hint">시간은 저절로 흐른다. 방침은 언제든 바꿀 수 있다. <kbd>1</kbd>~<kbd>5</kbd> · 정지 <kbd>Space</kbd></p>'}
+        <p class="eyebrow">성장</p>
+        ${young ? '' : '<p class="muted small focus-hint">시간은 저절로 흐른다. 성장은 언제든 바꿀 수 있다. <kbd>1</kbd>~<kbd>5</kbd> · 정지 <kbd>Space</kbd></p>'}
         <div class="focus-grid">
           ${FOCI.map((f) => {
             const mul = f === 'rest' ? 1 : focusMul(s, f);
@@ -920,7 +1028,7 @@ function viewLife(app: App): string {
           }).join('')}
         </div>
         ${!young && (s.stress ?? 0) >= STRESS_HIGH && s.focus !== 'rest' ? '<p class="warn small">스트레스가 높아 성장이 떨어지고 있다. 한 해 쉬어 가자!</p>' : ''}
-        ${young ? '<p class="muted small">아직 너무 어리다. 세 살이 되면 방침을 정할 수 있다.</p>' : ''}
+        ${young ? '<p class="muted small">아직 너무 어리다. 세 살이 되면 성장을 정할 수 있다.</p>' : ''}
         ${(s.trauma ?? 0) > 0 ? `<p class="warn small">${icon('skull')} 던전의 악몽 (${s.trauma}달 남음) — 스트레스가 100에 묶여 있다.</p>` : ''}
         ${(s.recover ?? 0) > 0 ? `<p class="warn small">${icon('heart')} 요양 중 (${s.recover}달 남음) — 성장과 수입이 절반이다.</p>` : ''}
       </div>`;
@@ -989,6 +1097,25 @@ function viewLife(app: App): string {
   `;
 }
 
+/** 던전 입장 안내창 */
+function dungeonConfirm(): string {
+  return `
+    <div class="modal-back" data-act="dg-cancel"></div>
+    <div class="modal" role="dialog" aria-label="던전 입장">
+      <h3>${icon('sword')} 던전에 들어간다</h3>
+      <ul class="small">
+        <li>한 번 들어가면 <b>귀환할 때까지 상점·여관에 갈 수 없다.</b> 가방은 열 수 있다.</li>
+        <li>던전은 <b>2년에 한 번</b>만 들어갈 수 있다.</li>
+        <li>쓰러지면 장비·소지품·돈을 잃는다. 두 번째는 진짜 죽음이다.</li>
+      </ul>
+      <div class="modal-actions">
+        <button class="btn primary" data-act="dungeon-enter">${icon('sword')} 던전으로 가기</button>
+        <button class="btn" data-act="town" data-arg="shop">${icon('store')} 상점으로 가기</button>
+        <button class="btn" data-act="dg-cancel">다시 생각하기</button>
+      </div>
+    </div>`;
+}
+
 /** 능력치·전투력 설명 상자 */
 function statInfoBox(app: App, s: LifeState): string {
   const k = app.statInfo;
@@ -999,14 +1126,14 @@ function statInfoBox(app: App, s: LifeState): string {
     const gear = (s.equip?.weapon?.power ?? 0) + (s.equip?.armor?.power ?? 0);
     const job = (jobById(s.jobId)?.combat ?? 0) * s.jobRank;
     const parts = [
-      ['체력', vit * w.vit], ['마력', mana * w.mana], [vit >= mana ? '주력(체력)' : '주력(마력)', w.main * Math.max(vit, mana)],
-      ['행운', luck * w.luck], ['지성', int * w.int], ['장비', gear], ['직업', job],
+      ['체력', (vit * w.vit) / 2], ['마력', (mana * w.mana) / 2], [vit >= mana ? '주력(체력)' : '주력(마력)', (w.main * Math.max(vit, mana)) / 2],
+      ['지성', (int * w.int) / 2], ['행운', (luck * w.luck) / 2], ['장비', gear], ['직업', job],
     ] as [string, number][];
     return `
       <div class="stat-info" data-act="stat" data-arg="cp">
         <b>${icon('sword')} 전투력 ${combatPower(s)}</b>
         <p>${parts.filter(([, v]) => v).map(([n, v]) => `${n} ${Math.round(v)}`).join(' + ')}</p>
-        <p class="muted small">사건 전투·던전의 승률을 정한다. 턴제 전투에서 마력은 마법, 행운은 치명타·회피·도주에 쓰인다.</p>
+        <p class="muted small">사건 전투·던전의 승률을 정한다. 턴제 전투에서 체력은 공격, 마력은 마법(같은 수치면 30% 더 셈), 지성은 치명타·마법 배율, 행운은 회피·도주에 쓰인다.</p>
       </div>`;
   }
   return `
@@ -1018,7 +1145,7 @@ function statInfoBox(app: App, s: LifeState): string {
 
 interface DuelState {
   d: Duel;
-  ctx: { kind: 'event'; choice: number } | { kind: 'boss' };
+  ctx: { kind: 'event'; choice: number } | { kind: 'boss' } | { kind: 'mob' };
   /** 연출 중 (행동 버튼 잠금) */
   busy: boolean;
   /** 승패가 나고 연출도 끝났다 → 「계속」 */
@@ -1036,7 +1163,7 @@ function openDuel(app: App, d: Duel, ctx: DuelState['ctx'], enemy: EnemyKind, ma
       enemy: enemySprite(enemy),
       magic,
       glow: magic ? 0x7ad0ff : s.jobId === 'hero' ? 0xfff0a0 : undefined,
-      enemyHp: ctx.kind === 'boss' ? BOSS_HP[enemy] : ENEMY_HP[enemy],
+      enemyHp: ctx.kind === 'event' ? ENEMY_HP[enemy] : BOSS_HP[enemy],
       groundY: app.gfx!.groundY,
       hpP: d.hp / d.hpMax,
       hpE: 1,
@@ -1054,7 +1181,7 @@ function duelPanel(app: App): string {
   const bar = (label: string, v: number, max: number, cls: string) =>
     `<div class="du-bar ${cls}"><span>${label}</span><i><u style="width:${Math.round((v / max) * 100)}%"></u></i><b>${v}/${max}</b></div>`;
   const acts: [DuelAction, string, IconName, string, boolean][] = [
-    ['attack', '공격', 'sword', `치명타 ${Math.round(critChance(s) * 100)}%`, false],
+    ['attack', '공격', 'sword', `×${attackMul(s).toFixed(1)} · 치명 ${Math.round(critChance(s) * 100)}%`, false],
     ['magic', '마법', 'wand', `MP ${MAGIC_COST} · ×${magicMul(s).toFixed(1)}`, d.mp < MAGIC_COST],
     ['guard', '방어', 'shield', d.counter ? '반격 준비됨' : '피해↓ 반격 준비', false],
     ['flee', '도주', 'arrow-left', `${Math.round(fleeChance(s) * 100)}%${du.ctx.kind === 'event' ? ' · 패배 처리' : ''}`, false],
@@ -1063,12 +1190,12 @@ function duelPanel(app: App): string {
   return `
     <div class="duel ${du.done ? `done ${d.result}` : ''}">
       <div class="du-head">
-        <p class="eyebrow">${du.ctx.kind === 'boss' ? '보스전' : '전투'} · ${d.turn + 1}턴</p>
+        <p class="eyebrow">${du.ctx.kind === 'boss' ? '보스전' : du.ctx.kind === 'mob' ? '마물' : '전투'} · ${d.turn + 1}턴</p>
         <h3>VS ${esc(d.foe)}</h3>
         <span class="du-cp">${icon('sword')} ${d.cp} vs ${d.ep}</span>
       </div>
       ${bar(esc(d.foe), d.eHp, d.eMax, 'enemy')}
-      ${bar('HP', d.hp, d.hpMax, 'hp')}
+      ${bar('체력', d.hp, d.hpMax, 'hp')}
       ${bar('MP', d.mp, d.mpMax, 'mp')}
       <ol class="du-log">${d.log.slice(-4).map((l) => `<li>${esc(l)}</li>`).join('')}</ol>
       ${du.done
@@ -1086,7 +1213,7 @@ function timeBar(app: App, s: LifeState, held: boolean): string {
   return `
     <div class="timebar ${held ? 'held' : app.paused ? 'paused' : ''}">
       <button class="tb-play" data-act="pause" ${held ? 'disabled' : ''} aria-label="${app.paused ? '재생' : '일시 정지'}">${app.paused || held ? '▶' : 'Ⅱ'}</button>
-      <span class="tb-month">${s.age}세 ${Math.max(1, month)}월</span>
+      <span class="tb-month">${s.age}세 ${month + 1}월</span>
       <div class="year-bar"><i style="width:${yearPct(s, app.monthFrac)}"></i></div>
       <span class="tb-state">${held ? '사건!' : app.paused ? '정지' : ''}</span>
       <div class="tb-pace">${PACES.map((p) => `<button class="chip ${app.pace === p.v ? 'on' : ''}" data-act="pace" data-arg="${p.v}" title="한 해 ${p.v}초">${p.name}</button>`).join('')}</div>

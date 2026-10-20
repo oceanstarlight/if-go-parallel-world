@@ -25,7 +25,7 @@ export function careerArc(a: ArcSpec): GameEvent[] {
       text: a.opportunity.text,
       choices: [
         { label: a.opportunity.take, check: { stat: a.stat, dc: a.dc },
-          success: { text: a.opportunity.win, effect: { gold: a.gold * 3, stats: { fame: 2 }, mood: 'joy' }, tone: 'good' },
+          success: { text: a.opportunity.win, effect: { gold: a.gold * 3, stats: { fame: 4 }, mood: 'joy' }, tone: 'good' },
           fail: { text: a.opportunity.lose, effect: { gold: -a.gold, stress: 10 } } },
         { label: a.opportunity.pass, success: { text: a.opportunity.passText, effect: { stress: -5 } } },
       ],
@@ -34,9 +34,9 @@ export function careerArc(a: ArcSpec): GameEvent[] {
       id: id('rival'), title: a.rival.title, branch: a.branch, once: true, weight: 1.4, cond: { minAge: 20 },
       text: a.rival.text,
       choices: [
-        { label: a.rival.fight, check: { stat: a.stat, dc: a.dc + 10 },
-          success: { text: a.rival.win, effect: { jobRank: 1, stats: { fame: 3 } }, tone: 'milestone' },
-          fail: { text: a.rival.lose, effect: { stats: { fame: -2 }, mood: 'anger' } } },
+        { label: a.rival.fight, check: { stat: a.stat, dc: a.dc + 20 },
+          success: { text: a.rival.win, effect: { jobRank: 1, stats: { fame: 6 } }, tone: 'milestone' },
+          fail: { text: a.rival.lose, effect: { stats: { fame: -4 }, mood: 'anger' } } },
         { label: a.rival.ally, success: { text: a.rival.allyText, effect: { gold: Math.round(a.gold * 0.5), karma: 3 } } },
       ],
     },
@@ -44,8 +44,8 @@ export function careerArc(a: ArcSpec): GameEvent[] {
       id: id('crisis'), title: a.crisis.title, branch: a.branch, once: true, weight: 1.4, cond: { minAge: 22 },
       text: a.crisis.text,
       choices: [
-        { label: a.crisis.handle, check: { stat: a.stat, dc: a.dc + 5 },
-          success: { text: a.crisis.win, effect: { gold: a.gold, stats: { fame: 3 } }, tone: 'good' },
+        { label: a.crisis.handle, check: { stat: a.stat, dc: a.dc + 10 },
+          success: { text: a.crisis.win, effect: { gold: a.gold, stats: { fame: 6 } }, tone: 'good' },
           fail: { text: a.crisis.lose, effect: { goldPct: -0.3, stress: 15, mood: 'gloom' } } },
         { label: a.crisis.flee, success: { text: a.crisis.fleeText, effect: { gold: -Math.round(a.gold * 0.5) } } },
       ],
@@ -60,7 +60,7 @@ export function careerArc(a: ArcSpec): GameEvent[] {
 
 export const ARC_EVENTS: GameEvent[] = [
   ...careerArc({
-    branch: 'farmer', stat: 'vit', gold: 60, dc: 28,
+    branch: 'farmer', stat: 'vit', gold: 60, dc: 56,
     opportunity: { title: '품평회', text: '왕도에서 농작물 품평회가 열린다! 올해 키운 호박이 유난히 크다.',
       take: '호박을 출품한다', win: '금상! 「전설의 호박」이라는 이름이 붙었다. 상금이 두둑하다!', lose: '수레가 뒤집혀 호박이 박살났다… 수레값만 날렸다.',
       pass: '조용히 농사나 짓는다', passText: '평화로운 하루. 이것도 나쁘지 않다.' },
@@ -73,7 +73,7 @@ export const ARC_EVENTS: GameEvent[] = [
     windfall: { title: '밭에서 나온 항아리', text: '밭을 갈다 괭이에 무언가 걸렸다. 낡은 항아리다!', result: '항아리 안에는 옛 금화가 가득! 할아버지의 할아버지가 숨겨둔 걸까?' },
   }),
   ...careerArc({
-    branch: 'merchant', stat: 'int', gold: 200, dc: 36,
+    branch: 'merchant', stat: 'int', gold: 200, dc: 72,
     opportunity: { title: '독점 계약', text: '항구에 처음 보는 향신료가 들어왔다. 독점 계약을 맺으면 큰돈이 될 것 같다.',
       take: '독점 계약을 맺는다', win: '대박! 왕도 귀족들이 줄을 섰다. 금고가 넘친다!', lose: '알고 보니 그냥 말린 풀이었다… 계약금만 날렸다.',
       pass: '신중하게 지켜본다', passText: '돌다리도 두들겨 보고 건넌다. 장사의 기본이다.' },
@@ -86,7 +86,7 @@ export const ARC_EVENTS: GameEvent[] = [
     windfall: { title: '단골의 팁', text: '오랜 단골 귀족 부인이 은밀히 귀띔해 주었다. "다음 달 왕실 혼례가 있대요."', result: '혼례용 비단을 미리 사두었다가 세 배로 팔았다!' },
   }),
   ...careerArc({
-    branch: 'court', stat: 'int', gold: 300, dc: 48,
+    branch: 'court', stat: 'int', gold: 300, dc: 96,
     opportunity: { title: '국왕의 특명', text: '국왕이 당신을 따로 불렀다. "이 어려운 일, 그대라면 해낼 수 있겠지?"',
       take: '특명을 받든다', win: '완벽하게 해냈다! 국왕이 금화 주머니를 하사했다.', lose: '실수로 일을 그르쳤다. 국왕의 표정이 차갑다…',
       pass: '정중히 사양한다', passText: '모난 돌이 정 맞는다. 궁정에선 몸을 사리는 것도 지혜다.' },
@@ -99,7 +99,7 @@ export const ARC_EVENTS: GameEvent[] = [
     windfall: { title: '하사품', text: '왕비의 생일 연회에서 당신이 바친 시가 크게 칭찬받았다.', result: '왕비가 보석 박힌 브로치를 하사했다. 팔면 한밑천이다!' },
   }),
   ...careerArc({
-    branch: 'thief', stat: 'luck', gold: 150, dc: 38,
+    branch: 'thief', stat: 'luck', gold: 150, dc: 76,
     opportunity: { title: '보물 지도', text: '술 취한 선원에게서 보물 지도를 슬쩍했다. 진짜일까?',
       take: '지도를 따라간다', win: '진짜였다! 동굴 깊숙한 곳에서 해적의 금화 상자를 찾았다!', lose: '가짜 지도였다. 함정에 빠져 장비만 잃었다.',
       pass: '팔아치운다', passText: '다른 바보에게 지도를 팔았다. 이게 진짜 도둑의 지혜!' },
@@ -112,7 +112,7 @@ export const ARC_EVENTS: GameEvent[] = [
     windfall: { title: '주운 지갑', text: '훔친 지갑 하나가 유난히 묵직하다.', result: '안에는 귀족의 금화가 가득! 오늘은 운수 좋은 날!' },
   }),
   ...careerArc({
-    branch: 'adventurer', stat: 'vit', gold: 120, dc: 34,
+    branch: 'adventurer', stat: 'vit', gold: 120, dc: 68,
     opportunity: { title: '긴급 의뢰', text: '길드 게시판에 금테 두른 긴급 의뢰가 붙었다. 「마을을 습격하는 오우거 토벌」.',
       take: '의뢰를 받는다', win: '오우거를 쓰러뜨렸다! 마을 사람들의 환호와 두둑한 보수!', lose: '오우거의 몽둥이에 날아갔다. 치료비가 보수보다 비쌌다.',
       pass: '다른 사람에게 양보한다', passText: '무리하지 않는 것도 모험가의 실력이다.' },
@@ -125,7 +125,7 @@ export const ARC_EVENTS: GameEvent[] = [
     windfall: { title: '전설의 상인', text: '던전 입구에서 수상한 상인이 낡은 반지를 사겠다고 한다.', result: '쓸모없는 줄 알았던 반지가 고대 유물이었다! 큰돈을 받았다.' },
   }),
   ...careerArc({
-    branch: 'faith', stat: 'cha', gold: 80, dc: 30,
+    branch: 'faith', stat: 'cha', gold: 80, dc: 60,
     opportunity: { title: '순례단', text: '성지 순례단을 이끌 사제를 찾는다고 한다.',
       take: '순례단을 이끈다', win: '무사히 순례를 마쳤다! 감사의 헌금이 쏟아졌다.', lose: '길을 잃어 순례가 엉망이 됐다. 사비로 보상했다.',
       pass: '신전을 지킨다', passText: '조용한 기도의 나날. 마음이 맑아진다.' },
@@ -138,7 +138,7 @@ export const ARC_EVENTS: GameEvent[] = [
     windfall: { title: '익명의 기부', text: '신전 문 앞에 묵직한 자루가 놓여 있다. 쪽지에는 「예전에 구해준 사람」.', result: '자루 가득 금화가! 여신님, 감사합니다.' },
   }),
   ...careerArc({
-    branch: 'demon', stat: 'mana', gold: 200, dc: 40,
+    branch: 'demon', stat: 'mana', gold: 200, dc: 80,
     opportunity: { title: '마왕의 시험', text: '마왕이 군단장들을 불러모았다. "인간의 요새 하나를 함락시킨 자에게 영지를 주겠다."',
       take: '요새로 출격한다', win: '요새가 함락됐다! 마왕이 직접 하사품을 내렸다.', lose: '용사 파티와 마주쳐 후퇴했다. 체면이 말이 아니다.',
       pass: '몸을 사린다', passText: '무리한 공적보다 생존. 마왕군에서 오래 사는 비결이다.' },
@@ -151,7 +151,7 @@ export const ARC_EVENTS: GameEvent[] = [
     windfall: { title: '용의 둥지', text: '순찰 중에 비어 있는 용의 둥지를 발견했다.', result: '용이 모아둔 금화 더미를 챙겼다! 마왕에겐 비밀이다.' },
   }),
   ...careerArc({
-    branch: 'hero', stat: 'vit', gold: 200, dc: 44,
+    branch: 'hero', stat: 'vit', gold: 200, dc: 88,
     opportunity: { title: '왕의 부탁', text: '국왕이 머리를 숙였다. "공주가 마물에게 납치되었소. 부디…"',
       take: '공주를 구하러 간다', win: '공주를 구했다! 왕국 전체가 축제다. 국왕이 금고를 열었다.', lose: '마물에게 당해 후퇴했다. 공주는 다른 기사가 구했다…',
       pass: '다른 임무가 먼저다', passText: '용사에게는 더 큰 사명이 있다. …아마도.' },

@@ -1,7 +1,7 @@
 import type { Item, LifeState } from '../types';
 import { jobById } from '../data/jobs';
 import { gearByBase, makeItem, nextUid, sellPrice } from '../data/items';
-import { OWNED_CALM, marketById, marketPrice, owns } from '../data/market';
+import { OWNED_CALM, chaDeal, marketById, marketPrice, owns } from '../data/market';
 import { applyEffect, type Rng } from './life';
 import { earn } from './record';
 import { statOf, trinketSlots } from './trinket';
@@ -11,62 +11,58 @@ export const bagCap = (s: LifeState) => 30 + (owns(s, 'big_bag') ? 20 : 0);
 
 /** 던전 최대 HP */
 export const maxHp = (s: LifeState) => 60 + statOf(s, 'vit') * 2 + (s.equip?.armor?.power ?? 0);
+/** 능력치·장비가 줄어 최대 체력이 내려가면 현재 체력도 맞춘다 */
+export function clampHp(s: LifeState) {
+  if (s.hp !== undefined && s.hp > maxHp(s)) s.hp = maxHp(s);
+}
 
 export const goldOf = (s: LifeState) => s.gold ?? 0;
 
 /** 1,234G */
 export const fmtGold = (g: number) => `${g < 0 ? '-' : ''}${Math.abs(Math.round(g)).toLocaleString('ko-KR')}G`;
 
-/** 이번 달 돈벌이의 이름 (UI 팝업) */
+/** 연봉의 이름 (UI 팝업) */
 export function payLabel(s: LifeState): string {
   if (s.jobId === 'merchant') return '장사 수익';
-  if (s.jobId === 'farmer' || s.jobId === null) return '수입';
-  if (s.jobId === 'thief') return '수입';
-  return '월급';
+  if (s.jobId === 'farmer') return '수확';
+  return '연봉';
 }
 
-/** 농부·농지의 수확 달 (0부터 세어 9 = 10월) */
-export const HARVEST_MONTH = 9;
+/** 연봉을 받는 나이 (미성년은 없다) */
+export const PAY_AGE = 19;
 
 /**
- * 한 달의 살림: 월급(연봉 ÷ 12), 상인은 장사 수익이 달마다 오르내리고 밑천이 돈을 번다.
- * 농부와 농지는 가을에 한꺼번에 거둔다. 요양 중에는 반만 번다.
- * 돌려주는 문장이 있으면 연대기에 남긴다 (풍년·흉년처럼 눈에 띄는 일만).
+ * 돈벌이: 한 해가 끝나면 1월에 지난 한 해치를 연봉으로 받는다.
+ * 직업이 있고 성인(19세~)일 때만. 그 밖의 달에는 아무것도 들어오지 않는다.
  */
 export function monthlyEconomy(s: LifeState, month: number, rng: Rng): string | null {
-  let note: string | null = null;
-  let pay = 0;
+  s.lastPay = 0;
+  if (month !== 0) return null;
   const job = jobById(s.jobId);
-  const rankIncome = job ? job.income[Math.max(1, Math.min(5, s.jobRank))] ?? 0 : 0;
-  if (job?.id === 'farmer') {
-    if (month === HARVEST_MONTH) {
-      let base = rankIncome;
-      const r = rng();
-      if (r < 0.12) {
-        base = Math.round(base * 0.4);
-        note = '흉년이 들었다… 올해 수확은 형편없다.';
-      } else if (r > 0.9) {
-        base = Math.round(base * 1.6);
-        note = '대풍년! 곳간이 넘쳐난다.';
-      } else note = `가을걷이를 마쳤다. 수확을 팔아 ${fmtGold(base)}를 벌었다.`;
-      pay += base;
+  if (!job || s.age < PAY_AGE) return null;
+  let note: string | null = null;
+  let pay = job.income[Math.max(1, Math.min(5, s.jobRank))] ?? 0;
+  if (job.id === 'farmer') {
+    const r = rng();
+    if (r < 0.12) {
+      pay = Math.round(pay * 0.4);
+      note = '지난해는 흉년이었다… 수확은 형편없었다.';
+    } else if (r > 0.9) {
+      pay = Math.round(pay * 1.6);
+      note = '지난해는 대풍년! 곳간이 넘쳐난다.';
     }
-  } else if (job?.id === 'merchant') {
-    pay += Math.round((rankIncome / 12) * (0.4 + rng() * 1.2));
-    // 밑천이 돈을 번다: 가진 돈의 0.5% (직급에 따라 한도)
-    if (goldOf(s) > 0) pay += Math.min(Math.round(goldOf(s) * 0.005), 60 * s.jobRank);
-  } else if (job) {
-    pay += Math.round(rankIncome / 12);
-  } else if (s.age >= 16) {
-    pay += 1; // 잡일
+  } else if (job.id === 'merchant') {
+    pay = Math.round(pay * (0.4 + rng() * 1.2));
+    // 밑천이 돈을 번다: 가진 돈의 6% (직급에 따라 한도)
+    if (goldOf(s) > 0) pay += Math.min(Math.round(goldOf(s) * 0.06), 720 * s.jobRank);
   }
-  if (month === HARVEST_MONTH && owns(s, 'land')) pay += s.jobId === 'farmer' ? 600 : 240;
+  if (owns(s, 'land')) pay += job.id === 'farmer' ? 600 : 240;
   if ((s.recover ?? 0) > 0) pay = Math.round(pay / 2);
   s.gold = goldOf(s) + pay;
   s.lastPay = pay;
   s.yearIncome = (s.yearIncome ?? 0) + pay;
   earn(s, pay);
-  return note;
+  return note ?? `${payLabel(s)} ${fmtGold(pay)}를 받았다.`;
 }
 
 /**
@@ -75,7 +71,8 @@ export function monthlyEconomy(s: LifeState, month: number, rng: Rng): string | 
  */
 export function yearEndEconomy(s: LifeState, rng: Rng): string | null {
   let note: string | null = null;
-  const living = s.age >= 18 && !owns(s, 'house') && !owns(s, 'villa') ? 60 : 0;
+  // 생활비는 가진 만큼만 나간다 (빈털터리를 빚더미로 만들지 않는다)
+  const living = s.age >= 18 && !owns(s, 'house') && !owns(s, 'villa') ? Math.min(60, Math.max(0, goldOf(s))) : 0;
   let net = (s.yearIncome ?? 0) - living;
   s.gold = goldOf(s) - living;
   earn(s, -living);
@@ -140,16 +137,17 @@ const takeFromBag = (s: LifeState, uid: number): Item | null => {
 export function sell(s: LifeState, uid: number): Result {
   const it = takeFromBag(s, uid);
   if (!it) return { ok: false, msg: '가방에 없다.' };
-  s.gold = goldOf(s) + sellPrice(it);
-  earn(s, sellPrice(it));
-  return { ok: true, msg: `「${it.name}」을(를) ${fmtGold(sellPrice(it))}에 팔았다.` };
+  const price = sellPrice(it, chaDeal(s));
+  s.gold = goldOf(s) + price;
+  earn(s, price);
+  return { ok: true, msg: `「${it.name}」을(를) ${fmtGold(price)}에 팔았다.` };
 }
 
 /** 재료(전리품)를 한꺼번에 판다 */
 export function sellAllLoot(s: LifeState): Result {
   const loot = (s.bag ?? []).filter((it) => it.kind === 'loot');
   if (!loot.length) return { ok: false, msg: '팔 전리품이 없다.' };
-  const total = loot.reduce((a, it) => a + sellPrice(it), 0);
+  const total = loot.reduce((a, it) => a + sellPrice(it, chaDeal(s)), 0);
   s.bag = (s.bag ?? []).filter((it) => it.kind !== 'loot');
   s.gold = goldOf(s) + total;
   earn(s, total);
@@ -206,16 +204,18 @@ export function drinkBest(s: LifeState): Result {
   return drink(s, potions[0].uid);
 }
 
-export const INN_PRICE = 30;
+/** 여관비: 회복할 HP 3당 1골드 (나머지가 있으면 1골드 더) */
+export const innPrice = (s: LifeState) => Math.ceil(Math.max(0, maxHp(s) - (s.hp ?? maxHp(s))) / 3);
 
 /** 여관에서 쉰다: HP 완전 회복 */
 export function innRest(s: LifeState): Result {
   if ((s.hp ?? maxHp(s)) >= maxHp(s)) return { ok: false, msg: '이미 HP가 가득하다.' };
-  if (goldOf(s) < INN_PRICE) return { ok: false, msg: '여관비가 모자라다.' };
-  s.gold = goldOf(s) - INN_PRICE;
-  earn(s, -INN_PRICE);
+  const price = innPrice(s);
+  if (goldOf(s) < price) return { ok: false, msg: `여관비가 모자라다. (${fmtGold(price)})` };
+  s.gold = goldOf(s) - price;
+  earn(s, -price);
   s.hp = maxHp(s);
-  return { ok: true, msg: `여관에서 푹 쉬었다. HP 가득! (-${fmtGold(INN_PRICE)})` };
+  return { ok: true, msg: `여관에서 푹 쉬었다. 체력 가득! (-${fmtGold(price)})` };
 }
 
 /** 시작 장비 (출신에 관계없이 천 옷 한 벌) */

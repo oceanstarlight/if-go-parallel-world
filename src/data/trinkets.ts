@@ -43,9 +43,9 @@ export const STORY_TRINKETS: TrinketDef[] = [
 const ALL = [...TRINKETS, ...STORY_TRINKETS];
 export const trinketDef = (base: string) => ALL.find((t) => t.base === base);
 
-const MAIN: Record<Rarity, [number, number]> = { common: [2, 3], rare: [4, 6], epic: [7, 9], legend: [11, 14] };
+const MAIN: Record<Rarity, [number, number]> = { common: [4, 6], rare: [8, 12], epic: [14, 18], legend: [22, 28] };
 const SUB: Record<Rarity, { n: number; range: [number, number] }> = {
-  common: { n: 0, range: [0, 0] }, rare: { n: 0, range: [0, 0] }, epic: { n: 1, range: [2, 4] }, legend: { n: 2, range: [3, 5] },
+  common: { n: 0, range: [0, 0] }, rare: { n: 0, range: [0, 0] }, epic: { n: 1, range: [4, 8] }, legend: { n: 2, range: [6, 10] },
 };
 const VALUE: Record<Rarity, number> = { common: 60, rare: 220, epic: 800, legend: 3000 };
 const PREFIX: Record<Rarity, string> = { common: '', rare: '빛나는 ', epic: '영웅의 ', legend: '전설의 ' };

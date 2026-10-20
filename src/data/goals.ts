@@ -25,7 +25,7 @@ export const GOALS: Goal[] = [
   { id: 'top_student', name: '아카데미 수석 차지하기', done: (s) => has(s, 'top_student'), reward: 12 },
   { id: 'rank3', name: '직업에서 3단계까지 승진하기', done: (s) => s.jobRank >= 3, reward: 8 },
   { id: 'rank5', name: '직업 최고 직위에 오르기', done: (s) => s.jobRank >= 5, reward: 15 },
-  { id: 'fame60', name: '명성 60 넘기기 (유명인 되기)', done: (s) => s.stats.fame >= 60, reward: 10 },
+  { id: 'fame60', name: '명성 120 넘기기 (유명인 되기)', done: (s) => s.stats.fame >= 120, reward: 10 },
   { id: 'saint', name: '업보 +60 (성인 군자)', done: (s) => s.karma >= 60, reward: 10 },
   { id: 'villain', name: '업보 -60 (희대의 악당)', canAssign: (s) => has(s, 'demonblood') || has(s, 'witchblood'), done: (s) => s.karma <= -60, reward: 10 },
   { id: 'stat90', name: '능력치 하나를 90 이상으로', done: (s) => Object.values(s.stats).some((v) => v >= 90), reward: 10 },

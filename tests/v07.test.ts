@@ -26,7 +26,7 @@ describe('v0.7 전투력', () => {
     s.gold = 10000;
     expect(buy(s, 'w4').ok).toBe(true);
     equip(s, s.bag![0].uid);
-    expect(combatPower(s) - before).toBe(42);
+    expect(combatPower(s) - before).toBe(48); // 42 × 1.15
   });
   it('100층 마왕은 1층보다 훨씬 강하다', () => {
     expect(floorPower(100, true)).toBeGreaterThan(floorPower(5, true) * 8);
@@ -114,7 +114,11 @@ describe('v0.7 던전', () => {
     s.age = 20;
     s.hp = 1;
     s.focus = 'train';
-    advanceYear(s, seededRng(10));
+    const rng = seededRng(10);
+    while (s.age < 21 && !s.death) {
+      s.pendingEventId = null;
+      advanceYear(s, rng);
+    }
     if (!s.death) expect(s.hp).toBe(maxHp(s));
   });
   it('100층 마왕을 쓰러뜨리면 명성과 막대한 부, 그리고 게임은 계속된다', () => {

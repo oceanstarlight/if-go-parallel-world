@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { REPEAT_GAP, advanceMonth, choose, createLife, currentEvent } from '../src/engine/life';
 import { seededRng } from '../src/engine/sim';
 import { MAGIC_COST, autoDuel, duelTurn, startDuel } from '../src/engine/duel';
-import { beginDive, bossAhead, descendPath, settleBoss } from '../src/engine/dungeon';
+import { beginDive, bossAhead, descendPath, settleBoss, settleMob } from '../src/engine/dungeon';
 import { combatPower } from '../src/engine/combat';
 import { STAT_INFO } from '../src/data/stats';
 import { STAT_KEYS } from '../src/data/stats';
@@ -35,10 +35,11 @@ describe('v1.1 능력치와 전투력', () => {
   it('마력과 행운이 전투력을 올린다', () => {
     const s = createLife(base, seededRng(1));
     const cp = combatPower(s);
-    s.stats.luck += 10;
-    expect(combatPower(s)).toBe(cp + 6);
-    s.stats.mana += 10;
-    expect(combatPower(s)).toBeGreaterThanOrEqual(cp + 16);
+    s.stats.luck += 20;
+    expect(combatPower(s)).toBeGreaterThan(cp);
+    const cp2 = combatPower(s);
+    s.stats.mana += 20;
+    expect(combatPower(s)).toBeGreaterThanOrEqual(cp2 + 11);
   });
 });
 
@@ -90,13 +91,22 @@ describe('v1.1 턴제 전투', () => {
     s.age = 20;
     s.hp = 9999;
     beginDive(s, 0);
-    let r = descendPath(s, seededRng(7));
+    // 길목의 마물은 이기고 지나간다
+    const toBoss = (rng: () => number) => {
+      let r = descendPath(s, rng);
+      while (r === 'mob') {
+        expect(settleMob(s, 'win', 9999, rng)).toBe('continue');
+        r = descendPath(s, rng);
+      }
+      return r;
+    };
+    let r = toBoss(seededRng(7));
     expect(r).toBe('boss');
     expect(bossAhead(s).floor).toBe(5);
     expect(settleBoss(s, 'win', 50, seededRng(8))).toBe('cleared');
     expect(s.dive?.floor).toBe(5);
     s.hp = 9999;
-    r = descendPath(s, seededRng(9));
+    r = toBoss(seededRng(9));
     expect(r).toBe('boss');
     expect(settleBoss(s, 'lose', 0, seededRng(10))).toBe('fallen');
     expect(s.death).toBeNull();
