@@ -1,4 +1,5 @@
 import type { Cond, LifeState, StatKey } from '../types';
+import { statOf } from './trinket';
 
 export function matches(c: Cond | undefined, s: LifeState): boolean {
   if (!c) return true;
@@ -12,10 +13,10 @@ export function matches(c: Cond | undefined, s: LifeState): boolean {
   if (c.flags && !c.flags.every((f) => s.flags.includes(f))) return false;
   if (c.notFlags && c.notFlags.some((f) => s.flags.includes(f))) return false;
   if (c.stats) {
-    for (const [k, v] of Object.entries(c.stats)) if (s.stats[k as StatKey] < v) return false;
+    for (const [k, v] of Object.entries(c.stats)) if (statOf(s, k as StatKey) < v) return false;
   }
   if (c.maxStats) {
-    for (const [k, v] of Object.entries(c.maxStats)) if (s.stats[k as StatKey] > v) return false;
+    for (const [k, v] of Object.entries(c.maxStats)) if (statOf(s, k as StatKey) > v) return false;
   }
   if (c.karmaMin !== undefined && s.karma < c.karmaMin) return false;
   if (c.karmaMax !== undefined && s.karma > c.karmaMax) return false;

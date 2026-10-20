@@ -79,6 +79,10 @@ export function contemporaries(seed: number, exclude: string): LifeState[] {
 function autoTown(s: LifeState, rng: Rng) {
   sellAllLoot(s);
   for (const it of [...(s.bag ?? [])]) {
+    if (it.kind === 'trinket') {
+      equip(s, it.uid); // 빈 칸이 있으면 찬다
+      continue;
+    }
     if (it.kind !== 'weapon' && it.kind !== 'armor') continue;
     if (it.power > (s.equip?.[it.kind]?.power ?? 0)) equip(s, it.uid);
   }

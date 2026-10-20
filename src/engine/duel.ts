@@ -1,5 +1,6 @@
 import type { LifeState } from '../types';
 import { combatPower } from './combat';
+import { statOf } from './trinket';
 import { maxHp } from './economy';
 import type { Rng } from './life';
 
@@ -54,15 +55,15 @@ export const MAGIC_COST = 15;
 const P_HIT = 0.22, E_HIT = 0.25, P_EXP = 0.7;
 const CRIT_MUL = 1.7;
 
-export const critChance = (s: LifeState) => Math.min(0.45, 0.05 + s.stats.luck * 0.003);
-export const dodgeChance = (s: LifeState) => Math.min(0.25, 0.03 + s.stats.luck * 0.0015);
-export const fleeChance = (s: LifeState) => Math.min(0.9, 0.3 + s.stats.luck * 0.006);
+export const critChance = (s: LifeState) => Math.min(0.45, 0.05 + statOf(s, 'luck') * 0.003);
+export const dodgeChance = (s: LifeState) => Math.min(0.25, 0.03 + statOf(s, 'luck') * 0.0015);
+export const fleeChance = (s: LifeState) => Math.min(0.9, 0.3 + statOf(s, 'luck') * 0.006);
 /** 마법 배율: 마력이 높을수록 강하다 */
-export const magicMul = (s: LifeState) => 0.9 + s.stats.mana / 50;
+export const magicMul = (s: LifeState) => 0.9 + statOf(s, 'mana') / 50;
 
 export function startDuel(s: LifeState, kind: Duel['kind'], foe: string, ep: number): Duel {
   const hpMax = maxHp(s);
-  const mpMax = 30 + s.stats.mana;
+  const mpMax = 30 + statOf(s, 'mana');
   return {
     kind, foe, cp: combatPower(s), ep,
     hp: Math.max(1, Math.min(s.hp ?? hpMax, hpMax)), hpMax,
@@ -134,6 +135,6 @@ export function duelTurn(d: Duel, s: LifeState, action: DuelAction, rng: Rng): B
 
 /** 자동 전투 (테스트·밸런스 확인용): 마나가 있으면 마법, 아니면 공격 */
 export function autoDuel(d: Duel, s: LifeState, rng: Rng): DuelResult {
-  for (let i = 0; i < 60 && !d.result; i++) duelTurn(d, s, d.mp >= MAGIC_COST && s.stats.mana > s.stats.vit ? 'magic' : 'attack', rng);
+  for (let i = 0; i < 60 && !d.result; i++) duelTurn(d, s, d.mp >= MAGIC_COST && statOf(s, 'mana') > statOf(s, 'vit') ? 'magic' : 'attack', rng);
   return d.result ?? 'lose';
 }

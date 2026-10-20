@@ -5,6 +5,8 @@ import { rollTraits, traitById } from '../data/traits';
 import { BATTLE_ENEMY, ENEMY_NAME, battleOdds, isCombat } from './combat';
 import { maxHp, monthlyEconomy, starterKit, yearEndEconomy } from './economy';
 import { bump, rec } from './record';
+import { statOf, trinketSlots } from './trinket';
+import { makeTrinket, randomTrinket, trinketDef } from '../data/trinkets';
 import { deathById } from '../data/deaths';
 import { OWNED_FOCUS } from '../data/market';
 import { inBranch } from '../data/branches';
@@ -13,7 +15,7 @@ import { GOALS } from '../data/goals';
 import { CHEATS, cheatById } from '../data/cheats';
 import { jobById } from '../data/jobs';
 import { type Gender, genderOfName, namesOf, opposite, pick } from '../data/names';
-import { STAT_KEYS } from '../data/stats';
+import { STAT_KEYS, STAT_NAMES } from '../data/stats';
 import { ALL_EVENTS, eventById } from '../data/events';
 import { BIRTH_TEXT, QUIET_YEAR } from '../data/flavor';
 import { matches } from './cond';
@@ -372,7 +374,7 @@ function flushInjury(s: LifeState) {
 export function successChance(s: LifeState, check: Check): number {
   const bonus = (cheatById(s.cheatId).checkBonus?.[check.stat] ?? 0)
     + traitsOf(s).reduce((a, t) => a + (t.checkBonus?.[check.stat] ?? 0), 0);
-  const raw = 50 + (s.stats[check.stat] - check.dc) * 3 + (s.stats.luck - 20) * 0.3 + bonus;
+  const raw = 50 + (statOf(s, check.stat) - check.dc) * 3 + (statOf(s, 'luck') - 20) * 0.3 + bonus;
   return clamp(Math.round(raw), 5, 95);
 }
 
@@ -431,6 +433,7 @@ export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
   if (e.goldSet !== undefined) s.gold = e.goldSet;
   if ((s.gold ?? 0) > g0) rec(s).earned += (s.gold ?? 0) - g0;
   if (e.own && !(s.owned ?? []).includes(e.own)) s.owned = [...(s.owned ?? []), e.own];
+  if (e.trinket) gainTrinket(s, e.trinket, rng);
   if (e.caught) {
     s.caught = (s.caught ?? 0) + 1;
     if ((s.gold ?? 0) > 0) s.gold = 0;
@@ -440,6 +443,19 @@ export function applyEffect(s: LifeState, e: Effect | undefined, rng: Rng) {
   }
   if (e.death) kill(s, e.death);
   else if (s.stats.vit <= 0) kill(s, e.zeroCause ?? 'illness');
+}
+
+/** 사건 보상 장신구: 빈 칸이 있으면 바로 차고, 없으면 가방에 넣는다 */
+function gainTrinket(s: LifeState, t: NonNullable<Effect['trinket']>, rng: Rng) {
+  const rarity = t.rarity ?? 'rare';
+  const def = t.base ? trinketDef(t.base) : undefined;
+  const it = def ? makeTrinket(def, rarity, rng) : randomTrinket(rarity, rng, t.stat);
+  const worn = s.equip?.trinkets ?? [];
+  const wear = worn.length < trinketSlots(s);
+  if (wear) s.equip = { ...(s.equip ?? {}), trinkets: [...worn, it] };
+  else s.bag = [...(s.bag ?? []), it];
+  const bonus = Object.entries(it.stats ?? {}).map(([k, v]) => `${STAT_NAMES[k as StatKey]} +${v}`).join(', ');
+  log(s, `장신구 「${it.name}」을(를) 얻었다! (${bonus})${wear ? ' 바로 찼다.' : ' 칸이 꽉 차서 가방에 넣었다.'}`, 'good');
 }
 
 /** 판정 성공 확률. 전투 사건이면 전투력 승부 */

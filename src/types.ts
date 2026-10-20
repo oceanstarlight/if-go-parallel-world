@@ -109,7 +109,7 @@ export interface LifeState {
   /** 가방 */
   bag?: Item[];
   /** 장착 중인 장비 */
-  equip?: { weapon?: Item | null; armor?: Item | null };
+  equip?: { weapon?: Item | null; armor?: Item | null; trinkets?: Item[] };
   /** 상점에서 산 영구 소유물 (집, 농지, 말 …) */
   owned?: string[];
   /** 던전 HP (한 해가 지나면 가득 찬다) */
@@ -147,7 +147,7 @@ export interface LifeState {
   record?: LifeRecord;
 }
 
-export type ItemKind = 'weapon' | 'armor' | 'loot' | 'potion';
+export type ItemKind = 'weapon' | 'armor' | 'loot' | 'potion' | 'trinket';
 export type Rarity = 'common' | 'rare' | 'epic' | 'legend';
 
 /** 가방에 들어가는 물건. 순수 JSON */
@@ -163,6 +163,8 @@ export interface Item {
   power: number;
   /** 상점에 팔 때 받는 값 */
   value: number;
+  /** 장신구가 올려 주는 능력치 */
+  stats?: Partial<Stats>;
 }
 
 /** 던전 원정 한 번의 상태 */
@@ -259,6 +261,8 @@ export interface Effect {
   caught?: boolean;
   /** 상점 소유물을 얻는다 */
   own?: string;
+  /** 장신구를 얻는다: 원형 id(TRINKETS) 또는 주 능력치, 희귀도 */
+  trinket?: { base?: string; stat?: StatKey; rarity?: Rarity };
 }
 
 export interface Outcome {

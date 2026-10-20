@@ -1,6 +1,7 @@
 import type { Choice, LifeState } from '../types';
 import type { EnemyKind } from '../gfx/sprites';
 import { jobById } from '../data/jobs';
+import { effStats } from './trinket';
 
 /** 전투 연출이 붙는 사건과 그 적. 이 사건의 체력·마력 판정은 전투력 승부가 된다 */
 export const BATTLE_ENEMY: Record<string, EnemyKind> = {
@@ -29,7 +30,7 @@ export const CP_WEIGHT = { vit: 1, mana: 1, main: 0.5, luck: 0.6, int: 0.25 } as
 
 /** 내 전투력: 능력치 + 장비 + 직업 */
 export function combatPower(s: LifeState): number {
-  const { vit, mana, int, luck } = s.stats;
+  const { vit, mana, int, luck } = effStats(s);
   const gear = (s.equip?.weapon?.power ?? 0) + (s.equip?.armor?.power ?? 0);
   const job = (jobById(s.jobId)?.combat ?? 0) * s.jobRank;
   const w = CP_WEIGHT;

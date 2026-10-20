@@ -807,3 +807,26 @@ button.stat:hover, button.stat.on { background: #eef3ff; }
 .cr-end { margin: 48px 0 30vh; letter-spacing: 0.3em; color: #8a84a8; }
 .cr-skip { position: fixed; right: 20px; bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 101; background: rgba(255, 255, 255, 0.12); color: #fff; border-color: rgba(255, 255, 255, 0.3); }
 .cr-skip .ic { margin-left: 4px; }
+
+/* ───── 장신구 ───── */
+.t-head { margin: 4px 0 6px; display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.t-head .ic { color: #c87aff; }
+.t-slots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 12px; }
+.t-slot { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 76px; padding: 6px 4px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line-2); font: inherit; color: inherit; text-align: center; }
+button.t-slot { cursor: pointer; }
+.t-slot strong { font-size: 11px; line-height: 1.2; }
+.t-slot small { font-size: 10px; color: var(--muted); line-height: 1.2; }
+.t-slot .ic { width: 18px; height: 18px; color: #c87aff; }
+.t-slot.empty { border-style: dashed; }
+.t-slot.locked { opacity: 0.5; border-style: dashed; }
+.t-slot.r-rare { border-color: #5aa8ff; }
+.t-slot.r-epic { border-color: #b07aff; background: #faf5ff; }
+.t-slot.r-legend { border-color: #ffb020; background: #fffaf0; }
+.bar { position: relative; }
+.fill-bonus { position: absolute; top: 0; height: 100%; background: repeating-linear-gradient(45deg, #c87aff, #c87aff 2px, #e8c8ff 2px, #e8c8ff 4px); }
+.stat-val.boosted { color: #9a4aff; font-weight: 700; }
+@media (max-width: 760px) {
+  .t-slots { gap: 4px; }
+  .t-slot { min-height: 64px; }
+  .t-slot strong { font-size: 10px; }
+}

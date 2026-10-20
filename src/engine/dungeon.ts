@@ -5,6 +5,8 @@ import { fmtGold, maxHp } from './economy';
 import { applyEffect, gainStat, kill, type Rng } from './life';
 import { bagCap } from './economy';
 import { bump, earn, rec } from './record';
+import { statOf } from './trinket';
+import { randomTrinket } from '../data/trinkets';
 
 /**
  * 던전: 시간이 흐르지 않는 별도 모드. 100계층, 5층씩 내려간다.
@@ -64,6 +66,11 @@ function gearDrop(rng: Rng, floor: number, boss: boolean): Item {
   return makeItem(pool[tier - 1], rarityRoll(rng, floor, boss), rng);
 }
 
+/** 장신구 드롭: 깊을수록, 보스일수록 희귀하다 */
+function trinketDrop(rng: Rng, floor: number, boss: boolean): Item {
+  return randomTrinket(rarityRoll(rng, floor, boss), rng);
+}
+
 function materialDrop(rng: Rng, floor: number): Item {
   const b = biomeOf(floor);
   const [name, value] = b.loot[Math.floor(rng() * b.loot.length)];
@@ -103,7 +110,11 @@ let fallNotes: [string, Tone][] = [];
 /** 처음 쓰러짐: 모든 것을 잃고 지상으로 실려 나간다 */
 function fall(s: LifeState, floor: number) {
   const d = s.dive!;
-  const lostItems = (s.bag ?? []).length + d.loot.length + (s.equip?.weapon ? 1 : 0) + (s.equip?.armor ? 1 : 0);
+  // 차고 있던 장신구는 절반을 잃는다 (하나뿐이면 그것마저). 나머지는 모두 잃는다
+  const worn = [...(s.equip?.trinkets ?? [])];
+  const lostTrinkets = Math.ceil(worn.length / 2);
+  for (let i = 0; i < lostTrinkets; i++) worn.splice(Math.floor(Math.random() * worn.length), 1);
+  const lostItems = (s.bag ?? []).length + d.loot.length + (s.equip?.weapon ? 1 : 0) + (s.equip?.armor ? 1 : 0) + lostTrinkets;
   const lostGold = Math.max(0, s.gold ?? 0) + d.gold;
   s.dgFallen = true;
   s.dgBanUntil = s.age + DUNGEON_BAN_YEARS;
@@ -111,7 +122,7 @@ function fall(s: LifeState, floor: number) {
   s.stress = 100;
   s.mood = 'fear';
   s.bag = [];
-  s.equip = { weapon: null, armor: null };
+  s.equip = { weapon: null, armor: null, trinkets: worn };
   if ((s.gold ?? 0) > 0) s.gold = 0;
   d.loot = [];
   d.gold = 0;
@@ -122,9 +133,9 @@ function fall(s: LifeState, floor: number) {
   // 원정 기록은 그 층의 마지막 일(함정·패배)을 적은 뒤에 남긴다 (finish)
   fallNotes = [
     [`${floor}층에서 쓰러졌다… 정신을 차려 보니 지상의 진료소였다. 누군가 끌고 나와 준 모양이다.`, 'death'],
-    [`장비·소지품 ${lostItems}개와 ${fmtGold(lostGold)}를 모두 잃었다. 3년간 악몽에 시달리고, ${s.dgBanUntil}세까지 던전에 들어갈 수 없다. 다음에 또 쓰러지면… 정말 끝이다.`, 'bad'],
+    [`장비·소지품 ${lostItems}개와 ${fmtGold(lostGold)}를 모두 잃었다.${lostTrinkets ? ` 차고 있던 장신구 ${lostTrinkets}개도 사라졌다${worn.length ? ` (${worn.length}개는 무사)` : ''}.` : ''} 3년간 악몽에 시달리고, ${s.dgBanUntil}세까지 던전에 들어갈 수 없다. 다음에 또 쓰러지면… 정말 끝이다.`, 'bad'],
   ];
-  s.log.push({ age: s.age, m: Math.max(1, s.month ?? 0), text: `던전 ${floor}층에서 쓰러졌다! 목숨은 건졌지만 장비·소지품과 ${fmtGold(lostGold)}를 모두 잃었다. 3년간 악몽에 시달린다. (${s.dgBanUntil}세까지 던전 출입 불가 · 다음엔 진짜 죽음)`, tone: 'bad' });
+  s.log.push({ age: s.age, m: Math.max(1, s.month ?? 0), text: `던전 ${floor}층에서 쓰러졌다! 목숨은 건졌지만 장비·소지품과 ${fmtGold(lostGold)}를 모두 잃었다.${lostTrinkets ? ` 장신구도 ${lostTrinkets}개 잃었다.` : ''} 3년간 악몽에 시달린다. (${s.dgBanUntil}세까지 던전 출입 불가 · 다음엔 진짜 죽음)`, tone: 'bad' });
 }
 
 export type DescendResult = 'cleared' | 'fled' | 'dead' | 'conquered' | 'fallen';
@@ -156,7 +167,8 @@ export function descendPath(s: LifeState, rng: Rng = Math.random): DescendResult
       const ep = floorPower(f);
       const p = winChance(cp, ep) / 100;
       if (rng() < p) {
-        const it = rng() < 0.75 ? materialDrop(rng, f) : null;
+        // 마물은 가끔(6%) 장신구를 떨어뜨린다
+        const it = rng() < 0.06 ? trinketDrop(rng, f, false) : rng() < 0.75 ? materialDrop(rng, f) : null;
         if (it) d.loot.push(it);
         const res = hurt(s, ep * 0.12 * (1.2 - p), f);
         bump(rec(s).slain, mon);
@@ -168,7 +180,7 @@ export function descendPath(s: LifeState, rng: Rng = Math.random): DescendResult
         if (res !== 'ok') return finish(s, res);
       }
     } else if (r < 0.7) {
-      if (rng() * 100 < 35 + s.stats.luck / 2) note(s, `${f}층 · 발밑의 함정을 아슬아슬하게 피했다.`);
+      if (rng() * 100 < 35 + statOf(s, 'luck') / 2) note(s, `${f}층 · 발밑의 함정을 아슬아슬하게 피했다.`);
       else {
         const res = hurt(s, floorPower(f) * 0.2, f);
         note(s, `${f}층 · 함정에 걸렸다! (HP ${s.hp})`, 'bad');
@@ -196,6 +208,7 @@ function winBoss(s: LifeState, rng: Rng): DescendResult {
   const [ln, lv] = bossLoot(bf);
   d.loot.push(makeLoot(ln, lv, rarityRoll(rng, bf, true), rng));
   if (rng() < 0.5) d.loot.push(gearDrop(rng, bf, true));
+  if (rng() < 0.35) d.loot.push(trinketDrop(rng, bf, true));
   d.gold += bf * 20;
   gainStat(s, 'vit', 1, rng);
   gainStat(s, 'mana', 1, rng);

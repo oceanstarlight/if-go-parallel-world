@@ -105,8 +105,8 @@ export const YOUTH: GameEvent[] = [
     ],
   },
   {
-    id: 'y_love_letter', title: '밤새 쓴 편지', weight: 3,
-    cond: { minAge: 13, maxAge: 17, flags: ['yt_crush'] },
+    id: 'y_love_letter', title: '밤새 쓴 편지', weight: 7,
+    cond: { minAge: 13, maxAge: 18, flags: ['yt_crush'] },
     text: '종이 열 장을 구겨 던진 끝에 편지가 완성되었다. 이걸 전해 줘야 할까, 말아야 할까.',
     choices: [
       { label: '직접 건넨다', check: { stat: 'cha', dc: 24 },
@@ -116,8 +116,8 @@ export const YOUTH: GameEvent[] = [
     ],
   },
   {
-    id: 'y_festival_date', title: '축제의 약속', weight: 3,
-    cond: { minAge: 14, maxAge: 17, flags: ['yt_first_love'] },
+    id: 'y_festival_date', title: '축제의 약속', weight: 8,
+    cond: { minAge: 14, maxAge: 18, flags: ['yt_first_love'] },
     text: '축제 전날, 그 아이가 조그맣게 말했다. "내일 광장 분수대 앞에서… 기다릴게."',
     choices: [
       { label: '일찍 가서 기다린다', success: { text: '해가 지자 불꽃이 올랐다. 나란히 올려다본 하늘은 평생 잊지 못할 것 같다.', effect: { stats: { cha: 2, luck: 1 }, mood: 'joy' }, tone: 'good' } },
@@ -125,8 +125,8 @@ export const YOUTH: GameEvent[] = [
     ],
   },
   {
-    id: 'y_first_love_end', title: '첫사랑의 끝', weight: 3,
-    cond: { minAge: 14, maxAge: 17, flags: ['yt_first_love'] },
+    id: 'y_first_love_end', title: '첫사랑의 끝', weight: 5,
+    cond: { minAge: 15, maxAge: 19, flags: ['yt_first_love'] },
     text: '시간이 흐르자 둘 사이에 조금씩 거리가 생겼다. 오늘, 그 아이가 조용히 말을 꺼냈다.',
     choices: [
       { label: '웃으며 보내 준다', success: { text: '"고마웠어." 마지막 인사를 하고 돌아서자 눈물이 쏟아졌다. 그래도 좋은 추억으로 남을 것이다.', effect: { unflags: ['yt_first_love'], stats: { cha: 2, int: 1 }, karma: 3, mood: 'calm' } } },
@@ -346,7 +346,7 @@ export const YOUTH: GameEvent[] = [
     text: '해가 지자 장터가 다른 얼굴을 드러냈다. 등불이 늘어서고 낮에는 보지 못한 노점이 길을 메운다.',
     choices: [
       { label: '신기한 가게를 돌아다닌다', check: { stat: 'luck', dc: 24 },
-        success: { text: '노점 구석에서 숨은 보물 같은 소품을 싼값에 건졌다. 장사꾼이 한숨을 쉬었다.', effect: { gold: 15, stats: { luck: 2, int: 1 } }, tone: 'good' },
+        success: { text: '노점 구석에서 숨은 보물 같은 소품을 싼값에 건졌다. 장사꾼이 한숨을 쉬었다.', effect: { gold: 15, stats: { luck: 2, int: 1 }, trinket: { rarity: 'common' } }, tone: 'good' },
         fail: { text: '바가지를 쓰고 말았다. 반짝이는 돌멩이가 알고 보니 유리조각이었다.', effect: { gold: -10, stats: { int: 1 } } } },
       { label: '군것질로 배를 채운다', success: { text: '꼬치, 호떡, 달콤한 시럽. 배가 빵빵해질 때까지 먹고 나서야 집으로 향했다.', effect: { stats: { vit: 1 }, mood: 'joy' } } },
     ],
@@ -471,7 +471,7 @@ export const YOUTH: GameEvent[] = [
     choices: [
       { label: '공고문을 끝까지 읽는다', success: { text: '상단이 야간 운송을 시작했다는 평범한 이야기였다. 괜히 긴장했나 싶어 피식 웃음이 나왔다.', effect: { unflags: ['yt_odd_rumor'], stats: { int: 1 }, mood: 'calm' } } },
       { label: '상단을 찾아가 말을 걸어 본다', check: { stat: 'cha', dc: 24 },
-        success: { text: '상단 사람들이 의외로 친절했다. 먼 도시 이야기를 한 아름 들었고 작은 선물까지 받았다.', effect: { unflags: ['yt_odd_rumor'], gold: 15, stats: { cha: 2, fame: 1 } }, tone: 'good' },
+        success: { text: '상단 사람들이 의외로 친절했다. 먼 도시 이야기를 한 아름 들었고 작은 선물까지 받았다.', effect: { unflags: ['yt_odd_rumor'], gold: 15, stats: { cha: 2, fame: 1 }, trinket: { stat: 'cha', rarity: 'common' } }, tone: 'good' },
         fail: { text: '경계하는 눈초리에 한 마디도 못 하고 돌아섰다. 소문은 소문일 뿐이었다.', effect: { unflags: ['yt_odd_rumor'], stats: { cha: -1 } } } },
     ],
   },

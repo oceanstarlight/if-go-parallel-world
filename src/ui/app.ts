@@ -31,7 +31,8 @@ import { branchPaths } from '../data/branches';
 import { BATTLE_ENEMY, CP_WEIGHT, ENEMY_NAME, battleOdds, combatPower, isCombat } from '../engine/combat';
 import { MAGIC_COST, autoDuel, critChance, duelTurn, fleeChance, magicMul, startDuel, type Duel, type DuelAction } from '../engine/duel';
 import { beginDive, bossAhead, canEnterDungeon, descendPath, endDiveOnDeath, retreat, settleBoss } from '../engine/dungeon';
-import { buy as marketBuy, drink, drinkBest, equip, fmtGold, innRest, payLabel, repairItems, sell, sellAllLoot } from '../engine/economy';
+import { buy as marketBuy, drink, drinkBest, equip, fmtGold, innRest, payLabel, repairItems, sell, sellAllLoot, unequipTrinket } from '../engine/economy';
+import { statOf, trinketBonus } from '../engine/trinket';
 import { rec } from '../engine/record';
 import { bossEnemy } from '../gfx/mapping';
 import { biomeOf } from '../data/items';
@@ -516,6 +517,10 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
       if (app.life) app.notice = equip(app.life, Number(arg)).msg;
       afterStep(app);
       break;
+    case 'unequip-trinket':
+      if (app.life) app.notice = unequipTrinket(app.life, Number(arg)).msg;
+      afterStep(app);
+      break;
     case 'drink-item':
       if (app.life) app.notice = drink(app.life, Number(arg)).msg;
       afterStep(app);
@@ -836,11 +841,12 @@ function viewLife(app: App): string {
       <div class="year-body">${g.items.map((l, i) => `<p class="tone-${l.tone}">${l.m && l.m !== g.items[i - 1]?.m ? `<i class="mon">${l.m}월</i>` : ''}${esc(l.text)}</p>`).join('')}</div>
     </div>`).join('');
 
+  const bonus = trinketBonus(s);
   const stats = STAT_KEYS.map((k) => `
     <button class="stat ${app.statInfo === k ? 'on' : ''}" data-act="stat" data-arg="${k}" title="${STAT_NAMES[k]}: 누르면 설명">
       <span class="stat-name">${STAT_NAMES[k]}</span>
-      <div class="bar"><div class="fill fill-${k}" style="width:${s.stats[k]}%"></div></div>
-      <span class="stat-val">${s.stats[k]}</span>
+      <div class="bar"><div class="fill fill-${k}" style="width:${s.stats[k]}%"></div>${bonus[k] ? `<div class="fill-bonus" style="left:${s.stats[k]}%;width:${statOf(s, k) - s.stats[k]}%"></div>` : ''}</div>
+      <span class="stat-val ${bonus[k] ? 'boosted' : ''}" ${bonus[k] ? `title="원래 ${s.stats[k]} + 장신구 ${bonus[k]}"` : ''}>${statOf(s, k)}</span>
     </button>`).join('');
 
   const rels = (['friend', 'rival', 'mentor', 'spouse'] as RelKey[]).map((k) => relLine(s, k)).join('');
@@ -1005,7 +1011,7 @@ function statInfoBox(app: App, s: LifeState): string {
   }
   return `
     <div class="stat-info" data-act="stat" data-arg="${k}">
-      <b>${STAT_NAMES[k]} ${s.stats[k]}</b>
+      <b>${STAT_NAMES[k]} ${statOf(s, k)}</b>${trinketBonus(s)[k] ? ` <span class="muted small">(원래 ${s.stats[k]} + 장신구 ${trinketBonus(s)[k]})</span>` : ''}
       <ul>${STAT_INFO[k].map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
     </div>`;
 }
