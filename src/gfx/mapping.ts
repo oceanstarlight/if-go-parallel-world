@@ -40,6 +40,11 @@ const EVENT_SCENE: Record<string, SceneKind | 'home'> = {
   hero_slain_avenger: 'graveyard', avenger_duel: 'battlefield', own_housewarming: 'home', own_horse_race: 'road',
   own_cat_gift: 'home', own_castle_siege: 'battlefield', guild_instructor: 'tavern', abyss_voice: 'dungeon',
   abyss_mark_throne: 'demon_castle', peace_after_demon_lord: 'castle',
+  rv_oath: 'road', rv_rising: 'village', rv_reunion: 'tavern', rv_showdown: 'battlefield',
+  herb_granny: 'forest', herb_fever: 'village', herb_cliff: 'forest', herb_thanks: 'village',
+  sensei_roadside: 'road', sensei_training: 'forest', sensei_trial: 'forest', sensei_legacy: 'road',
+  fest_crisis: 'village', fest_prepare: 'village', fest_storm: 'village', fest_finale: 'village',
+  wolf_child_cry: 'village', wolf_child_trace: 'forest', wolf_child_battle: 'forest', wolf_child_thanks: 'village',
     lg_statue: 'village', lg_bard: 'tavern', lg_book: 'library', lg_villain: 'village', lg_ghost: 'graveyard',
 };
 
