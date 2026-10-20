@@ -88,7 +88,7 @@ npm run build   # dist/ 에 정적 파일 생성 (어디에 올려도 동작)
 
 ### 로그인 · 클라우드 저장 (선택)
 
-Google / GitHub 로그인과 기기 간 저장은 Firebase (Auth + Firestore) 를 써요. 설정이 없으면 로그인 UI 가 꺼지고 게스트(localStorage)로만 동작해요.
+Google / GitHub 로그인과 기기 간 저장은 Firebase (Auth + Firestore) 를 써요. 설정이 없어도 로그인 화면은 보이지만, 로그인 버튼은 "준비 중" 안내만 하고 게스트(localStorage)로만 동작해요.
 
 1. Firebase 프로젝트 생성 → **Authentication** 에서 Google, GitHub 제공업체 켜기 (GitHub 는 OAuth 앱의 Client ID/Secret 필요, 콜백 URL 은 Firebase 가 알려줘요)
 2. Authentication > 설정 > **승인된 도메인** 에 배포 주소(`<user>.github.io`)와 `localhost` 추가
