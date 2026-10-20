@@ -830,3 +830,33 @@ button.t-slot { cursor: pointer; }
   .t-slot { min-height: 64px; }
   .t-slot strong { font-size: 10px; }
 }
+
+/* ───── 모바일 인생 화면: 연대기가 보이도록 위쪽을 압축 ───── */
+@media (max-width: 760px) {
+  .view-life { gap: 8px; padding-top: 8px; }
+  .view-life .sheet { padding: 8px 10px; }
+  .view-life .sheet-top { gap: 10px; }
+  .view-life .sheet-top .portrait-host { width: 64px; }
+  .view-life .sheet-head p.small { display: none; } /* 출신·권능은 정보 탭에서 */
+  .view-life .stats { grid-template-columns: 1fr 1fr 1fr; gap: 2px 8px; margin-top: 4px; }
+  .view-life .stat { grid-template-columns: 24px 1fr 20px; gap: 3px; font-size: 11px; padding-top: 1px; padding-bottom: 1px; }
+  .view-life .stat .bar { height: 4px; }
+  .view-life .mind { margin-top: 4px; }
+  .view-life .econ { margin-top: 2px; }
+  /* 장면: 화면 높이의 약 1/5. 하늘 쪽을 잘라 땅(인물이 서는 곳)은 남긴다 */
+  .view-life .scene-host { height: clamp(104px, 21dvh, 190px); overflow: hidden; display: flex; align-items: flex-end; justify-content: center; flex: none; }
+  /* 전투 중: 전투 시트가 아래를 덮으므로 하늘을 더 잘라 인물이 시트 위에 오게 한다 (HP 는 시트에 있다) */
+  .view-life.dueling .scene-host { height: clamp(100px, calc(100dvh - 45px - var(--ub-h) - 400px), 200px); }
+  /* 시간 막대: 한 줄 */
+  .view-life .timebar { flex-wrap: nowrap; padding: 2px 2px 6px; gap: 6px; }
+  .view-life .tb-play { width: 28px; height: 28px; }
+  .view-life .tb-month { min-width: 0; font-size: 12px; white-space: nowrap; }
+  .view-life .year-bar { min-width: 40px; }
+  .view-life .tb-state { display: none; }
+  .view-life .tb-pace { gap: 3px; }
+  .view-life .tb-pace .chip { padding: 2px 6px; font-size: 11px; }
+  /* 연대기: 남은 자리를 모두, 최소 높이 보장 */
+  .view-life .center { gap: 6px; }
+  .view-life .chronicle { min-height: 150px; padding: 10px 12px; }
+  .view-life .year { grid-template-columns: 34px 1fr; font-size: 13px; }
+}
