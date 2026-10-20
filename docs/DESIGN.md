@@ -201,6 +201,7 @@ src/
     text.ts          {name}, {friend} 같은 치환
     score.ts         환생석 정산
   meta.ts            영구 저장 (localStorage)
+  cloud.ts           로그인 + 클라우드 저장 (Firebase, 선택)
   ui/                화면 렌더링
   gfx/               도트 그래픽 (painter, portrait, scenes, sprites, mapping, stage)
 tests/sim.test.ts    무작위 인생 수천 회 자동 시뮬레이션 (오류·밸런스 확인)
