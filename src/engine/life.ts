@@ -371,6 +371,8 @@ export function naturalDeathChance(s: LifeState): number {
 /** 늘 진짜 죽음인 사인: 노환, 교수대(세 번째 체포), 던전에서 쓰러짐 */
 const REAL_DEATH = new Set(['old_age', 'gallows', 'dungeon', 'abyss']);
 /** 중상이 이 횟수에 이르면 죽는다 */
+/** 내 직업의 사건이 뽑힐 가중치 배율 */
+export const JOB_EVENT_MUL = 4;
 export const MAX_INJURY = 3;
 /** 첫 생의 시작: 어쩌다 환생하게 되었나 (1인칭) */
 const PROLOGUES = [
@@ -610,7 +612,9 @@ function pickEvent(s: LifeState, rng: Rng): GameEvent | null {
   const times: Record<string, number> = {};
   for (const id of s.seen) times[id] = (times[id] ?? 0) + 1;
   const pool = ALL_EVENTS.filter((e) => !e.milestone && eligible(s, e) && !(s.age - (seenAt[e.id] ?? -99) < REPEAT_GAP));
-  const weights = pool.map((e) => ((e.weight ?? 1) * (e.focus && e.focus === s.focus ? 3 : 1)) / (1 + 1.5 * (times[e.id] ?? 0)));
+  // 직업이 생기면 그 직업의 사건(상인=돈, 모험가=전투, 궁정 마법사=왕실…)이 삶의 중심이 된다
+  const jobMul = (e: GameEvent) => (s.jobId && e.cond.jobs?.includes(s.jobId) ? JOB_EVENT_MUL : 1);
+  const weights = pool.map((e) => ((e.weight ?? 1) * (e.focus && e.focus === s.focus ? 3 : 1) * jobMul(e)) / (1 + 1.5 * (times[e.id] ?? 0)));
   const total = weights.reduce((a, b) => a + b, 0);
   if (total <= 0) return null;
   let r = rng() * total;
