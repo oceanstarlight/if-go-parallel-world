@@ -1,6 +1,6 @@
 import { Painter, darken, hexToRgb, lighten } from './painter';
 import { figureOf, lookOf, type PortraitSpec, type Ramp } from './portrait';
-import { drawFigure, figureChin, type BackHair, type Bangs, type Figure } from './dotportrait';
+import { drawProfileHead, profileChin, type BackHair, type Bangs, type Figure } from './dotportrait';
 
 /** 전투 스프라이트. 모두 오른쪽을 바라보도록 그린다 (적은 좌우 반전해서 쓴다). */
 
@@ -34,15 +34,15 @@ export interface HeadArt {
   chin: number;
 }
 
-/** 포즈마다 표정을 바꿔 머리를 그린다 */
+/** 포즈마다 표정을 바꿔 옆얼굴 머리를 그린다 (초상화와 같은 설정, 오른쪽을 바라본다) */
 export function figureHead(base: Figure, extra?: (p: Painter) => void): (pose: Pose) => HeadArt {
   const cache: Partial<Record<Pose, HeadArt>> = {};
   const mood: Record<Pose, Figure['mood']> = { idle: base.mood, breathe: base.mood, attack: 'angry', hurt: 'afraid' };
   return (pose) =>
     (cache[pose] ??= (() => {
-      const p = drawFigure({ ...base, mood: mood[pose], blink: false, sway: pose === 'breathe' ? 1 : 0, headOnly: true });
+      const p = drawProfileHead({ ...base, mood: mood[pose], blink: false, sway: pose === 'breathe' ? 1 : 0 });
       extra?.(p);
-      return { p, chin: figureChin(base) };
+      return { p, chin: profileChin(base) };
     })());
 }
 
@@ -52,21 +52,21 @@ const isInk = (c: string) => {
   return r * 0.3 + g * 0.59 + b * 0.11 < 60;
 };
 
-/** 머리 위에 투구를 씌운다 */
+/** 옆얼굴 머리에 투구를 씌운다 (눈썹 위까지) */
 function helmetOver(p: Painter, c: string) {
   for (let y = 0; y <= 10; y++) for (let x = 0; x < 32; x++) {
     const v = p.get(x, y);
-    if (v && !isInk(v)) p.px(x, y, y <= 2 ? lighten(c, 0.3) : x > 20 ? darken(c, 0.2) : c);
+    if (v && !isInk(v)) p.px(x, y, y <= 5 ? lighten(c, 0.3) : x <= 8 ? darken(c, 0.2) : c);
   }
-  for (let x = 7; x <= 24; x++) p.px(x, 10, lighten(c, 0.35));
+  for (let x = 5; x <= 24; x++) if (p.get(x, 10)) p.px(x, 10, lighten(c, 0.35));
 }
 
-/** 머리를 두건으로 감싼다 (얼굴만 드러난다) */
+/** 옆얼굴 머리를 두건으로 감싼다 (얼굴 앞쪽만 드러난다) */
 function hoodOver(p: Painter, c: string) {
   for (let y = 0; y < 28; y++) for (let x = 0; x < 32; x++) {
     const v = p.get(x, y);
     if (!v || isInk(v)) continue;
-    if (y <= 8 || x <= 9 || x >= 22) p.px(x, y, x > 20 ? darken(c, 0.2) : c);
+    if (y <= 9 || x <= 13) p.px(x, y, x <= 8 ? darken(c, 0.2) : c);
   }
 }
 
@@ -164,7 +164,8 @@ export function drawHumanoid(o: HumanoidOpts, pose: Pose = 'idle'): Painter {
   if (art) {
     // 머리 전체(뒷머리 포함) → 몸 → 턱 위의 얼굴·앞머리 → 앞팔·무기
     // 긴 뒷머리는 몸 뒤로 가고, 외곽선은 두 겹이 되지 않는다
-    const hx = cx + 1 - 16, hy = neckY - art.chin;
+    // 옆얼굴은 뒤통수가 왼쪽: 목덜미(그리드 x15 근처)가 목 위에 오게 놓는다
+    const hx = cx - 15, hy = neckY - art.chin;
     const top = new Painter(32, art.chin + 1);
     for (let y = 0; y <= art.chin; y++) for (let x = 0; x < 32; x++) top.px(x, y, art.p.get(x, y));
     p.outlineTinted(0.6);
@@ -349,9 +350,9 @@ function npcHead(o: {
     if (o.helmet) helmetOver(p, o.helmet);
     if (o.hood) hoodOver(p, o.hood);
     if (o.crown) {
-      for (let x = 11; x <= 20; x++) p.px(x, 2, '#e0b850');
-      for (const x of [11, 14, 17, 20]) p.px(x, 1, '#e0b850');
-      p.px(15, 2, '#ff3040');
+      for (let x = 10; x <= 17; x++) p.px(x, 3, '#e0b850');
+      for (const x of [10, 13, 16]) p.px(x, 2, '#e0b850');
+      p.px(14, 3, '#ff3040');
     }
   });
 }
