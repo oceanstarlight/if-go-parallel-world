@@ -224,7 +224,7 @@ export const CHILDHOOD: GameEvent[] = [
   },
   {
     id: 'c_plague', title: '유행병', once: true, weight: 0.4,
-    cond: { minAge: 12, maxAge: 90 },
+    cond: { minAge: 12, maxAge: 52 },
     text: '왕국에 지독한 유행병이 돌고 있다. 거리마다 기침 소리가 가득하다.',
     auto: {
       check: { stat: 'vit', dc: 45 },

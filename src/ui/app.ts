@@ -627,6 +627,9 @@ function birth(app: App) {
     upgrades: app.meta.upgrades,
     npcPast: app.meta.npcMet ?? {},
     lifeNo: app.meta.totalLives + 1,
+    loop: app.meta.worldEnds ?? 0,
+    hints: app.meta.hintsHeard ?? 0,
+    afterHappy: app.meta.lastHappy,
     fated,
     legends: app.meta.legends ?? [],
   });
@@ -1064,7 +1067,7 @@ function viewLife(app: App): string {
       </div>
     </aside>
     <section class="center">
-      <div class="scene-host" data-gfx="scene" data-maxh="${Math.floor(window.innerHeight * 0.45)}"></div>
+      <div class="scene-host ${s.omen ? `omen omen-${s.omen}` : ''}" data-gfx="scene" data-maxh="${Math.floor(window.innerHeight * 0.45)}"></div>
       ${s.death ? '' : timeBar(app, s, !!ev)}
       <div class="chronicle">${chronicle}</div>
     </section>
@@ -1264,7 +1267,7 @@ function viewCredits(app: App): string {
     section('능력치', STAT_KEYS.map((k) => line(STAT_NAMES[k], String(s.stats[k]))).join('')),
     section('함께한 힘', [line('여신의 권능', esc(cheatById(s.cheatId).name)), ...traitsOf(s).map((t) => line('타고난 특성', esc(t.name)))].join('')),
     `<p class="cr-epitaph">${esc(d.epitaph)}</p>`,
-    `<p class="cr-end">— 그리고, 다음 생으로 —</p>`,
+    `<p class="cr-end">${esc(d.endLine ?? '— 그리고, 다음 생으로 —')}</p>`,
   ].join('');
   // 줄 수에 맞춰 흐르는 시간을 정한다
   const secs = Math.max(20, Math.min(48, 14 + deeds.length * 1.2 + rels.length));

@@ -11,7 +11,7 @@ export const NPC_EVENTS: GameEvent[] = [
   // ───── 떠돌이 마녀 루루 ─────
   {
     id: 'npc_lulu', title: '떠돌이 마녀 루루', once: true, weight: 1.4,
-    cond: { minAge: 7, maxAge: 70, test: (s) => past(s, 'lulu') < 3 },
+    cond: { minAge: 7, maxAge: 50, test: (s) => past(s, 'lulu') < 3 },
     text: (s) =>
       past(s, 'lulu') === 0
         ? '숲길을 걷는데 하늘에서 빗자루 탄 소녀가 떨어졌다. "아야야… 너, 방금 나 떨어지는 거 봤지?!" 마녀 모자가 삐뚤어져 있다.'
@@ -30,7 +30,7 @@ export const NPC_EVENTS: GameEvent[] = [
   },
   {
     id: 'npc_lulu_regular', title: '단골손님 루루', once: true, weight: 2.5,
-    cond: { minAge: 10, maxAge: 80, test: (s) => past(s, 'lulu') >= 3 },
+    cond: { minAge: 10, maxAge: 52, test: (s) => past(s, 'lulu') >= 3 },
     text: (s) => `"${past(s, 'lulu')}번째 생에서도 만나다니, 우리 운명인가 봐!" 마녀 루루가 비밀 물약 세 병을 꺼냈다. "단골 특별 서비스♪ 하나만 골라!"`,
     choices: [
       { label: '젊음의 물약', success: { text: '한 모금 마시자 몸에 활력이 넘쳤다! "피부 좋아졌다~"', effect: { meet: 'lulu', stats: { vit: 42 } }, tone: 'good' } },
@@ -42,7 +42,7 @@ export const NPC_EVENTS: GameEvent[] = [
   // ───── 사신 그림 ─────
   {
     id: 'npc_grim', title: '차 마시는 사신', once: true, weight: 3,
-    cond: { minAge: 55 },
+    cond: { minAge: 45 },
     text: (s) =>
       past(s, 'grim') === 0
         ? '검은 로브의 해골이 집 앞 벤치에 앉아 있다. "안녕? 난 사신이야. 아직 데리러 온 건 아니고~ 심심한데 체스 한 판 할래?"'
@@ -63,7 +63,7 @@ export const NPC_EVENTS: GameEvent[] = [
   // ───── 고양이 상인 모모 ─────
   {
     id: 'npc_momo', title: '고양이 상인 모모', once: true, weight: 1.4,
-    cond: { minAge: 12, maxAge: 80, maxStats: { luck: 277 } },
+    cond: { minAge: 12, maxAge: 52, maxStats: { luck: 277 } },
     text: (s) =>
       past(s, 'momo') < 2
         ? '고양이 귀 상인 모모가 보따리를 펼쳤다. "손님, 운명의 뽑기 한 판 어떠냥? 꽝은… 아마 없다냥!"'

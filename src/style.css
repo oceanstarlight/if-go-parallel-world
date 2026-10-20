@@ -894,3 +894,11 @@ button.t-slot { cursor: pointer; }
 .stat-val .grade.g-B { background: #e0ecff; color: #2a5ad8; }
 .stat-val .grade.g-E, .stat-val .grade.g-F { background: #f0f0f4; color: #8a8aa0; }
 .stat-name .talent { font-style: normal; color: #e8a000; margin-left: 1px; font-size: 0.85em; }
+
+/* 멸망 1년 전: 하늘이 물든다 */
+.scene-host.omen canvas { transition: filter 2s ease; }
+.scene-host.omen-ash canvas { filter: grayscale(0.85) brightness(0.8) contrast(1.1); }
+.scene-host.omen-ochre canvas { filter: sepia(0.9) saturate(1.4) hue-rotate(-10deg) brightness(0.85); }
+.scene-host.omen-crimson canvas { filter: sepia(0.6) saturate(2) hue-rotate(-40deg) brightness(0.8); }
+.scene-host.omen-pale canvas { filter: grayscale(1) brightness(1.15) contrast(0.8); }
+.scene-host.omen-storm canvas { filter: grayscale(0.6) brightness(0.65) hue-rotate(180deg) saturate(0.6); }

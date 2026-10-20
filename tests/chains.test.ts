@@ -46,6 +46,8 @@ describe('사건 연관성', () => {
     // 출신·시스템이 주는 플래그
     for (const m of CODE.matchAll(/flags: \[([^\]]*)\]/g)) for (const f of m[1].matchAll(/'([a-z0-9_]+)'/g)) setters.add(f[1]);
     for (const f of ['depth_20', 'depth_40', 'depth_60', 'depth_80', 'jailed']) setters.add(f);
+    // 세계의 시계가 세우는 플래그 (src/engine/world.ts)
+    for (const f of ['masked_1', 'masked_2', 'masked_3', 'truth_open', 'white_dragon', 'doom_dragon_now', 'doom_moon_now', 'doom_war_now', 'doom_vanish_now', 'doom_flood_now']) setters.add(f);
     const orphan = ALL_EVENTS.flatMap((ev) => (ev.cond.flags ?? []).filter((f) => !setters.has(f)).map((f) => `${ev.id}: ${f}`));
     expect(orphan).toEqual([]);
   });

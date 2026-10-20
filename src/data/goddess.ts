@@ -5,6 +5,13 @@ import type { LifeState } from '../types';
  * 사인별 대사 + 나이·전생 횟수·같은 죽음 반복에 따른 대사를 섞는다.
  */
 const BY_CAUSE: Record<string, string[]> = {
+  doom_dragon: ['…미안. 이번엔 나도 어쩔 수 없었어.', '세계가… 또 끝났네. 괜찮아, 다시 시작하면 돼.'],
+  doom_moon: ['달이 떨어지는 건… 나도 처음 봤어. 정말이야.', '…또 끝났구나. 이번엔 조금 더 멀리 가 볼래?'],
+  doom_war: ['다들 왜 그렇게 싸웠을까. …너는 끝까지 잘 버텼어.'],
+  doom_vanish: ['…다들 어디로 갔을까. 넌 기억해 줘. 부탁이야.'],
+  doom_flood: ['물이 다 덮어 버렸네. …다음엔 높은 곳에서 태어나게 해 줄게.'],
+  happy_end: ['……'],
+  bad_end: ['……알아 버렸구나.'],
   old_age: ['수고했어. 정말 오래 살았네! 주름살도 귀여웠어♪', '천수를 누렸구나. 이런 엔딩, 여신으로서 제일 좋아해.'],
   illness: ['아팠지? 다음 생엔 튼튼한 몸으로 보내줄게… 아마도.', '이세계에도 감기약이 있으면 좋을 텐데. 내가 건의해 볼게.'],
   plague: ['손 씻으라고 했잖아! …아, 그건 전전생 얘기였나?'],
@@ -46,6 +53,8 @@ export function goddessLines(s: LifeState, ctx: GoddessContext, rng: () => numbe
   const cause = s.death?.causeId ?? 'old_age';
   const pool = BY_CAUSE[cause] ?? BY_CAUSE.illness;
   const out = [pool[Math.floor(rng() * pool.length)]];
+  // 해피엔딩 뒤의 여신은 아무 말도 하지 않는다
+  if (cause === 'happy_end') return out;
   if (ctx.prevCause === cause && cause !== 'old_age') out.unshift('…또 그걸로 죽었어? 진짜 두 번 연속이야?');
   else if (ctx.causeCount >= 3 && cause !== 'old_age') out.unshift(`이걸로 ${ctx.causeCount}번째야. 혹시 일부러 그러는 거 아니지?`);
   if (s.age < 10) out.push('그나저나 너무 빨리 왔잖아! 다음엔 좀 더 놀다 와.');

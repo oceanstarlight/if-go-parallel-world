@@ -72,6 +72,6 @@ describe('v1.4 동시대 환생자', () => {
       for (let i = 0; i < 40; i++) a += simulateLife(i * 101 + 3, opt).age;
       return a / 40;
     };
-    expect(avg(PEER_HARD)).toBeLessThan(avg({}) - 15);
+    expect(avg(PEER_HARD)).toBeLessThan(avg({}) - 5);
   });
 });

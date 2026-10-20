@@ -93,7 +93,7 @@ export const DESTINY_EVENTS: GameEvent[] = [
 /** 소중한 사람이 위험할 때 (Sir Brante 의 '대신 죽어주기') */
 const blow = (key: RelKey, who: string): GameEvent => ({
   id: `x_blow_${key}`, title: '날아드는 칼날', once: true, weight: 0.8,
-  cond: { minAge: 16, maxAge: 75, hasRel: [key], notFlags: ['blow_event'] },
+  cond: { minAge: 16, maxAge: 52, hasRel: [key], notFlags: ['blow_event'] },
   text: `한밤중의 습격! 어둠 속에서 번뜩인 칼날이 ${who} {${key}}에게 날아든다. 생각할 틈이 없다!`,
   choices: [
     { label: '몸을 던져 대신 맞는다 (불굴 목숨 -1)', cond: { test: (s) => s.extraLives > 0 },

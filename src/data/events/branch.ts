@@ -122,7 +122,7 @@ export const BRANCH_EVENTS: GameEvent[] = [
 
   // ───── 공통: 인생 2막 (가지를 갈아탄다) ─────
   {
-    id: 'b_career_change', title: '인생 2막', once: true, weight: 1.2, cond: { minAge: 28, maxAge: 50, notJobs: [null, 'hero', 'demon_officer'] },
+    id: 'b_career_change', title: '인생 2막', once: true, weight: 1.2, cond: { minAge: 28, maxAge: 44, notJobs: [null, 'hero', 'demon_officer'] },
     text: '문득 거울을 보았다. "이대로 괜찮은 걸까?" 새로운 길이 머릿속을 스친다.',
     choices: [
       { label: '고향에서 농사를 짓는다', cond: { notJobs: ['farmer'] }, success: { text: '도시를 떠나 흙냄새 나는 삶으로. 마음이 편안해졌다.', effect: { job: 'farmer', stress: -20 } } },

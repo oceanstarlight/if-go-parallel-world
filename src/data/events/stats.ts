@@ -19,7 +19,7 @@ export const STAT_EVENTS: GameEvent[] = [
   },
   {
     id: 's_vit_mountain', title: '새벽 산행', weight: 1, focus: 'train',
-    cond: { minAge: 12, maxAge: 65 },
+    cond: { minAge: 12, maxAge: 49 },
     text: '마을 뒷산 정상에서 해돋이를 보면 일 년 내내 건강하다는 말이 있다.',
     choices: [
       { label: '뛰어서 오른다', check: { stat: 'vit', dc: 90 },
@@ -30,7 +30,7 @@ export const STAT_EVENTS: GameEvent[] = [
   },
   {
     id: 's_vit_cold', title: '독한 감기', weight: 0.8,
-    cond: { minAge: 3, maxAge: 90 },
+    cond: { minAge: 3, maxAge: 52 },
     text: '목이 칼칼하고 머리가 지끈거린다. 마을에 감기가 돌고 있다.',
     choices: [
       { label: '푹 쉰다', success: { text: '사흘을 내리 잤다. 개운하지만 몸이 조금 약해진 느낌이다.', effect: { stats: { vit: -3 }, stress: -10 } } },
@@ -43,7 +43,7 @@ export const STAT_EVENTS: GameEvent[] = [
   // ───── 마력 ─────
   {
     id: 's_mana_starlight', title: '별빛 명상', weight: 1, focus: 'study',
-    cond: { minAge: 6, maxAge: 80 },
+    cond: { minAge: 6, maxAge: 52 },
     text: '구름 한 점 없는 밤, 별빛이 유난히 가깝게 느껴진다. 손끝이 찌릿하다.',
     choices: [
       { label: '눈을 감고 별빛을 받아들인다', check: { stat: 'mana', dc: 73 },
@@ -54,7 +54,7 @@ export const STAT_EVENTS: GameEvent[] = [
   },
   {
     id: 's_mana_runes', title: '이상한 룬 문자', weight: 0.9,
-    cond: { minAge: 10, maxAge: 70 },
+    cond: { minAge: 10, maxAge: 50 },
     text: '헌책방 구석의 책장에 손가락을 대자 룬 문자가 희미하게 빛났다.',
     choices: [
       { label: '룬을 따라 읽는다', check: { stat: 'int', dc: 84 },
@@ -65,7 +65,7 @@ export const STAT_EVENTS: GameEvent[] = [
   },
   {
     id: 's_mana_overflow', title: '마력 과부하', weight: 0.6,
-    cond: { minAge: 8, maxAge: 60, stats: { mana: 84 } },
+    cond: { minAge: 8, maxAge: 47, stats: { mana: 84 } },
     text: '요즘 마력이 넘쳐흐른다. 촛불이 저절로 켜졌다 꺼졌다 한다.',
     choices: [
       { label: '마력을 하늘로 쏘아 올린다', success: { text: '밤하늘에 커다란 불꽃이 피었다! 마을 사람들이 축제인 줄 알았다.', effect: { stats: { mana: 6, fame: 6 }, stress: -10 }, tone: 'good' } },
@@ -78,7 +78,7 @@ export const STAT_EVENTS: GameEvent[] = [
   // ───── 지성 ─────
   {
     id: 's_int_riddle', title: '수수께끼 노인', weight: 1, focus: 'study',
-    cond: { minAge: 7, maxAge: 70 },
+    cond: { minAge: 7, maxAge: 50 },
     text: '다리 위의 노인이 길을 막고 웃었다. "수수께끼를 풀면 지나가게 해 주지."',
     choices: [
       { label: '머리를 굴린다', check: { stat: 'int', dc: 78 },
@@ -89,7 +89,7 @@ export const STAT_EVENTS: GameEvent[] = [
   },
   {
     id: 's_int_library', title: '밤샘 독서', weight: 1, focus: 'study',
-    cond: { minAge: 9, maxAge: 80 },
+    cond: { minAge: 9, maxAge: 52 },
     text: '도서관에서 빌린 두꺼운 책이 손에서 떨어지지 않는다. 벌써 자정이다.',
     choices: [
       { label: '끝까지 읽는다', success: { text: '새벽닭이 울 무렵 마지막 장을 덮었다. 세상이 조금 넓어 보인다.', effect: { stats: { int: 8 }, stress: 6 }, tone: 'good' } },
@@ -98,7 +98,7 @@ export const STAT_EVENTS: GameEvent[] = [
   },
   {
     id: 's_int_scam', title: '그럴듯한 약장수', weight: 0.8,
-    cond: { minAge: 12, maxAge: 85 },
+    cond: { minAge: 12, maxAge: 52 },
     text: '광장의 약장수가 "머리가 좋아지는 기적의 물약!"을 외친다. 한 병에 50골드.',
     choices: [
       { label: '성분을 따져 묻는다', check: { stat: 'int', dc: 84 },
@@ -111,7 +111,7 @@ export const STAT_EVENTS: GameEvent[] = [
   // ───── 매력 ─────
   {
     id: 's_cha_dance', title: '광장의 춤판', weight: 1, focus: 'social',
-    cond: { minAge: 10, maxAge: 75 },
+    cond: { minAge: 10, maxAge: 52 },
     text: '광장에서 악사들이 흥겨운 곡을 연주한다. 다들 손을 잡고 원을 그리며 돈다.',
     choices: [
       { label: '원 안으로 뛰어든다', check: { stat: 'cha', dc: 73 },
@@ -122,7 +122,7 @@ export const STAT_EVENTS: GameEvent[] = [
   },
   {
     id: 's_cha_mirror', title: '거울 앞 연습', weight: 0.8, focus: 'social',
-    cond: { minAge: 12, maxAge: 50 },
+    cond: { minAge: 12, maxAge: 44 },
     text: '내일 중요한 자리가 있다. 거울 앞에서 웃는 얼굴을 연습해 본다.',
     choices: [
       { label: '백 번 연습한다', success: { text: '광대가 아플 지경이지만 미소에 자신감이 붙었다.', effect: { stats: { cha: 8 } }, tone: 'good' } },
@@ -131,7 +131,7 @@ export const STAT_EVENTS: GameEvent[] = [
   },
   {
     id: 's_cha_rumor', title: '나쁜 소문', weight: 0.7,
-    cond: { minAge: 12, maxAge: 80 },
+    cond: { minAge: 12, maxAge: 52 },
     text: '누군가 당신에 대한 이상한 소문을 퍼뜨리고 있다. 사람들의 시선이 따갑다.',
     choices: [
       { label: '정면으로 해명한다', check: { stat: 'cha', dc: 90 },
@@ -144,7 +144,7 @@ export const STAT_EVENTS: GameEvent[] = [
   // ───── 명성 ─────
   {
     id: 's_fame_fire', title: '불난 집', weight: 0.8,
-    cond: { minAge: 12, maxAge: 65 },
+    cond: { minAge: 12, maxAge: 49 },
     text: '이웃집에서 연기가 치솟는다! 안에 아이가 있다는 외침이 들린다.',
     choices: [
       { label: '불길 속으로 뛰어든다', check: { stat: 'vit', dc: 95 },
@@ -157,7 +157,7 @@ export const STAT_EVENTS: GameEvent[] = [
   },
   {
     id: 's_fame_bard', title: '음유시인의 노래', weight: 0.7,
-    cond: { minAge: 16, maxAge: 85, stats: { fame: 42 } },
+    cond: { minAge: 16, maxAge: 52, stats: { fame: 42 } },
     text: '떠돌이 음유시인이 당신의 이야기를 노래로 만들고 싶다고 한다.',
     choices: [
       { label: '과장 좀 섞어 들려준다', success: { text: '노래 속 당신은 용을 세 마리쯤 쓰러뜨렸다. 노래는 대히트였다!', effect: { stats: { fame: 14 }, karma: -2 }, tone: 'good' } },
@@ -166,7 +166,7 @@ export const STAT_EVENTS: GameEvent[] = [
   },
   {
     id: 's_fame_contest', title: '마을 대항 시합', weight: 1,
-    cond: { minAge: 10, maxAge: 50 },
+    cond: { minAge: 10, maxAge: 44 },
     text: '이웃 마을과 해마다 여는 시합 날이다. 대표 선수 자리가 하나 비었다.',
     choices: [
       { label: '대표로 나선다', check: { stat: 'luck', dc: 73 },
@@ -179,7 +179,7 @@ export const STAT_EVENTS: GameEvent[] = [
   // ───── 행운 ─────
   {
     id: 's_luck_coin', title: '반짝이는 동전', weight: 1, focus: 'explore',
-    cond: { minAge: 4, maxAge: 90 },
+    cond: { minAge: 4, maxAge: 52 },
     text: '길바닥에서 반짝이는 동전을 발견했다. 앞면일까, 뒷면일까?',
     choices: [
       { label: '주워서 던져 본다', check: { stat: 'luck', dc: 67 },
@@ -190,7 +190,7 @@ export const STAT_EVENTS: GameEvent[] = [
   },
   {
     id: 's_luck_blackcat', title: '검은 고양이', weight: 0.9,
-    cond: { minAge: 5, maxAge: 85 },
+    cond: { minAge: 5, maxAge: 52 },
     text: '검은 고양이가 앞길을 가로질렀다. 불길하다는 말도, 행운이라는 말도 있다.',
     choices: [
       { label: '쓰다듬어 준다', success: { text: '고양이가 그르릉거리며 발에 몸을 비볐다. 왠지 좋은 일이 생길 것 같다.', effect: { stats: { luck: 8 }, mood: 'joy' }, tone: 'good' } },
@@ -199,7 +199,7 @@ export const STAT_EVENTS: GameEvent[] = [
   },
   {
     id: 's_luck_lottery', title: '축제 복권', weight: 0.8,
-    cond: { minAge: 14, maxAge: 90 },
+    cond: { minAge: 14, maxAge: 52 },
     text: '추수 축제에서 복권을 판다. 한 장에 10골드, 1등은 황금 송아지!',
     choices: [
       { label: '한 장 산다', check: { stat: 'luck', dc: 112 },
@@ -221,7 +221,7 @@ export const STAT_EVENTS: GameEvent[] = [
   },
   {
     id: 's_t_mentor', title: '스승의 반지', once: true, weight: 2,
-    cond: { minAge: 18, maxAge: 70, hasRel: ['mentor'] },
+    cond: { minAge: 18, maxAge: 50, hasRel: ['mentor'] },
     text: '{mentor:이} 낡은 반지를 빼 건넸다. "이제 네가 가질 때가 됐다."',
     choices: [
       { label: '두 손으로 받는다', success: { text: '반지에 새겨진 문양이 손끝에 따뜻하게 닿는다. 스승의 지혜가 깃든 듯하다.', effect: { trinket: { base: 't_mentor', rarity: 'epic' }, rel: { mentor: 10 } }, tone: 'good' } },
@@ -241,7 +241,7 @@ export const STAT_EVENTS: GameEvent[] = [
   },
   {
     id: 's_t_hero', title: '쓰러진 용사', once: true, weight: 0.8,
-    cond: { minAge: 16, maxAge: 60 },
+    cond: { minAge: 16, maxAge: 47 },
     text: '숲길에서 상처투성이 노병을 만났다. 깨진 견장을 내밀며 마을까지 데려다 달라고 한다.',
     choices: [
       { label: '업고 마을까지 간다', check: { stat: 'vit', dc: 84 },
@@ -252,7 +252,7 @@ export const STAT_EVENTS: GameEvent[] = [
   },
   {
     id: 's_t_star', title: '떨어진 별', once: true, weight: 0.7,
-    cond: { minAge: 8, maxAge: 80 },
+    cond: { minAge: 8, maxAge: 52 },
     text: '한밤중, 뒷산에 별똥별이 떨어졌다. 숲 사이로 희미한 빛이 새어 나온다.',
     choices: [
       { label: '빛을 찾아간다', check: { stat: 'mana', dc: 78 },
@@ -263,7 +263,7 @@ export const STAT_EVENTS: GameEvent[] = [
   },
   {
     id: 's_t_crown', title: '축제의 왕', once: true, weight: 0.8,
-    cond: { minAge: 14, maxAge: 60, stats: { cha: 70 } },
+    cond: { minAge: 14, maxAge: 47, stats: { cha: 70 } },
     text: '추수 축제에서 「올해의 축제 왕」을 뽑는다고 한다. 친구들이 등을 떠민다.',
     choices: [
       { label: '무대에 오른다', check: { stat: 'cha', dc: 95 },

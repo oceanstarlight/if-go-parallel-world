@@ -112,7 +112,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   // ═════ 성검을 거부한 용사의 핏줄 ═════
   {
     id: 'sword_crisis', title: '다시 우는 성검', once: true, weight: 6,
-    cond: { flags: ['hero_refused'], minAge: 26, maxAge: 50 },
+    cond: { flags: ['hero_refused'], minAge: 26, maxAge: 44 },
     text: '마왕군이 고향을 덮쳤다. 잠가두었던 지하실에서, 성검이 마지막으로 울고 있다.',
     choices: [
       { label: '이번엔 성검을 뽑는다', check: { stat: 'vit', dc: 84 },
@@ -152,7 +152,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   },
   {
     id: 'arranged_child', title: '작은 기적', once: true, weight: 5,
-    cond: { flags: ['arranged_love'], hasRel: ['spouse'], maxAge: 45 },
+    cond: { flags: ['arranged_love'], hasRel: ['spouse'], maxAge: 42 },
     text: '정략으로 시작한 결혼에, 어느새 진짜 사랑이 피었다. 그리고 오늘, 둘에게 반가운 소식이 찾아왔다.',
     auto: { success: { text: '아기가 태어났다! 대공가 전체가 축제 분위기다.', effect: { flags: ['has_child'], rel: { spouse: 15 }, mood: 'joy', stats: { fame: 8 } }, tone: 'milestone' } },
   },
@@ -446,7 +446,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   },
   {
     id: 'rv_showdown', title: '십 년 만의 승부', once: true, weight: 7,
-    cond: { minAge: 25, maxAge: 48, hasRel: ['rival'], flags: ['rv_final'] },
+    cond: { minAge: 25, maxAge: 43, hasRel: ['rival'], flags: ['rv_final'] },
     text: '그 언덕에 다시 섰다. 노을도, 바람도 그날 그대로다. 맞은편에서 {rival:이} 목검 대신 진짜 검을 뽑았다. "자, 약속을 지킬 시간이다."',
     choices: [
       { label: '검으로 정면승부', check: { stat: 'vit', dc: 101 },
@@ -462,7 +462,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   // ═════ 마을 열병과 약초꾼 (구한 노파 → 번지는 열병 → 월광초 → 감사) ═════
   {
     id: 'herb_granny', title: '쓰러진 약초꾼', once: true, weight: 3,
-    cond: { minAge: 12, maxAge: 60 },
+    cond: { minAge: 12, maxAge: 47 },
     text: '숲길에서 약초 바구니를 안은 노파가 주저앉아 있다. 발목이 퉁퉁 부었다. "아이고… 이 늙은이를 좀 부축해 주겠나?"',
     choices: [
       { label: '업고 마을까지 간다', check: { stat: 'vit', dc: 73 },
@@ -474,7 +474,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   },
   {
     id: 'herb_fever', title: '마을에 번진 열병', once: true, weight: 6,
-    cond: { minAge: 12, maxAge: 70, flags: ['herb_granny'] },
+    cond: { minAge: 12, maxAge: 50, flags: ['herb_granny'] },
     text: '며칠 뒤, 마을 사람들이 줄줄이 열병에 쓰러졌다. 약초꾼 노파가 병상을 둘러보며 중얼거렸다. "월광초가 있어야 해… 절벽 위에 딱 한 군데 피는데."',
     choices: [
       { label: '내가 가져오겠다고 나선다', success: { text: '"맡겨 주세요!" 노파가 지도를 그려 주었다. 오늘 밤 보름달이 뜬다.', effect: { flags: ['herb_need'], stats: { vit: 3 }, karma: 3 }, tone: 'good' } },
@@ -483,7 +483,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   },
   {
     id: 'herb_cliff', title: '절벽 위의 월광초', once: true, weight: 8, focus: 'explore',
-    cond: { minAge: 12, maxAge: 70, flags: ['herb_need'] },
+    cond: { minAge: 12, maxAge: 50, flags: ['herb_need'] },
     text: '보름달 밤, 절벽 끝에 은빛 꽃이 반짝인다. 바람이 거세다. 한 발만 더 내딛으면 닿을 것 같은데.',
     choices: [
       { label: '밧줄을 묶고 내려간다', check: { stat: 'vit', dc: 84 },
@@ -496,7 +496,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   },
   {
     id: 'herb_thanks', title: '약초꾼의 선물', once: true, weight: 8,
-    cond: { minAge: 12, maxAge: 70, flags: ['herb_cure'] },
+    cond: { minAge: 12, maxAge: 50, flags: ['herb_cure'] },
     text: '월광초 달인 약을 마신 마을 사람들이 하나둘 자리에서 일어났다. 약초꾼 노파가 당신을 불러 세웠다.',
     choices: [
       { label: '약초 달이는 법을 배운다', success: { text: '"눈썰미가 좋구먼." 노파가 비법서를 건넸다. 약초 냄새가 옷에 배었다.', effect: { unflags: ['herb_granny', 'herb_cure'], stats: { int: 8, vit: 3 }, karma: 4 }, tone: 'good' } },
@@ -520,7 +520,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   },
   {
     id: 'sensei_training', title: '스승의 수련', once: true, weight: 6,
-    cond: { minAge: 14, maxAge: 50, hasRel: ['mentor'], flags: ['sensei_taught'] },
+    cond: { minAge: 14, maxAge: 44, hasRel: ['mentor'], flags: ['sensei_taught'] },
     text: '{mentor:은} 잔소리 하나 없이 하루 종일 같은 동작만 시켰다. 사흘째, 팔은 후들거리고 머릿속은 하얘졌다.',
     choices: [
       { label: '입 다물고 끝까지 따른다', check: { stat: 'vit', dc: 78 },
@@ -533,7 +533,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   },
   {
     id: 'sensei_trial', title: '스승의 시험', once: true, weight: 7,
-    cond: { minAge: 15, maxAge: 55, hasRel: ['mentor'], flags: ['sensei_ready'] },
+    cond: { minAge: 15, maxAge: 45, hasRel: ['mentor'], flags: ['sensei_ready'] },
     text: '{mentor:이} 낡은 나무 막대기를 하나 던졌다. "마지막 시험일세. 이 막대로 저 바위를 갈라 보게."',
     choices: [
       { label: '숨을 고르고 힘을 모은다', check: { stat: 'vit', dc: 90 },
@@ -546,7 +546,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   },
   {
     id: 'sensei_legacy', title: '마지막 가르침', once: true, weight: 8,
-    cond: { minAge: 15, maxAge: 65, hasRel: ['mentor'], flags: ['sensei_heir'] },
+    cond: { minAge: 15, maxAge: 49, hasRel: ['mentor'], flags: ['sensei_heir'] },
     text: '{mentor:이} 보따리를 풀어 낡은 책 한 권과 막대기를 건넸다. "나는 이제 길을 떠나려 하네. 자네가 내 마지막 제자야."',
     choices: [
       { label: '책을 받고 가르침을 잇겠다 약속한다', success: { text: '책 첫 장에는 이렇게 적혀 있었다. "길은 멈춘 자에게는 닿지 않는다." {mentor:은} 웃으며 어깨를 두드렸다.', effect: { unflags: ['sensei_heir', 'sensei_taught'], stats: { int: 11, vit: 6, fame: 8 }, karma: 5 }, tone: 'milestone' } },
@@ -559,7 +559,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   // ═════ 고향 축제 지키기 (위기 → 준비 → 비바람 → 성대한 마무리) ═════
   {
     id: 'fest_crisis', title: '축제 준비위원 모집', once: true, weight: 3,
-    cond: { minAge: 14, maxAge: 55 },
+    cond: { minAge: 14, maxAge: 45 },
     text: '촌장이 광장에서 한숨을 쉰다. "올해 축제는 일손이 없어서 접어야 할 판이야. 누가 나서 줄 사람 없나?"',
     choices: [
       { label: '내가 맡겠다고 손을 든다', success: { text: '"오오, 장하다!" 촌장이 두 손을 꼭 잡았다. 광장이 갑자기 활기를 띠었다.', effect: { flags: ['fest_host'], karma: 3, stats: { cha: 3 } }, tone: 'good' } },
@@ -569,7 +569,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   },
   {
     id: 'fest_prepare', title: '축제 준비', once: true, weight: 7,
-    cond: { minAge: 14, maxAge: 56, flags: ['fest_host'] },
+    cond: { minAge: 14, maxAge: 46, flags: ['fest_host'] },
     text: '등불, 천막, 음식 재료, 무대. 해야 할 일이 산더미다. 마을 사람들이 눈을 반짝이며 지시를 기다린다.',
     choices: [
       { label: '일을 나눠 맡기고 진두지휘한다', check: { stat: 'cha', dc: 84 },
@@ -583,7 +583,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   },
   {
     id: 'fest_storm', title: '축제 날의 소나기', once: true, weight: 8,
-    cond: { minAge: 14, maxAge: 56, flags: ['fest_ready'] },
+    cond: { minAge: 14, maxAge: 46, flags: ['fest_ready'] },
     text: '축제 당일, 해질녘에 먹구름이 몰려왔다. 우르릉 천둥과 함께 굵은 빗방울이 광장에 쏟아진다. 등불이 하나둘 꺼진다!',
     choices: [
       { label: '마법으로 빗줄기를 밀어낸다', check: { stat: 'mana', dc: 90 },
@@ -597,7 +597,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   },
   {
     id: 'fest_finale', title: '불꽃 속의 마무리', once: true, weight: 9,
-    cond: { minAge: 14, maxAge: 56, flags: ['fest_grand'] },
+    cond: { minAge: 14, maxAge: 46, flags: ['fest_grand'] },
     text: '비가 그치자 하늘에 무지개가 걸렸다. 촌장이 마지막 불꽃을 쏘아 올리며 외쳤다. "올해 축제의 주인공은 바로 이 아이다!"',
     choices: [
       { label: '손을 흔들며 인사한다', success: { text: '광장이 박수로 가득 찼다. 마을 사람들이 어깨를 들썩이며 당신의 이름을 불렀다.', effect: { unflags: ['fest_grand', 'fest_host'], stats: { fame: 14, cha: 6 }, karma: 5, mood: 'joy' }, tone: 'milestone' } },
@@ -608,7 +608,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   // ═════ 늑대에게 잡혀간 아이 (비명 → 추적 → 늑대와 전투 → 아이의 보답) ═════
   {
     id: 'wolf_child_cry', title: '마을 어귀의 비명', once: true, weight: 3,
-    cond: { minAge: 12, maxAge: 50 },
+    cond: { minAge: 12, maxAge: 44 },
     text: '마을 어귀에서 아이 엄마가 주저앉아 울부짖는다. "우리 아이가… 늑대가 물고 숲으로 갔어요!"',
     choices: [
       { label: '곧장 숲으로 달려간다', success: { text: '"제가 찾아올게요!" 말이 끝나기도 전에 몸이 먼저 달렸다. 발자국이 숲 안쪽으로 이어진다.', effect: { flags: ['wolf_chase'], stats: { vit: 3 }, karma: 4 }, tone: 'good' } },
@@ -620,7 +620,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   },
   {
     id: 'wolf_child_trace', title: '숲속의 발자국', once: true, weight: 9, focus: 'explore',
-    cond: { minAge: 12, maxAge: 50, flags: ['wolf_chase'] },
+    cond: { minAge: 12, maxAge: 44, flags: ['wolf_chase'] },
     text: '어두운 숲, 꺾인 가지와 작은 신발 한 짝. 멀리서 낮은 으르렁 소리와 아이의 훌쩍임이 들려온다.',
     choices: [
       { label: '흔적을 하나하나 짚어 따라간다', check: { stat: 'int', dc: 73 },
@@ -633,7 +633,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   },
   {
     id: 'wolf_child_battle', title: '늑대 두목과의 대치', once: true, weight: 10,
-    cond: { minAge: 12, maxAge: 50, flags: ['wolf_found'] },
+    cond: { minAge: 12, maxAge: 44, flags: ['wolf_found'] },
     text: '굴 안쪽, 아이가 웅크린 채 떨고 있다. 그 앞을 거대한 은빛 늑대가 가로막았다. 눈이 마주치자 으르렁 소리가 굴을 울렸다.',
     choices: [
       { label: '검으로 정면 돌파', check: { stat: 'vit', dc: 84 },
@@ -649,7 +649,7 @@ export const CHAIN_EVENTS: GameEvent[] = [
   },
   {
     id: 'wolf_child_thanks', title: '아이의 꽃다발', once: true, weight: 10,
-    cond: { minAge: 12, maxAge: 55, flags: ['wolf_saved'] },
+    cond: { minAge: 12, maxAge: 45, flags: ['wolf_saved'] },
     text: '며칠 뒤, 문 앞에 작은 꽃다발이 놓여 있다. 삐뚤빼뚤한 글씨의 쪽지도 있다. "구해 줘서 고마워요! 커서 저도 영웅이 될래요!"',
     choices: [
       { label: '꽃다발을 소중히 간직한다', success: { text: '창가에 꽂아 둔 꽃이 시들 때까지 한참을 바라보았다. 그 아이의 웃음이 마음속에 오래도록 남았다.', effect: { unflags: ['wolf_saved'], stress: -30, karma: 5, mood: 'joy' }, tone: 'good' } },

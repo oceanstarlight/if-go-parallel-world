@@ -16,7 +16,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_yandere', title: '수상한 시선', once: true, weight: 3,
-    cond: { minAge: 18, maxAge: 55, flags: ['friend_obsessed'], hasRel: ['friend'] },
+    cond: { minAge: 18, maxAge: 45, flags: ['friend_obsessed'], hasRel: ['friend'] },
     text: '요즘 어딜 가든 누군가의 시선이 느껴진다. 오늘 밤, 문 앞에 {friend:이} 서 있었다. 손에는… 부엌칼?!',
     choices: [
       {
@@ -54,25 +54,25 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_child', title: '새 생명', once: true, weight: 3,
-    cond: { minAge: 21, maxAge: 45, hasRel: ['spouse'] },
+    cond: { minAge: 21, maxAge: 42, hasRel: ['spouse'] },
     text: '{spouse:와} 당신 사이에 아기가 태어났다!',
     auto: { success: { text: '조그만 손이 당신 손가락을 꼭 쥐었다. 두 번째 인생에서, 처음으로 지키고 싶은 것이 생겼다.', effect: { flags: ['has_child'], karma: 5, stats: { cha: 6 }, rel: { spouse: 10 } }, tone: 'good' } },
   },
   {
     id: 'a_spouse_death', title: '작별', once: true, weight: 1,
-    cond: { minAge: 50, maxAge: 90, hasRel: ['spouse'] },
+    cond: { minAge: 44, maxAge: 52, hasRel: ['spouse'] },
     text: '{spouse:이} 앓아누운 지 한 달이 지났다.',
     auto: { success: { text: '{spouse:이} 먼저 별이 되었다. 마지막까지 웃으며 당신의 손을 잡고 있었다.', effect: { removeRel: ['spouse'], stats: { vit: -14, cha: -6 } }, tone: 'bad' } },
   },
   {
     id: 'a_mentor_death', title: '스승님의 마지막 수업', once: true, weight: 1.5,
-    cond: { minAge: 30, maxAge: 80, hasRel: ['mentor'] },
+    cond: { minAge: 30, maxAge: 52, hasRel: ['mentor'] },
     text: '스승 {mentor:이} 위독하다는 소식이 날아왔다.',
     auto: { success: { text: '{mentor:은} "잘 컸구나" 하고 웃으며 눈을 감았다. 남은 것은 낡은 지팡이와 빼곡한 연구 노트였다.', effect: { removeRel: ['mentor'], stats: { int: 14, mana: 8 }, item: { base: 'w2', rarity: 'rare', name: '스승의 낡은 지팡이' } }, tone: 'bad' } },
   },
   {
     id: 'a_rival_duel', title: '결투 신청', weight: 2,
-    cond: { minAge: 16, maxAge: 45, hasRel: ['rival'], relMin: { rival: 11 } },
+    cond: { minAge: 16, maxAge: 42, hasRel: ['rival'], relMin: { rival: 11 } },
     text: '{rival:이} 장갑을 던졌다! "오늘이야말로 결판을 내자!"',
     choices: [
       {
@@ -90,7 +90,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_rival_deathmatch', title: '진검승부', once: true, weight: 3,
-    cond: { minAge: 20, maxAge: 60, hasRel: ['rival'], relMax: { rival: 10 } },
+    cond: { minAge: 20, maxAge: 47, hasRel: ['rival'], relMax: { rival: 10 } },
     text: '쌓이고 쌓인 앙금이 폭발 직전이다. {rival:은} 이번엔 진검승부를 하자고 한다.',
     choices: [
       {
@@ -107,7 +107,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_rival_reconcile', title: '오랜 라이벌', once: true, weight: 2,
-    cond: { minAge: 30, maxAge: 80, relMin: { rival: 70 } },
+    cond: { minAge: 30, maxAge: 52, relMin: { rival: 70 } },
     text: '{rival:이} 술병을 들고 찾아왔다.',
     auto: { success: { text: '라이벌이라 부르기엔 너무 오래 함께 달려왔다. 두 사람은 새벽까지 추억 이야기로 웃었다.', effect: { rel: { rival: 10 }, stats: { fame: 8 }, flags: ['rival_friend'] }, tone: 'good' } },
   },
@@ -115,7 +115,7 @@ export const ADULT: GameEvent[] = [
   // ───── 모험 / 위험 ─────
   {
     id: 'a_dungeon', title: '신규 던전', weight: 1.3, focus: 'explore',
-    cond: { minAge: 16, maxAge: 60 },
+    cond: { minAge: 16, maxAge: 47 },
     text: '왕국 북쪽에서 새 던전이 발견됐다! 최하층에는 고대의 보물이 잠들어 있다는 소문이다.',
     choices: [
       {
@@ -133,7 +133,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_bandits', title: '산길의 도적', weight: 2, focus: 'explore',
-    cond: { minAge: 15, maxAge: 65 },
+    cond: { minAge: 15, maxAge: 49 },
     text: '산길에서 도적 떼가 튀어나왔다! "가진 거 다 내놔!"',
     choices: [
       {
@@ -151,7 +151,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_gamble', title: '뒷골목 카지노', weight: 1, focus: 'explore',
-    cond: { minAge: 16, maxAge: 60 },
+    cond: { minAge: 16, maxAge: 47 },
     text: '반짝이는 지하 카지노. 주사위가 데굴데굴 구른다.',
     choices: [
       {
@@ -164,7 +164,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_dragon', title: '드래곤 습격', once: true, weight: 0.7,
-    cond: { minAge: 22, maxAge: 75, stats: { fame: 84 } },
+    cond: { minAge: 22, maxAge: 52, stats: { fame: 84 } },
     text: '하늘을 가르며 거대한 드래곤이 내려왔다! 도시가 불타고, 사람들이 당신을 부른다.',
     choices: [
       {
@@ -187,7 +187,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_war', title: '징집령', weight: 0.8,
-    cond: { minAge: 18, maxAge: 50, notJobs: ['knight', 'demon_officer', 'hero', 'priest'], notFlags: ['demonblood'] },
+    cond: { minAge: 18, maxAge: 44, notJobs: ['knight', 'demon_officer', 'hero', 'priest'], notFlags: ['demonblood'] },
     text: '국경에서 전쟁이 터졌다! 마을 광장에 징집 공고가 붙었다.',
     choices: [
       {
@@ -204,7 +204,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_illness', title: '몸살', weight: 0.8,
-    cond: { minAge: 30, maxAge: 99 },
+    cond: { minAge: 30, maxAge: 52 },
     text: '콜록콜록. 기침이 멈추지 않는다.',
     auto: {
       check: { stat: 'vit', dc: 78 },
@@ -216,7 +216,7 @@ export const ADULT: GameEvent[] = [
   // ───── 어둠 ─────
   {
     id: 'a_dark_pact', title: '악마의 속삭임', once: true, weight: 0.8,
-    cond: { minAge: 18, maxAge: 60 },
+    cond: { minAge: 18, maxAge: 47 },
     text: '밤마다 같은 목소리가 들린다. "원하는 힘을 주지. 대가는… 나중에 받을게♪"',
     choices: [
       { label: '계약한다', success: { text: '손등에 멋진 문양이 새겨졌다! 힘이 넘쳐흐른다. 중2병 감성 MAX.', effect: { flags: ['pact'], stats: { mana: 50, vit: 22, luck: 14 }, karma: -30 }, tone: 'bad' } },
@@ -225,7 +225,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_pact_due', title: '계약 만료일', once: true, weight: 8,
-    cond: { minAge: 45, flags: ['pact'] },
+    cond: { minAge: 42, flags: ['pact'] },
     text: '손등의 문양이 화끈거린다. 그 목소리가 문 앞에 와 있다. "약속한 대가, 받으러 왔어♪"',
     auto: {
       check: { stat: 'luck', dc: 140 },
@@ -235,7 +235,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_forbidden', title: '금단의 문', once: true, weight: 2,
-    cond: { minAge: 25, maxAge: 75, test: (s) => s.jobId === 'mage' || s.flags.includes('forbidden_knowledge') },
+    cond: { minAge: 25, maxAge: 52, test: (s) => s.jobId === 'mage' || s.flags.includes('forbidden_knowledge') },
     text: '오랜 연구 끝에, 신들이 잠가둔 진리의 문 열쇠를 찾아냈다.',
     choices: [
       {
@@ -248,7 +248,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_inquisition', title: '이단 심문관', once: true, weight: 1.5,
-    cond: { minAge: 18, maxAge: 80, notJobs: ['priest'], test: (s) => ['forbidden_knowledge', 'archmage_secret', 'pact', 'suspected'].some((f) => s.flags.includes(f)) },
+    cond: { minAge: 18, maxAge: 52, notJobs: ['priest'], test: (s) => ['forbidden_knowledge', 'archmage_secret', 'pact', 'suspected'].some((f) => s.flags.includes(f)) },
     text: '까만 망토의 심문관들이 문을 두드렸다. "이단 혐의로 조사하겠다!"',
     choices: [
       {
@@ -266,7 +266,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_demon_exposed', title: '정체 들통', once: true, weight: 1.5,
-    cond: { minAge: 15, maxAge: 70, flags: ['demonblood'], notJobs: ['demon_officer'] },
+    cond: { minAge: 15, maxAge: 50, flags: ['demonblood'], notJobs: ['demon_officer'] },
     text: '누군가 당신의 붉은 눈과 작은 뿔을 보았다. "저 사람, 마족 아니야?!" 소문이 돈다.',
     choices: [
       {
@@ -297,7 +297,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_hero_framed', title: '누명', once: true, weight: 4,
-    cond: { minAge: 19, maxAge: 50, flags: ['hero_party', 'hp_camp'], notFlags: ['hp_trust'] },
+    cond: { minAge: 19, maxAge: 44, flags: ['hero_party', 'hp_camp'], notFlags: ['hp_trust'] },
     text: '공주님이 독에 쓰러졌다. 그리고 세실이, 증거라며 당신의 단검을 들어 올렸다. 아르센의 눈이 흔들린다. 이건… 그 유명한 파티 추방물?!',
     choices: [
       {
@@ -318,7 +318,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_noble_poison', title: '은잔의 포도주', once: true, weight: 1.2,
-    cond: { minAge: 12, maxAge: 60, houses: ['noble'] },
+    cond: { minAge: 12, maxAge: 47, houses: ['noble'] },
     text: '화려한 연회. 그런데 당신의 은잔에서 살짝 쓴 냄새가 난다. 이건 독?!',
     choices: [
       {
@@ -340,7 +340,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_noble_succession', title: '후계 다툼', once: true, weight: 1.5,
-    cond: { minAge: 25, maxAge: 50, houses: ['noble'] },
+    cond: { minAge: 25, maxAge: 44, houses: ['noble'] },
     text: '대공이 쓰러졌다! 후계 자리를 두고 형제들의 암투가 시작됐다.',
     choices: [
       {
@@ -355,7 +355,7 @@ export const ADULT: GameEvent[] = [
   // ───── 일상 ─────
   {
     id: 'a_tavern', title: '음유시인', weight: 2, focus: 'social',
-    cond: { minAge: 16, maxAge: 70 },
+    cond: { minAge: 16, maxAge: 50 },
     text: '주점에서 류트를 든 음유시인이 말을 걸어왔다.',
     choices: [
       {
@@ -368,7 +368,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ball', title: '왕궁 무도회', weight: 1.5, focus: 'social',
-    cond: { minAge: 16, maxAge: 50 },
+    cond: { minAge: 16, maxAge: 44 },
     text: '반짝이는 왕궁 무도회 초대장이 도착했다!',
     choices: [
       {
@@ -381,7 +381,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_research', title: '왕립 도서관', weight: 1.5, focus: 'study',
-    cond: { minAge: 18, maxAge: 70 },
+    cond: { minAge: 18, maxAge: 50 },
     text: '왕립 도서관 비밀 서고의 열람 허가가 나왔다!',
     choices: [
       {
@@ -398,7 +398,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_monster_hunt', title: '마물 토벌', weight: 1.5, focus: 'train',
-    cond: { minAge: 16, maxAge: 60 },
+    cond: { minAge: 16, maxAge: 47 },
     text: '근처 마을에 마물이 나타났다! 길드에 토벌 의뢰가 붙었다.',
     choices: [
       {
@@ -411,7 +411,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_charity', title: '골목의 아이들', weight: 1,
-    cond: { minAge: 15, maxAge: 85 },
+    cond: { minAge: 15, maxAge: 52 },
     text: '골목의 아이들이 배고픈 눈으로 당신을 올려다본다.',
     choices: [
       { label: '가진 걸 나눠준다', success: { text: '아이들이 빵을 받아 들고 신나게 뛰어갔다. 한 아이가 돌아보며 꾸벅 인사했다.', effect: { karma: 10, stats: { cha: 3 } } } },
@@ -420,13 +420,13 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_temple_blessing', title: '여신의 축복', once: true, weight: 1,
-    cond: { minAge: 12, maxAge: 80, karmaMin: 35 },
+    cond: { minAge: 12, maxAge: 52, karmaMin: 35 },
     text: '신전의 할머니 사제가 당신을 불러 세웠다. "여신님께서 당신을 아끼고 계세요."',
     auto: { success: { text: '이마에 축복의 성유를 발라주었다. 몸이 깃털처럼 가벼워졌다!', effect: { stats: { luck: 17, fame: 6 } }, tone: 'good' } },
   },
   {
     id: 'a_reflection', title: '노을빛 회상', once: true, weight: 3,
-    cond: { minAge: 60 },
+    cond: { minAge: 47 },
     text: '흰머리가 꽤 늘었다. 지나온 날들을 돌아본다.',
     choices: [
       {
@@ -446,7 +446,7 @@ export const ADULT: GameEvent[] = [
   // 유적 탐사
   {
     id: 'a_ex_ruin_rumor', title: '유적의 소문', weight: 1.5, focus: 'explore',
-    cond: { minAge: 18, maxAge: 58, notFlags: ['ex_ruin', 'ex_ruin_in'] },
+    cond: { minAge: 18, maxAge: 46, notFlags: ['ex_ruin', 'ex_ruin_in'] },
     text: '주점에서 나이 든 탐험가가 술잔을 흔들며 속삭인다. "산 너머 안개 속에 아무도 들어가 본 적 없는 유적이 있어."',
     choices: [
       { label: '지도를 얻어 낸다', check: { stat: 'cha', dc: 90 },
@@ -457,7 +457,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_ruin_gate', title: '안개 속 유적 입구', weight: 3, focus: 'explore',
-    cond: { minAge: 18, maxAge: 58, flags: ['ex_ruin'] },
+    cond: { minAge: 18, maxAge: 46, flags: ['ex_ruin'] },
     text: '안개를 헤치고 도착한 곳에 이끼 낀 돌문이 우뚝 서 있다. 문 한가운데에 손바닥 모양의 홈이 파여 있다.',
     choices: [
       { label: '손을 대고 마력을 흘린다', check: { stat: 'mana', dc: 92 },
@@ -468,7 +468,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_ruin_vault', title: '유적의 작은 보물 방', weight: 4, focus: 'explore',
-    cond: { minAge: 18, maxAge: 58, flags: ['ex_ruin_in'] },
+    cond: { minAge: 18, maxAge: 46, flags: ['ex_ruin_in'] },
     text: '복도 끝 방에는 먼지 쌓인 상자들이 줄줄이 놓여 있다. 한쪽 벽에는 오래된 벽화가 빛난다.',
     choices: [
       { label: '상자를 하나씩 연다', check: { stat: 'luck', dc: 95 },
@@ -483,7 +483,7 @@ export const ADULT: GameEvent[] = [
   // 항해
   {
     id: 'a_ex_harbor_ship', title: '항구의 모집 공고', weight: 1.5, focus: 'explore',
-    cond: { minAge: 18, maxAge: 55, notFlags: ['ex_voyage'] },
+    cond: { minAge: 18, maxAge: 45, notFlags: ['ex_voyage'] },
     text: '항구 게시판에 새 공고가 붙었다. "동쪽 군도로 떠날 선원 구함. 일당 후함, 파도는 보장 못 함."',
     choices: [
       { label: '선원으로 지원한다', check: { stat: 'vit', dc: 84 },
@@ -494,7 +494,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_sea_storm', title: '바다 위의 폭풍', weight: 4, focus: 'explore',
-    cond: { minAge: 18, maxAge: 55, flags: ['ex_voyage'] },
+    cond: { minAge: 18, maxAge: 45, flags: ['ex_voyage'] },
     text: '출항 사흘째, 수평선이 새까맣게 변했다. 선장이 외친다. "돛을 접어라! 폭풍이다!"',
     choices: [
       { label: '돛 줄을 붙잡는다', check: { stat: 'vit', dc: 95 },
@@ -505,7 +505,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_island_landing', title: '이름 없는 섬', weight: 4, focus: 'explore',
-    cond: { minAge: 18, maxAge: 55, flags: ['ex_voyage'] },
+    cond: { minAge: 18, maxAge: 45, flags: ['ex_voyage'] },
     text: '폭풍이 지나가자 눈앞에 하얀 백사장의 작은 섬이 나타났다. 야자수 사이로 반짝이는 무언가가 보인다.',
     choices: [
       { label: '섬 안쪽을 탐사한다', check: { stat: 'luck', dc: 92 },
@@ -518,7 +518,7 @@ export const ADULT: GameEvent[] = [
   // 대상 호위
   {
     id: 'a_ex_caravan_guard', title: '대상단 호위', weight: 1.5, focus: 'explore',
-    cond: { minAge: 18, maxAge: 55, notFlags: ['ex_caravan'] },
+    cond: { minAge: 18, maxAge: 45, notFlags: ['ex_caravan'] },
     text: '사막 건너 오아시스 도시로 가는 대상단이 호위를 모집한다. "낙타는 우리가, 모험은 당신이!"',
     choices: [
       { label: '호위를 맡는다', check: { stat: 'vit', dc: 84 },
@@ -529,7 +529,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_oasis_mirage', title: '사막의 신기루', weight: 4, focus: 'explore',
-    cond: { minAge: 18, maxAge: 55, flags: ['ex_caravan'] },
+    cond: { minAge: 18, maxAge: 45, flags: ['ex_caravan'] },
     text: '뜨거운 모래바람 너머로 푸른 호수와 야자수가 아른거린다. 낙타가 그쪽으로 걸음을 틀려 한다.',
     choices: [
       { label: '고삐를 당겨 막는다', check: { stat: 'int', dc: 90 },
@@ -540,7 +540,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_caravan_arrive', title: '오아시스 도시 도착', weight: 4, focus: 'explore',
-    cond: { minAge: 18, maxAge: 55, flags: ['ex_caravan'] },
+    cond: { minAge: 18, maxAge: 45, flags: ['ex_caravan'] },
     text: '황금빛 성벽과 시끌벅적한 시장이 시야에 들어왔다. 대상 대장이 웃으며 품삯 주머니를 던졌다.',
     choices: [
       { label: '시장을 마음껏 구경한다', success: { text: '향신료, 비단, 요상한 악기. 눈이 돌아갈 만큼 신기한 물건이 가득했다.', effect: { unflags: ['ex_caravan'], gold: 60, stats: { cha: 3, int: 3 }, mood: 'joy' } } },
@@ -553,7 +553,7 @@ export const ADULT: GameEvent[] = [
   // 숲의 정령
   {
     id: 'a_ex_spirit_path', title: '숲의 속삭임', weight: 1.5, focus: 'explore',
-    cond: { minAge: 18, maxAge: 60, notFlags: ['ex_spirit'] },
+    cond: { minAge: 18, maxAge: 47, notFlags: ['ex_spirit'] },
     text: '약초를 캐러 숲에 들어갔는데 나무들이 바스락거리며 길을 알려 주는 것 같다. 반딧불이 앞서 날아간다.',
     choices: [
       { label: '반딧불을 따라간다', check: { stat: 'luck', dc: 84 },
@@ -564,7 +564,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_spirit_grove', title: '정령의 쉼터', weight: 4, focus: 'explore',
-    cond: { minAge: 18, maxAge: 60, flags: ['ex_spirit'] },
+    cond: { minAge: 18, maxAge: 47, flags: ['ex_spirit'] },
     text: '오솔길 끝, 달빛이 고인 샘 위에서 작은 빛의 정령들이 춤추고 있다. 당신을 보고도 도망치지 않는다.',
     choices: [
       { label: '조용히 샘물을 마신다', success: { text: '차가운 물이 목을 타고 흐르자 온몸의 피로가 사라졌다. 정령들이 고개를 끄덕이는 듯했다.', effect: { unflags: ['ex_spirit'], stats: { vit: 6, mana: 6 }, stress: -15, mood: 'calm' }, tone: 'good' } },
@@ -577,7 +577,7 @@ export const ADULT: GameEvent[] = [
   // 괴수 발자국
   {
     id: 'a_ex_giant_tracks', title: '거대한 발자국', weight: 1.5, focus: 'explore',
-    cond: { minAge: 18, maxAge: 55, notFlags: ['ex_beast'] },
+    cond: { minAge: 18, maxAge: 45, notFlags: ['ex_beast'] },
     text: '진흙 위에 사람 몸통만 한 발자국이 선명하다. 나뭇가지가 꺾이고 풀이 눌린 흔적이 숲 안쪽으로 이어진다.',
     choices: [
       { label: '흔적을 따라가 본다', check: { stat: 'int', dc: 84 },
@@ -588,7 +588,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_beast_den', title: '괴수의 굴 앞에서', weight: 4, focus: 'explore',
-    cond: { minAge: 18, maxAge: 55, flags: ['ex_beast'] },
+    cond: { minAge: 18, maxAge: 45, flags: ['ex_beast'] },
     text: '굴 입구에서 낮은 콧김 소리가 새어 나온다. 안쪽에 커다란 그림자가 웅크리고 있다.',
     choices: [
       { label: '먹이를 놓고 조용히 물러난다', check: { stat: 'luck', dc: 84 },
@@ -603,7 +603,7 @@ export const ADULT: GameEvent[] = [
   // 숨겨진 문
   {
     id: 'a_ex_hidden_door', title: '수상한 벽', weight: 1.5, focus: 'explore',
-    cond: { minAge: 18, maxAge: 60, notFlags: ['ex_hidden'] },
+    cond: { minAge: 18, maxAge: 47, notFlags: ['ex_hidden'] },
     text: '오래된 여관 지하 창고에서 벽 한 곳만 공기가 다르다. 손을 대 보니 미세한 바람이 흘러나온다.',
     choices: [
       { label: '벽을 두드려 본다', check: { stat: 'int', dc: 84 },
@@ -614,7 +614,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_secret_passage', title: '비밀 통로', weight: 4, focus: 'explore',
-    cond: { minAge: 18, maxAge: 60, flags: ['ex_hidden'] },
+    cond: { minAge: 18, maxAge: 47, flags: ['ex_hidden'] },
     text: '벽 너머로 좁은 통로가 어둠 속으로 이어진다. 바닥에 오래된 발자국이 하나 찍혀 있다.',
     choices: [
       { label: '등불을 들고 걸어 들어간다', check: { stat: 'vit', dc: 84 },
@@ -627,7 +627,7 @@ export const ADULT: GameEvent[] = [
   // 단발 모험
   {
     id: 'a_ex_canyon_bridge', title: '협곡의 흔들다리', weight: 1.5, focus: 'explore',
-    cond: { minAge: 18, maxAge: 58 },
+    cond: { minAge: 18, maxAge: 46 },
     text: '깊은 협곡 위에 낡은 밧줄 다리가 한 줄 걸려 있다. 건너편에 지름길이 보인다.',
     choices: [
       { label: '재빨리 건넌다', check: { stat: 'vit', dc: 84 },
@@ -638,7 +638,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_hot_spring', title: '숨겨진 온천', weight: 1.5, focus: 'explore',
-    cond: { minAge: 18, maxAge: 60 },
+    cond: { minAge: 18, maxAge: 47 },
     text: '산길을 오르는데 코끝에 유황 냄새가 스친다. 바위 사이로 김이 모락모락 피어오른다.',
     choices: [
       { label: '몸을 담근다', success: { text: '온몸의 근육이 사르르 풀렸다. 눈을 감자 산새 소리가 자장가처럼 들렸다.', effect: { stats: { vit: 6 }, stress: -20, mood: 'calm' }, tone: 'good' } },
@@ -649,7 +649,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_glacier', title: '빙하 횡단', weight: 1, focus: 'explore',
-    cond: { minAge: 18, maxAge: 52 },
+    cond: { minAge: 18, maxAge: 44 },
     text: '북쪽 산맥의 빙하가 햇빛에 눈부시게 빛난다. 건너편 마을로 가는 가장 빠른 길이다.',
     choices: [
       { label: '아이젠을 차고 걷는다', check: { stat: 'vit', dc: 92 },
@@ -660,7 +660,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_shipwreck', title: '해안의 난파선', weight: 1.5, focus: 'explore',
-    cond: { minAge: 18, maxAge: 58 },
+    cond: { minAge: 18, maxAge: 46 },
     text: '썰물 때 드러난 모래톱 위에 오래된 난파선이 반쯤 묻혀 있다. 갑판 틈 사이로 무언가 반짝인다.',
     choices: [
       { label: '밀물 전에 뒤져 본다', check: { stat: 'luck', dc: 90 },
@@ -671,7 +671,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_balloon', title: '시험 비행 기구', weight: 1, focus: 'explore',
-    cond: { minAge: 18, maxAge: 55 },
+    cond: { minAge: 18, maxAge: 45 },
     text: '마법 공방 앞마당에서 거대한 열기구가 부풀어 오른다. 기술자가 외친다. "시험 비행 동승자 구함!"',
     choices: [
       { label: '동승한다', check: { stat: 'luck', dc: 90 },
@@ -682,7 +682,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_floating_market', title: '수상 시장', weight: 1.5,
-    cond: { minAge: 18, maxAge: 60 },
+    cond: { minAge: 18, maxAge: 47 },
     text: '새벽 안개 속에서 수십 척의 조각배가 물 위에 모여든다. 과일, 비단, 보석이 배에서 배로 오간다.',
     choices: [
       { label: '배를 타고 흥정한다', check: { stat: 'cha', dc: 84 },
@@ -693,7 +693,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_toll_gate', title: '산길의 통행료', weight: 1.5,
-    cond: { minAge: 18, maxAge: 58 },
+    cond: { minAge: 18, maxAge: 46 },
     text: '산길 한복판에 밧줄이 쳐져 있다. 허름한 차림의 사내가 손을 내밀었다. "통행료는 은화 두 닢이오."',
     choices: [
       { label: '통행료를 낸다', success: { text: '사내가 "고맙소" 하며 길을 터 주었다. 의외로 산적이 아니라 마을 주민이었다.', effect: { gold: -10, karma: 1 } } },
@@ -705,7 +705,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_meteor_site', title: '별똥별 떨어진 자리', weight: 1,
-    cond: { minAge: 18, maxAge: 60 },
+    cond: { minAge: 18, maxAge: 47 },
     text: '어젯밤 하늘을 가른 별똥별이 근처 언덕에 떨어졌다는 소문이 돈다. 새벽부터 구경꾼이 줄을 섰다.',
     choices: [
       { label: '현장을 살펴본다', check: { stat: 'luck', dc: 90 },
@@ -716,7 +716,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_underground_river', title: '지하 강의 뗏목', weight: 1.5, focus: 'explore',
-    cond: { minAge: 18, maxAge: 55 },
+    cond: { minAge: 18, maxAge: 45 },
     text: '동굴 안쪽에서 물 흐르는 소리가 울린다. 어둠 속에서 누군가 버린 뗏목이 물결에 흔들리고 있다.',
     choices: [
       { label: '뗏목을 타고 내려간다', check: { stat: 'vit', dc: 90 },
@@ -727,7 +727,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_statue_puzzle', title: '조각상의 수수께끼', weight: 1.5, focus: 'study',
-    cond: { minAge: 18, maxAge: 60 },
+    cond: { minAge: 18, maxAge: 47 },
     text: '고대 광장의 석상 세 개가 서로 다른 방향을 가리키고 있다. 받침돌에는 이렇게 새겨져 있다. "진실을 가리키는 이는 하나."',
     choices: [
       { label: '수수께끼를 푼다', check: { stat: 'int', dc: 95 },
@@ -738,7 +738,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_swamp_hut', title: '늪지의 오두막', weight: 1.5, focus: 'explore',
-    cond: { minAge: 18, maxAge: 58 },
+    cond: { minAge: 18, maxAge: 46 },
     text: '안개 낀 늪 한가운데에 오두막이 있고 굴뚝에서 연기가 솔솔 올라온다. 문 앞에 개구리 인형이 줄지어 놓여 있다.',
     choices: [
       { label: '문을 두드린다', check: { stat: 'cha', dc: 84 },
@@ -749,7 +749,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_giant_mushroom', title: '거대 버섯 숲', weight: 1, focus: 'explore',
-    cond: { minAge: 18, maxAge: 60 },
+    cond: { minAge: 18, maxAge: 47 },
     text: '비 온 뒤의 숲에 집채만 한 버섯이 우후죽순 솟아 있다. 갓 아래에서 은은한 빛이 새어 나온다.',
     choices: [
       { label: '갓 아래를 탐험한다', check: { stat: 'luck', dc: 84 },
@@ -760,7 +760,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_lighthouse', title: '외딴 등대', weight: 1.5,
-    cond: { minAge: 18, maxAge: 60 },
+    cond: { minAge: 18, maxAge: 47 },
     text: '절벽 위 외딴 등대지기가 손짓한다. "오늘 밤 안개가 짙어서 말이야, 불 지피는 걸 도와줄 사람 없나?"',
     choices: [
       { label: '밤새 불을 지킨다', check: { stat: 'vit', dc: 78 },
@@ -771,7 +771,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_old_adventurer', title: '은퇴한 모험가', weight: 1.5, focus: 'social',
-    cond: { minAge: 18, maxAge: 60 },
+    cond: { minAge: 18, maxAge: 47 },
     text: '주점 한구석에서 팔뚝에 상처 투성이인 노인이 혼자 술잔을 기울인다. 모험담을 들려 달라는 아이들에게 둘러싸여 있다.',
     choices: [
       { label: '자리에 끼어 이야기를 듣는다', success: { text: '용 비늘을 닦던 이야기, 눈보라 속 탈출기. 노인의 이야기가 끝날 때쯤 소매에서 작은 부적이 굴러떨어졌다.', effect: { stats: { int: 3, cha: 3, luck: 3 }, mood: 'joy', trinket: { stat: 'luck', rarity: 'common' } }, tone: 'good' } },
@@ -782,7 +782,7 @@ export const ADULT: GameEvent[] = [
   },
   {
     id: 'a_ex_stray_cart', title: '고장 난 마차', weight: 1.5,
-    cond: { minAge: 18, maxAge: 60 },
+    cond: { minAge: 18, maxAge: 47 },
     text: '길가에서 바퀴가 빠진 상인 마차가 서 있다. 상인이 땀을 뻘뻘 흘리며 손짓한다. "어이, 거기! 힘 좀 빌려주겠나?"',
     choices: [
       { label: '바퀴를 함께 끼운다', check: { stat: 'vit', dc: 78 },

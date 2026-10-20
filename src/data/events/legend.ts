@@ -14,7 +14,7 @@ const title = (l: Legend | undefined) => (l ? `${l.deed} ${l.kind === 'villain' 
 export const LEGEND_EVENTS: GameEvent[] = [
   {
     id: 'lg_statue', title: '광장의 동상', once: true, weight: 2,
-    cond: { minAge: 6, maxAge: 60, test: hasLegend(['hero']) },
+    cond: { minAge: 6, maxAge: 47, test: hasLegend(['hero']) },
     text: (s) => `마을 광장에 커다란 동상이 서 있다. 받침돌에는 「${title(latest(s, ['hero']))}」. …어쩐지 거울을 보는 기분이다. 저 포즈, 내가 자주 하던 건데?`,
     choices: [
       { label: '동상 앞에서 맹세한다',
@@ -26,7 +26,7 @@ export const LEGEND_EVENTS: GameEvent[] = [
   },
   {
     id: 'lg_bard', title: '음유시인의 노래', once: true, weight: 2,
-    cond: { minAge: 10, maxAge: 75, test: hasLegend() },
+    cond: { minAge: 10, maxAge: 52, test: hasLegend() },
     text: (s) => `주점에서 음유시인이 노래한다. "옛날 옛적, ${josa(title(latest(s)), '이')} 살았다네~" 가사가 이상하게 구체적이다. 거기 그 부분, 실제로는 그렇게 멋있지 않았는데…`,
     choices: [
       { label: '따라 부른다',
@@ -45,7 +45,7 @@ export const LEGEND_EVENTS: GameEvent[] = [
   },
   {
     id: 'lg_villain', title: '악명 높은 이름', once: true, weight: 2,
-    cond: { minAge: 8, maxAge: 60, test: hasLegend(['villain']) },
+    cond: { minAge: 8, maxAge: 47, test: hasLegend(['villain']) },
     text: (s) => `"말 안 들으면 ${josa(latest(s, ['villain'])?.name ?? '', '이')} 잡아간다!" 엄마들이 아이를 겁줄 때 쓰는 이름. 그 이름이 왠지 귓가에 오래 남는다. …그거, 전생의 나잖아.`,
     choices: [
       { label: '전생의 죄를 갚기로 한다',
@@ -56,7 +56,7 @@ export const LEGEND_EVENTS: GameEvent[] = [
   },
   {
     id: 'lg_ghost', title: '작은 유령', once: true, weight: 2,
-    cond: { minAge: 5, maxAge: 50, test: hasLegend(['ghost']) },
+    cond: { minAge: 5, maxAge: 44, test: hasLegend(['ghost']) },
     text: (s) => {
       const l = latest(s, ['ghost'])!;
       return `무덤가에서 작은 유령이 훌쩍이고 있다. "나는 ${l.name}… ${l.age}살에 여기서 멈췄어." 고개를 든 유령이 당신을 보고 눈을 크게 떴다. "…어? 너, 나잖아?"`;

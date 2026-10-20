@@ -8,6 +8,7 @@ import { clampHp, maxHp, monthlyEconomy, starterKit, yearEndEconomy } from './ec
 import { bump, rec } from './record';
 import { statOf, trinketSlots } from './trinket';
 import { pickNote } from './notes';
+import { isWorldEnd, setupWorld, worldYear } from './world';
 import { makeTrinket, randomTrinket, trinketDef } from '../data/trinkets';
 import { gearByBase, makeItem } from '../data/items';
 import { deathById } from '../data/deaths';
@@ -45,6 +46,11 @@ export interface NewLifeOptions {
   fated?: boolean;
   /** 전설이 된 전생들 */
   legends?: Legend[];
+  /** 지금까지 겪은 멸망 수 · 들은 힌트 수 */
+  loop?: number;
+  hints?: number;
+  /** 직전 생이 해피엔딩이었다: 여신이 아무 말도 하지 않는다 */
+  afterHappy?: boolean;
   /** 특성을 직접 지정 (테스트용). 없으면 무작위 */
   traits?: string[];
   /** 성별. 없으면 이름으로 짐작한다 */
@@ -170,11 +176,16 @@ export function createLife(opt: NewLifeOptions, rng: Rng = Math.random): LifeSta
   s.statScale = 3;
   rec(s);
   s.goals = pickGoals(s, rng);
-  if ((opt.lifeNo ?? 1) > 1) {
+  setupWorld(s, { loop: opt.loop, hints: opt.hints }, rng);
+  if (opt.afterHappy) {
+    // 해피엔딩 뒤의 여신은 아무 말도 하지 않는다 (베드엔딩의 복선)
+    log(s, '환생의 여신은 나를 바라보기만 했다. "……"', 'milestone');
+  } else if ((opt.lifeNo ?? 1) > 1) {
     // 매 생마다 다시 만나는 환생의 여신
     log(s, `환생의 여신이 하품을 하며 손을 흔들었다. "어머, 벌써 ${opt.lifeNo}번째 인생이네? 이번엔 「${cheat.name}」 권능으로 해줄게~"`, 'milestone');
   } else {
-    log(s, `환생의 여신이 반짝이는 손가락으로 당신을 콕 찔렀다. "축하해, 이세계 환생이야! 선물로 「${cheat.name}」 권능을 줄게♪"`, 'milestone');
+    log(s, pick(PROLOGUES, rng), 'milestone');
+    log(s, `환생의 여신이 반짝이는 손가락으로 나를 콕 찔렀다. "축하해, 이세계 환생이야! 선물로 「${cheat.name}」 권능을 줄게♪"`, 'milestone');
   }
   log(s, fill(BIRTH_TEXT[house.id] ?? BIRTH_TEXT.farm, s), 'milestone');
   if (traits.length) {
@@ -361,6 +372,13 @@ export function naturalDeathChance(s: LifeState): number {
 const REAL_DEATH = new Set(['old_age', 'gallows', 'dungeon', 'abyss']);
 /** 중상이 이 횟수에 이르면 죽는다 */
 export const MAX_INJURY = 3;
+/** 첫 생의 시작: 어쩌다 환생하게 되었나 (1인칭) */
+const PROLOGUES = [
+  '야근을 마치고 돌아오던 겨울밤, 횡단보도에서 눈부신 헤드라이트를 본 것이 마지막 기억이다. 눈을 떴을 때, 나는 하얀 공간에 서 있었다.',
+  '열이 펄펄 끓던 밤이었다. 이번 감기는 좀 길다고 생각하며 눈을 감았는데, 다시 눈을 떴을 때 나는 하얀 공간에 서 있었다.',
+  '물에 빠진 아이를 건져 올린 것까지는 기억난다. 그다음은 차갑고 어두웠다. 그리고 나는 하얀 공간에 서 있었다.',
+  '계단에서 발을 헛디딘 순간, 세상이 천천히 돌았다. 정신을 차렸을 때, 나는 하얀 공간에 서 있었다.',
+];
 const HAZARDS = ['illness', 'plague', 'carriage', 'bandits', 'duel', 'famine', 'war'];
 /** 중상 뒤 요양 기간 (달) */
 const RECOVER_MONTHS = 12;
@@ -375,13 +393,13 @@ let sureDeath = false;
  */
 export function kill(s: LifeState, causeId: string): boolean {
   if (s.death) return true;
-  if (causeId !== 'old_age' && s.extraLives > 0) {
+  if (causeId !== 'old_age' && !isWorldEnd(causeId) && s.extraLives > 0) {
     s.extraLives--;
     s.stats.vit = Math.max(s.stats.vit, 70);
     log(s, '눈앞이 하얘졌다… 그런데 불굴의 육체가 발동! "아직 안 끝났어!" 당신은 벌떡 일어났다.', 'good');
     return false;
   }
-  if (!sureDeath && !REAL_DEATH.has(causeId) && (s.injuries ?? 0) < (s.injuryCap ?? MAX_INJURY) - 1) {
+  if (!sureDeath && !REAL_DEATH.has(causeId) && !isWorldEnd(causeId) && (s.injuries ?? 0) < (s.injuryCap ?? MAX_INJURY) - 1) {
     injure(s, causeId);
     return false;
   }
@@ -657,6 +675,9 @@ function startYear(s: LifeState, rng: Rng) {
     flushInjury(s);
   }
   s.yearMark = Math.floor(rng() * 4);
+  // 세계의 시계: 가면 쓴 사람 · 하늘의 전조 · 멸망의 날
+  const omen = worldYear(s);
+  if (omen) log(s, omen, 'bad');
 }
 
 /** 던전에 다시 들어갈 수 있게 되면 한 번만 알린다 (12세 · 2년 쿨다운 · 출입 금지가 풀릴 때) */

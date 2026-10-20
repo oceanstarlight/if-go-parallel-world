@@ -131,6 +131,14 @@ export interface LifeState {
   seenAt?: Record<string, number>;
   /** 올해 일어난 사건 수 */
   yearEvents?: number;
+  /** 이번 생의 회차 - 1 (지금까지 겪은 멸망 수) */
+  loop?: number;
+  /** 멸망이 오는 나이 (48~52) */
+  doomAge?: number;
+  /** 가면 쓴 사람이 찾아오는 나이 (1~3회차) */
+  hintAge?: number;
+  /** 멸망 1년 전부터 물드는 하늘 */
+  omen?: 'ash' | 'ochre' | 'crimson' | 'pale' | 'storm';
   /** 유년기 재능 점수 (12세가 끝나면 상위 1~2개가 각성) */
   talentPts?: Partial<Record<StatKey, number>>;
   /** 각성한 재능: 소년기에 두 배로 자란다 */
@@ -404,6 +412,8 @@ export interface DeathDef {
   name: string;
   hint: string;
   epitaph: string;
+  /** 크레딧 마지막 줄 (없으면 「그리고, 다음 생으로」) */
+  endLine?: string;
 }
 
 export interface MetaSave {
@@ -418,6 +428,14 @@ export interface MetaSave {
   npcMet?: Record<string, number>;
   /** 전설이 된 전생들 (최근 순) */
   legends?: Legend[];
+  /** 겪은 멸망 수 (회차) */
+  worldEnds?: number;
+  /** 가면 쓴 사람의 노래를 들은 수 (최대 3) */
+  hintsHeard?: number;
+  /** 해피엔딩을 본 수 */
+  happyEnds?: number;
+  /** 직전 생이 해피엔딩이었다 (여신이 말이 없다) */
+  lastHappy?: boolean;
 }
 
 export interface PastLife {

@@ -82,7 +82,7 @@ export const CAREER: GameEvent[] = [
   // ───── 기사 ─────
   {
     id: 'e_knight_war', title: '출정', weight: 2,
-    cond: { minAge: 18, maxAge: 60, jobs: ['knight'] },
+    cond: { minAge: 18, maxAge: 47, jobs: ['knight'] },
     text: '국경에 적군이 몰려왔다! 기사단에 출정 명령이 떨어졌다.',
     choices: [
       {
@@ -100,7 +100,7 @@ export const CAREER: GameEvent[] = [
   // ───── 상인 ─────
   {
     id: 'e_merchant_deal', title: '남쪽 무역로', weight: 3, once: true,
-    cond: { minAge: 18, maxAge: 65, jobs: ['merchant'] },
+    cond: { minAge: 18, maxAge: 49, jobs: ['merchant'] },
     text: '남쪽 무역로를 독점할 기회가 찾아왔다! 단, 전 재산을 걸어야 한다. 돈이 없다면… 빚을 낼 수도 있다.',
     choices: [
       {
@@ -119,7 +119,7 @@ export const CAREER: GameEvent[] = [
   // ───── 모험가 ─────
   {
     id: 'e_adv_betrayal', title: '야영지의 밤', once: true, weight: 2,
-    cond: { minAge: 18, maxAge: 55, jobs: ['adventurer'] },
+    cond: { minAge: 18, maxAge: 45, jobs: ['adventurer'] },
     text: '던전에서 돌아오는 길, 파티원들의 눈빛이 수상하다. 보물 분배를 두고 소곤소곤…',
     choices: [
       {
@@ -137,7 +137,7 @@ export const CAREER: GameEvent[] = [
   },
   {
     id: 'e_adv_quest', title: '고난도 의뢰', weight: 2,
-    cond: { minAge: 18, maxAge: 60, jobs: ['adventurer'] },
+    cond: { minAge: 18, maxAge: 47, jobs: ['adventurer'] },
     text: '길드 게시판에 금테 두른 의뢰서가 붙었다. "와이번 둥지 소탕, 보상 두둑함!"',
     choices: [
       {
@@ -151,7 +151,7 @@ export const CAREER: GameEvent[] = [
   // ───── 성직자 ─────
   {
     id: 'e_priest_heretic', title: '이단 재판', once: true, weight: 2,
-    cond: { minAge: 18, maxAge: 70, jobs: ['priest'] },
+    cond: { minAge: 18, maxAge: 50, jobs: ['priest'] },
     text: '이단 재판에 참석하라는 명령이 내려왔다. 피고는 마을의 약초꾼 할머니다.',
     choices: [
       { label: '판결을 따른다', success: { text: '할머니는 추방당했다. 위에서는 칭찬받았지만, 마음이 무거웠다.', effect: { karma: -15, jobRank: 1, stats: { fame: 14 } }, tone: 'bad' } },
@@ -164,7 +164,7 @@ export const CAREER: GameEvent[] = [
   },
   {
     id: 'e_priest_plague', title: '유행병이 도는 마을', weight: 1.5,
-    cond: { minAge: 18, maxAge: 70, jobs: ['priest'] },
+    cond: { minAge: 18, maxAge: 50, jobs: ['priest'] },
     text: '유행병이 도는 마을로 파견되었다. 신전 앞에 환자들이 줄을 서 있다.',
     choices: [
       {
@@ -178,7 +178,7 @@ export const CAREER: GameEvent[] = [
   // ───── 농부 ─────
   {
     id: 'e_farmer_harvest', title: '수확의 계절', weight: 2,
-    cond: { minAge: 18, maxAge: 85, jobs: ['farmer'] },
+    cond: { minAge: 18, maxAge: 52, jobs: ['farmer'] },
     text: '가을이 왔다! 1년 동안 흘린 땀이 열매를 맺을 시간.',
     auto: {
       check: { stat: 'luck', dc: 56 },
@@ -189,7 +189,7 @@ export const CAREER: GameEvent[] = [
   // ───── 마왕군 ─────
   {
     id: 'e_demon_raid', title: '작전 명령', weight: 2,
-    cond: { minAge: 16, maxAge: 70, jobs: ['demon_officer'], maxJobRank: 4 },
+    cond: { minAge: 16, maxAge: 50, jobs: ['demon_officer'], maxJobRank: 4 },
     text: '인간 마을을 습격하라는 명령이 떨어졌다.',
     choices: [
       { label: '명령을 따른다', success: { text: '마을은 불탔고, 상관은 흡족해했다. …뭔가 찝찝하다.', effect: { karma: -15, jobRank: 1, stats: { fame: 14 } }, tone: 'bad' } },
