@@ -85,6 +85,14 @@ describe('드문 사슬도 끝까지 이어진다', () => {
     expect(eligible(s, eventById('b_debt_doom')!)).toBe(true);
   });
 
+  it('차가운 결혼: 플래그와 배우자가 있으면 결말 사건이 열린다', () => {
+    const s = createLife(base, seededRng(8));
+    s.age = 30;
+    s.flags.push('cold_marriage');
+    s.rels.spouse = { name: '유리', affection: -20 };
+    expect(eligible(s, eventById('cold_marriage_end')!)).toBe(true);
+  });
+
   it('대신 칼을 맞아주면, 그 사람이 불굴 목숨을 돌려준다', () => {
     const s = createLife(base, seededRng(4));
     s.age = 30;
