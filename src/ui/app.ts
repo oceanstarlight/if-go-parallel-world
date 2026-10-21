@@ -1227,7 +1227,7 @@ function viewLife(app: App): string {
       ${centerPanel ? `<div class="center-panel">${centerPanel}</div>` : ''}
       <div class="chronicle">${chronicle}</div>
     </section>
-    <section class="action ${tab === 'action' ? 'open' : ''}">
+    <section class="action ${tab === 'action' && sidePanel ? 'open' : ''}">
       <button class="sheet-handle" data-act="tab" data-arg="none" aria-label="접기"></button>
       <div class="quick">
         <button class="btn" data-act="dungeon" ${ev || s.death || s.age < 12 ? 'disabled' : ''}>${icon('sword')} 던전${s.age < 12 ? ' (12세~)' : ''}</button>

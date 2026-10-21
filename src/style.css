@@ -976,3 +976,21 @@ button.t-slot { cursor: pointer; }
 .link.inline { margin: 0 0 0 6px; font-size: inherit; }
 .link:disabled { opacity: 0.5; }
 .modal h3 { line-height: 1.4; }
+
+/* ───── 모바일 사건 카드: 패널을 작게, 빈 시트가 카드를 가리지 않게 ───── */
+@media (max-width: 760px) {
+  .view-life .center-panel { padding: 12px; max-height: 50dvh; overflow-x: hidden; flex: 0 1 auto; min-height: 0; }
+  .center-panel ~ .chronicle { min-height: 80px; }
+  .center-panel .event-card .eyebrow { font-size: 12px; margin-bottom: 4px; }
+  .center-panel .event-card h3 { font-size: 18px; margin-bottom: 8px; }
+  .center-panel .event-text { font-size: 14px; line-height: 1.6; margin-bottom: 12px; }
+  .event-card.swipeable { padding-left: 10px; padding-right: 10px; }
+  .swipe-label { top: 4px; font-size: 13px; padding: 4px 10px; }
+  .swipe-guide { margin: 0 0 10px; }
+  .center-panel .choices { gap: 8px; }
+  .center-panel .choice { grid-template-columns: 1fr; padding: 10px 12px; font-size: 14px; }
+  .center-panel .choice kbd { display: none; }
+  .center-panel .choices.duo { gap: 8px; }
+  .center-panel .choices.duo .choice { padding: 10px 8px; min-height: 56px; font-size: 14px; word-break: keep-all; }
+  .center-panel .choice:hover:not(:disabled) { transform: none; box-shadow: none; }
+}
