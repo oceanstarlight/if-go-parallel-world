@@ -17,6 +17,7 @@ import {
 import { RARITY_NAME } from '../data/traits';
 import { type OracleAnswer, oracleById, pickOracle } from '../data/oracle';
 import { fill } from '../engine/text';
+import { cloudEnabled, connectAuth, getChoice, setChoice, signIn, signOut, startCloud, type CloudUser, type Provider, type SyncState } from '../cloud';
 import { buy, isUnlocked, loadMeta, loadRun, saveRun, settleLife, type SettleResult } from '../meta';
 import { GfxStage } from '../gfx/stage';
 import { drawPortrait, specFromLife } from '../gfx/portrait';
@@ -38,7 +39,7 @@ import { bossEnemy, mobEnemy } from '../gfx/mapping';
 import { biomeOf } from '../data/items';
 import { ENEMY_HP as BOSS_HP } from '../gfx/mapping';
 
-type Screen = 'title' | 'setup' | 'oracle' | 'life' | 'dungeon' | 'town' | 'credits' | 'death' | 'altar' | 'codex' | 'lives';
+type Screen = 'gate' | 'title' | 'setup' | 'oracle' | 'life' | 'dungeon' | 'town' | 'credits' | 'death' | 'altar' | 'codex' | 'lives';
 /** 모바일 바텀시트 탭 */
 type Tab = 'none' | 'action' | 'menu';
 
@@ -94,6 +95,22 @@ interface App {
   townTab: 'shop' | 'bag';
   townCat: MarketCat;
   music: Music;
+  cloud: CloudView;
+}
+
+/** 로그인·클라우드 저장 상태 */
+interface CloudView {
+  user: CloudUser | null;
+  /** 이전 로그인이 이어지는지 확인 중 */
+  checking: boolean;
+  /** 로그인 창이 열려 있다 */
+  busy: boolean;
+  error: string;
+  sync: SyncState;
+  /** 게스트로 계속하기 안내창 */
+  guestAsk: boolean;
+  /** 이 기기와 계정의 저장이 달라서 고르는 중 */
+  conflict: { local: string; cloud: string; resolve: (pick: 'local' | 'cloud') => void } | null;
 }
 
 const esc = (v: string | number) =>
@@ -102,8 +119,10 @@ const esc = (v: string | number) =>
 const FOCI: Focus[] = ['train', 'study', 'social', 'explore', 'rest'];
 
 export async function mount(root: HTMLElement) {
+  const choice = getChoice();
   const app: App = {
-    screen: 'title',
+    // 아직 고른 적이 없는 첫 방문이면 로그인 화면부터 (Firebase 설정이 없어도 화면은 보인다)
+    screen: choice === null ? 'gate' : 'title',
     meta: loadMeta(),
     life: loadRun(),
     setup: { name: '', cheatId: 'growth', fated: true },
@@ -127,6 +146,7 @@ export async function mount(root: HTMLElement) {
     townTab: 'shop',
     townCat: 'weapon',
     music: new Music(),
+    cloud: { user: null, checking: cloudEnabled && choice === 'user', busy: false, error: '', sync: 'idle', guestAsk: false, conflict: null },
   };
   if (app.life) repairItems(app.life);
   // 사망 상태로 저장된 삶이 있으면 (정산 직전 새로고침) 바로 정산
@@ -152,6 +172,34 @@ export async function mount(root: HTMLElement) {
     if (log) log.scrollTop = log.scrollHeight;
     bindSwipe(root, (act, i) => run(act, String(i)));
   };
+  if (cloudEnabled) {
+    startCloud({
+      onUser: (user) => {
+        app.cloud.user = user;
+        app.cloud.checking = false;
+        if (user) {
+          setChoice('user');
+          if (app.screen === 'gate') app.screen = 'title';
+        } else if (getChoice() === 'user') {
+          // 로그아웃했거나 로그인이 풀렸다
+          setChoice(null);
+          app.cloud.sync = 'idle';
+          app.screen = 'gate';
+        }
+        render();
+      },
+      onSync: (state) => {
+        app.cloud.sync = state;
+        render();
+      },
+      onConflict: (local, cloud) =>
+        new Promise((resolve) => {
+          app.cloud.conflict = { local, cloud, resolve };
+          render();
+        }),
+    });
+    if (choice !== 'guest') connectAuth();
+  }
   const run = (action: string, arg?: string) => {
     if (app.battleLogFrom !== null) {
       app.gfx?.skipBattle();
@@ -294,6 +342,41 @@ function act(app: App, action: string, arg?: string): Promise<void> | void {
     case 'music':
       app.music.toggle();
       break;
+    case 'login': {
+      if (app.cloud.busy) break;
+      app.cloud.busy = true;
+      app.cloud.error = '';
+      return signIn(arg as Provider).then((err) => {
+        app.cloud.busy = false;
+        app.cloud.error = err ?? '';
+      });
+    }
+    case 'login-open':
+      connectAuth();
+      app.screen = 'gate';
+      break;
+    case 'logout':
+      app.cloud.busy = true;
+      return signOut().finally(() => {
+        app.cloud.busy = false;
+      });
+    case 'guest-ask':
+      app.cloud.guestAsk = true;
+      break;
+    case 'guest-ask-close':
+      app.cloud.guestAsk = false;
+      break;
+    case 'guest-go':
+      setChoice('guest');
+      app.cloud.guestAsk = false;
+      app.screen = 'title';
+      break;
+    case 'conflict': {
+      const c = app.cloud.conflict;
+      app.cloud.conflict = null;
+      c?.resolve(arg === 'cloud' ? 'cloud' : 'local');
+      break;
+    }
     case 'go':
       if (arg === 'life' && !app.life) break;
       app.screen = arg as Screen;
@@ -686,8 +769,11 @@ function tickGhost(app: App) {
 // ───────────────────────── 화면 ─────────────────────────
 
 function view(app: App): string {
+  if (app.screen === 'gate') {
+    return `<main class="screen view-gate">${viewGate(app)}</main>${app.cloud.guestAsk ? guestConfirm() : ''}${app.cloud.conflict ? conflictConfirm(app.cloud.conflict) : ''}`;
+  }
   const body = {
-    title: viewTitle, setup: viewSetup, oracle: viewOracle, life: viewLife, death: viewDeath,
+    gate: viewGate, title: viewTitle, setup: viewSetup, oracle: viewOracle, life: viewLife, death: viewDeath,
     dungeon: (a: App) => (a.life ? viewDungeon(a.life, a.duel ? duelPanel(a) : '') : viewTitle(a)),
     town: (a: App) => (a.life ? viewTown(a.life, a.townTab, a.townCat) : viewTitle(a)),
     altar: viewAltar, codex: viewCodex, lives: viewLives, credits: viewCredits,
@@ -704,12 +790,13 @@ function view(app: App): string {
     ${underbar(app)}
     ${app.notice ? `<div class="toast">${esc(app.notice)}</div>` : ''}
     ${app.dgConfirm ? dungeonConfirm() : ''}
+    ${app.cloud.conflict ? conflictConfirm(app.cloud.conflict) : ''}
   `;
 }
 
 /** 모바일 하단 고정 바 (데스크톱에서는 CSS 로 숨긴다) */
 function underbar(app: App): string {
-  if (app.screen === 'credits') return '';
+  if (app.screen === 'credits' || app.screen === 'gate') return '';
   const item = (act: string, arg: string, ic: IconName, label: string, on = false, extra = '') =>
     `<button class="ub-item ${on ? 'on' : ''}" data-act="${act}" data-arg="${arg}" ${extra}><span class="ub-icon">${icon(ic)}</span><span class="ub-label">${label}</span></button>`;
   if ((app.screen === 'dungeon' || app.screen === 'town') && app.life) {
@@ -796,8 +883,75 @@ function viewTitle(app: App): string {
         <button class="btn" data-act="go" data-arg="codex">사인 도감 <span class="muted">${found}/${DEATHS.length}</span></button>
         <button class="btn" data-act="go" data-arg="lives">지난 생애 <span class="muted">${m.totalLives}</span></button>
       </div>
+      ${accountRow(app.cloud)}
     </section>
   `;
+}
+
+const SYNC_TEXT: Record<SyncState, string> = { idle: '', saving: '저장 중…', saved: '클라우드에 저장됨', error: '저장 대기 중 (연결 확인)' };
+
+/** 타이틀 아래 작은 계정 줄 */
+function accountRow(c: CloudView): string {
+  if (c.user) {
+    return `<p class="account small muted">${esc(c.user.name)} 님 · ${SYNC_TEXT[c.sync] || '연결됨'}
+      <button class="link inline" data-act="logout" ${c.busy ? 'disabled' : ''}>로그아웃</button></p>`;
+  }
+  if (c.checking) return '<p class="account small muted">로그인 확인 중…</p>';
+  return `<p class="account small muted"><button class="link inline" data-act="login-open">로그인하고 어느 기기에서나 이어하기</button></p>`;
+}
+
+const GOOGLE_G = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
+const GITHUB_MARK = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>';
+
+/** 첫 방문 로그인 화면 */
+function viewGate(app: App): string {
+  const { busy, error } = app.cloud;
+  return `
+    <section class="title-card gate">
+      <div class="scene-host title-scene" data-gfx="scene" data-maxh="${Math.floor(window.innerHeight * 0.5)}"></div>
+      <p class="eyebrow">이세계 인생 연대기</p>
+      <h1>환생록</h1>
+      <p class="lede">로그인하면 기록이 계정에 저장돼서,<br>어느 기기에서나 이어서 플레이할 수 있어요.</p>
+      <div class="menu">
+        <button class="btn login" data-act="login" data-arg="google" ${busy ? 'disabled' : ''}>${GOOGLE_G}<span>Google로 로그인</span></button>
+        <button class="btn login" data-act="login" data-arg="github" ${busy ? 'disabled' : ''}>${GITHUB_MARK}<span>GitHub로 로그인</span></button>
+      </div>
+      ${busy ? '<p class="small muted gate-note">로그인 창을 확인해 주세요…</p>' : ''}
+      ${error ? `<p class="small gate-note gate-error">${esc(error)}</p>` : ''}
+      <button class="link guest-link" data-act="guest-ask">게스트로 계속하기</button>
+    </section>
+  `;
+}
+
+/** 게스트로 계속하기 안내창 */
+function guestConfirm(): string {
+  return `
+    <div class="modal-back" data-act="guest-ask-close"></div>
+    <div class="modal" role="dialog" aria-label="게스트로 계속하기">
+      <h3>로그인하면 어느 기기에서나 플레이 할 수 있어요</h3>
+      <div class="modal-actions">
+        <button class="btn" data-act="guest-go">계속하기</button>
+        <button class="btn primary" data-act="guest-ask-close">로그인하기</button>
+      </div>
+    </div>`;
+}
+
+/** 이 기기의 기록과 계정의 기록이 서로 다를 때 고르는 창 */
+function conflictConfirm(c: NonNullable<CloudView['conflict']>): string {
+  return `
+    <div class="modal-back"></div>
+    <div class="modal" role="dialog" aria-label="기록 선택">
+      <h3>${icon('cloud')} 어느 기록으로 이어갈까요?</h3>
+      <ul class="small">
+        <li><b>이 기기</b> · ${esc(c.local)}</li>
+        <li><b>내 계정</b> · ${esc(c.cloud)}</li>
+      </ul>
+      <p class="small muted">고르지 않은 쪽 기록은 사라져요.</p>
+      <div class="modal-actions">
+        <button class="btn" data-act="conflict" data-arg="local">이 기기 기록 사용</button>
+        <button class="btn primary" data-act="conflict" data-arg="cloud">내 계정 기록 사용</button>
+      </div>
+    </div>`;
 }
 
 function viewSetup(app: App): string {
@@ -969,17 +1123,18 @@ function viewLife(app: App): string {
     s.fated ? '운명' : '',
   ].filter(Boolean).join(' · ');
 
-  let panel: string;
+  let centerPanel = '';
+  let sidePanel = '';
   if (app.duel) {
-    panel = duelPanel(app);
+    centerPanel = duelPanel(app);
   } else if (app.battleLogFrom !== null) {
-    panel = `
+    centerPanel = `
       <div class="death-call">
         <p class="eyebrow">전투</p>
         <p class="muted small">화면을 누르거나 Space 를 누르면 건너뛴다.</p>
       </div>`;
   } else if (s.death) {
-    panel = `
+    centerPanel = `
       <div class="death-call">
         <p class="death-cause">${esc(deathById(s.death.causeId).name)}</p>
         <p class="muted">${esc(s.name)}의 이번 생은 여기까지! 다음 생을 기약하자.</p>
@@ -989,7 +1144,7 @@ function viewLife(app: App): string {
     const choices = visibleChoices(s, ev);
     const duo = choices.length === 2;
     const swipe = duo && !choices.some((c) => choiceLocked(s, c));
-    panel = `
+    centerPanel = `
       <div class="event-card ${swipe ? 'swipeable' : ''}" ${swipe ? `data-swipe="choose" data-left="${esc(fill(choices[0].label, s))}" data-right="${esc(fill(choices[1].label, s))}"` : ''}>
         ${swipe ? '<div class="swipe-label"></div>' : ''}
         <p class="eyebrow">${s.age}세 ${(s.month ?? 0) + 1}월의 사건 · 시간이 멈췄다</p>
@@ -1017,7 +1172,7 @@ function viewLife(app: App): string {
       </div>`;
   } else {
     const young = s.age < 2;
-    panel = `
+    sidePanel = `
       <div class="focus-card">
         <p class="eyebrow">성장</p>
         ${young ? '' : '<p class="muted small focus-hint">시간은 저절로 흐른다. 성장은 언제든 바꿀 수 있다. <kbd>1</kbd>~<kbd>5</kbd> · 정지 <kbd>Space</kbd></p>'}
@@ -1069,6 +1224,7 @@ function viewLife(app: App): string {
     <section class="center">
       <div class="scene-host ${s.omen ? `omen omen-${s.omen}` : ''}" data-gfx="scene" data-maxh="${Math.floor(window.innerHeight * 0.45)}"></div>
       ${s.death ? '' : timeBar(app, s, !!ev)}
+      ${centerPanel ? `<div class="center-panel">${centerPanel}</div>` : ''}
       <div class="chronicle">${chronicle}</div>
     </section>
     <section class="action ${tab === 'action' ? 'open' : ''}">
@@ -1077,7 +1233,7 @@ function viewLife(app: App): string {
         <button class="btn" data-act="dungeon" ${ev || s.death || s.age < 12 ? 'disabled' : ''}>${icon('sword')} 던전${s.age < 12 ? ' (12세~)' : ''}</button>
         <button class="btn" data-act="town" ${ev || s.death ? 'disabled' : ''}>${icon('store')} 마을</button>
       </div>
-      ${panel}
+      ${sidePanel}
     </section>
     <section class="m-panel ${tab === 'menu' ? 'open' : ''}">
       <button class="sheet-handle" data-act="tab" data-arg="none" aria-label="접기"></button>
@@ -1507,7 +1663,7 @@ function syncGfx(app: App, root: HTMLElement) {
   } else if (app.screen === 'town' && app.life) {
     g.setPortrait(specFromLife(app.life));
     g.setScene('village', hashStr(app.life.name) % 97);
-  } else if (app.screen === 'title') {
+  } else if (app.screen === 'title' || app.screen === 'gate') {
     g.setScene('title', 3);
   }
   g.mountScene(sceneHost);

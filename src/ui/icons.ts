@@ -3,7 +3,7 @@
  * fill="currentColor" 라서 CSS color 로 색을 바꾼다.
  */
 const RAW = import.meta.glob(
-  '../../node_modules/pixelarticons/svg/{sword,shield,potion,coins,store,backpack,crown,skull,fire,zap,smile,frown,angry,annoyed,leaf,sparkles,sparkle,castle,home,map,heart,trophy,wand,target,menu,diamond-gem,book-open,hourglass,share,download,search,bed,arrow-down,arrow-left,arrow-right,door-closed,gift,lock,check,close,user,briefcase,chart-line,warning-diamond,moon,sun,volume-2,volume-x}.svg',
+  '../../node_modules/pixelarticons/svg/{sword,shield,potion,coins,store,backpack,crown,skull,fire,zap,smile,frown,angry,annoyed,leaf,sparkles,sparkle,castle,home,map,heart,trophy,wand,target,menu,diamond-gem,book-open,hourglass,share,download,search,bed,arrow-down,arrow-left,arrow-right,door-closed,gift,lock,check,close,user,briefcase,chart-line,warning-diamond,moon,sun,volume-2,volume-x,cloud}.svg',
   { query: '?raw', import: 'default', eager: true },
 ) as Record<string, string>;
 
@@ -18,7 +18,7 @@ export type IconName =
   | 'smile' | 'frown' | 'angry' | 'annoyed' | 'leaf' | 'sparkles' | 'sparkle' | 'castle' | 'home' | 'map'
   | 'heart' | 'trophy' | 'wand' | 'target' | 'menu' | 'diamond-gem' | 'book-open' | 'hourglass' | 'share'
   | 'download' | 'search' | 'bed' | 'arrow-down' | 'arrow-left' | 'arrow-right' | 'door-closed' | 'gift'
-  | 'lock' | 'check' | 'close' | 'user' | 'briefcase' | 'chart-line' | 'warning-diamond' | 'moon' | 'sun' | 'volume-2' | 'volume-x';
+  | 'lock' | 'check' | 'close' | 'user' | 'briefcase' | 'chart-line' | 'warning-diamond' | 'moon' | 'sun' | 'volume-2' | 'volume-x' | 'cloud';
 
 /** <i class="ic">svg</i> */
 export function icon(name: IconName, cls = ''): string {
