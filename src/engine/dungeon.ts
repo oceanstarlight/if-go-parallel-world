@@ -162,6 +162,8 @@ export function bossAhead(s: LifeState) {
 
 /** 길에서 마물과 마주칠 확률 (나머지는 함정·보물상자·샘물·조용한 통로) */
 export const MOB_CHANCE = 0.2;
+/** 길목(마물·함정·상자)을 건너뛰고 5계층마다 보스만 상대한다 */
+export const BOSS_ONLY = true;
 
 /**
  * 앞의 4층을 한 층씩 지나간다.
@@ -174,6 +176,14 @@ export function descendPath(s: LifeState, rng: Rng = Math.random, auto = false):
   if (!d || s.death || d.fallen || d.floor >= DUNGEON_DEPTH) return 'fled';
   if (d.atBoss) return 'boss';
   if (d.mob) return 'mob';
+  // 5계층마다 보스만: 길목은 건너뛰고 곧장 보스 방 앞으로
+  if (BOSS_ONLY) {
+    d.cursor = d.floor + 4;
+    rec(s).maxFloor = Math.max(rec(s).maxFloor, d.floor + 4);
+    d.atBoss = true;
+    note(s, `${d.floor + 1}~${d.floor + 4}층을 단숨에 지나 ${d.floor + 5}층 보스 방 앞에 섰다. 가방을 점검하자.`, 'normal');
+    return 'boss';
+  }
   const cp = combatPower(s);
   for (let f = (d.cursor ?? d.floor) + 1; f <= d.floor + 4; f++) {
     d.cursor = f;
@@ -199,7 +209,7 @@ export function descendPath(s: LifeState, rng: Rng = Math.random, auto = false):
         if (res !== 'ok') return finish(s, res);
       }
     } else if (r < 0.45) {
-      if (rng() * 100 < 35 + statOf(s, 'luck') / 4) note(s, `${f}층 · 발밑의 함정을 아슬아슬하게 피했다.`);
+      if (rng() * 100 < 35 + statOf(s, 'luck') / 5.6) note(s, `${f}층 · 발밑의 함정을 아슬아슬하게 피했다.`);
       else {
         const res = hurt(s, floorPower(f) * 0.2, f);
         note(s, `${f}층 · 함정에 걸렸다! (체력 ${s.hp})`, 'bad');

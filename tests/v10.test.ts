@@ -67,11 +67,11 @@ describe('v1.0 중상 누적제', () => {
     }
   });
 
-  it('체력이 0이 되어도 중상이면 체력 20으로 살아난다', () => {
+  it('체력이 0이 되어도 중상이면 체력 28로 살아난다', () => {
     const s = createLife(base, seededRng(8));
     applyEffect(s, { stats: { vit: -400 }, zeroCause: 'illness' }, seededRng(9));
     expect(s.death).toBeNull();
-    expect(s.stats.vit).toBe(20);
+    expect(s.stats.vit).toBe(28);
   });
 });
 

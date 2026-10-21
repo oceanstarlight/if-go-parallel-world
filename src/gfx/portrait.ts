@@ -39,7 +39,7 @@ export function specFromLife(s: LifeState): PortraitSpec {
     jobRank: s.jobRank,
     dead: !!s.death,
     mood: moodOf(s),
-    injured: !s.death && s.age >= 3 && s.stats.vit < 50,
+    injured: !s.death && s.age >= 3 && s.stats.vit < 70,
     gender: s.gender ?? genderOfName(s.name),
   };
 }

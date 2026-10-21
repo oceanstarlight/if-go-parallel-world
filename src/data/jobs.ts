@@ -1,4 +1,4 @@
-import type { Job } from '../types';
+import type { Job, StatKey } from '../types';
 
 /**
  * 직업. income 은 직급(1~5)별 연봉(골드, 매달 1/12씩 월급으로), combat 은 직급당 전투력 보너스.
@@ -49,6 +49,13 @@ export const JOBS: Job[] = [
 ];
 
 export const jobById = (id: string | null) => JOBS.find((j) => j.id === id) ?? null;
+
+/** 특수 직업은 성인식 등급이 D(81) 이상이어야 한다. 여러 개면 그중 하나만 넘으면 된다 */
+export const JOB_REQ: Record<string, StatKey[]> = {
+  knight: ['atk'], hero: ['atk'], mage: ['mana'], priest: ['mana'], demon_officer: ['mana', 'atk'],
+  court: ['int'], merchant: ['int'],
+};
+export const JOB_REQ_MIN = 81;
 
 export function jobTitle(jobId: string | null, rank: number): string {
   const job = jobById(jobId);

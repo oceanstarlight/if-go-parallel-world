@@ -9,9 +9,9 @@ import { DEATHS, deathById } from '../data/deaths';
 import { type Gender, namesOf, pick } from '../data/names';
 import { SHOP, itemCost } from '../data/shop';
 import { goalById } from '../data/goals';
-import { FOCUS_DESC, FOCUS_NAMES, MOOD_HINT, MOOD_NAMES, REL_NAMES, STAT_INFO, STAT_KEYS, STAT_NAMES, affectionWord } from '../data/stats';
+import { FOCUS_DESC, FOCUS_NAMES, MOOD_HINT, MOOD_NAMES, REL_NAMES, GRADED, STAT_INFO, STAT_KEYS, STAT_NAMES, affectionWord } from '../data/stats';
 import {
-  MAX_INJURY, MONTHS, STRESS_HIGH, advanceMonth, applyOracle, canAdvance, genderOf, choiceLocked, choose, createLife, currentEvent, focusMul,
+  MAX_INJURY, MONTHS, STAT_MAX, gradeOf, STRESS_HIGH, advanceMonth, applyOracle, canAdvance, genderOf, choiceLocked, choose, createLife, jobReqMissing, currentEvent, focusMul,
   successChance, traitsOf, visibleChoices, rollHouse, rollCheat,
 } from '../engine/life';
 import { RARITY_NAME } from '../data/traits';
@@ -710,6 +710,9 @@ function birth(app: App) {
     upgrades: app.meta.upgrades,
     npcPast: app.meta.npcMet ?? {},
     lifeNo: app.meta.totalLives + 1,
+    loop: app.meta.worldEnds ?? 0,
+    hints: app.meta.hintsHeard ?? 0,
+    afterHappy: app.meta.lastHappy,
     fated,
     legends: app.meta.legends ?? [],
   });
@@ -1104,11 +1107,12 @@ function viewLife(app: App): string {
     </div>`).join('');
 
   const bonus = trinketBonus(s);
-  const stats = STAT_KEYS.map((k) => `
+  const pct = (v: number) => (Math.min(STAT_MAX, v) / STAT_MAX) * 100;
+  const stats = GRADED.map((k) => `
     <button class="stat ${app.statInfo === k ? 'on' : ''}" data-act="stat" data-arg="${k}" title="${STAT_NAMES[k]}: 누르면 설명">
-      <span class="stat-name">${STAT_NAMES[k]}</span>
-      <div class="bar"><div class="fill fill-${k}" style="width:${s.stats[k] / 2}%"></div>${bonus[k] ? `<div class="fill-bonus" style="left:${s.stats[k] / 2}%;width:${Math.min(200, statOf(s, k)) / 2 - s.stats[k] / 2}%"></div>` : ''}</div>
-      <span class="stat-val ${bonus[k] ? 'boosted' : ''}" ${bonus[k] ? `title="원래 ${s.stats[k]} + 장신구 ${bonus[k]}"` : ''}>${statOf(s, k)}${app.ghost[k] ? `<i class="ghost ${app.ghost[k]!.d > 0 ? 'up' : 'down'}">${app.ghost[k]!.d > 0 ? '+' : ''}${app.ghost[k]!.d}</i>` : ''}</span>
+      <span class="stat-name">${STAT_NAMES[k]}${s.talents?.includes(k) ? '<i class="talent">★</i>' : ''}</span>
+      <div class="bar"><div class="fill fill-${k}" style="width:${pct(s.stats[k])}%"></div>${bonus[k] ? `<div class="fill-bonus" style="left:${pct(s.stats[k])}%;width:${pct(statOf(s, k)) - pct(s.stats[k])}%"></div>` : ''}</div>
+      <span class="stat-val ${bonus[k] ? 'boosted' : ''}" ${bonus[k] ? `title="원래 ${s.stats[k]} + 장신구 ${bonus[k]}"` : ''}><b class="grade g-${gradeOf(statOf(s, k))}">${gradeOf(statOf(s, k))}</b>${statOf(s, k)}${app.ghost[k] ? `<i class="ghost ${app.ghost[k]!.d > 0 ? 'up' : 'down'}">${app.ghost[k]!.d > 0 ? '+' : ''}${app.ghost[k]!.d}</i>` : ''}</span>
     </button>`).join('');
 
   const rels = (['friend', 'rival', 'mentor', 'spouse'] as RelKey[]).map((k) => relLine(s, k)).join('');
@@ -1149,10 +1153,11 @@ function viewLife(app: App): string {
         ${swipe ? '<p class="swipe-guide"><b class="l">← 왼쪽</b> · 카드를 밀어서 선택 · <b class="r">오른쪽 →</b></p>' : ''}
         <div class="choices ${duo ? 'duo' : ''}">
           ${choices.map((c, i) => {
-            const locked = choiceLocked(s, c);
+            const locked = choiceLocked(s, c) && choices.some((x) => !choiceLocked(s, x));
             const notes = [
               c.check && !isCombat(ev.id, c) && cheat.showChance ? `${icon('search')}성공률 ${successChance(s, c.check)}%` : '',
               c.will ? `${icon('zap')}의지력 ${c.will}${locked ? ` (부족: ${s.will ?? 0})` : ''}` : '',
+              jobReqMissing(s, c.success.effect?.job) ? `${icon('lock')}${jobReqMissing(s, c.success.effect?.job)}` : '',
             ].filter(Boolean).join(' · ');
             const odds = isCombat(ev.id, c) ? battleOdds(s, c) : null;
             return `
@@ -1217,7 +1222,7 @@ function viewLife(app: App): string {
       </div>
     </aside>
     <section class="center">
-      <div class="scene-host" data-gfx="scene" data-maxh="${Math.floor(window.innerHeight * 0.45)}"></div>
+      <div class="scene-host ${s.omen ? `omen omen-${s.omen}` : ''}" data-gfx="scene" data-maxh="${Math.floor(window.innerHeight * 0.45)}"></div>
       ${s.death ? '' : timeBar(app, s, !!ev)}
       ${centerPanel ? `<div class="center-panel">${centerPanel}</div>` : ''}
       <div class="chronicle">${chronicle}</div>
@@ -1277,19 +1282,19 @@ function statInfoBox(app: App, s: LifeState): string {
   const k = app.statInfo;
   if (!k) return '';
   if (k === 'cp') {
-    const { vit, mana, int, luck } = s.stats;
+    const { atk, def, mana, vit, int } = s.stats;
     const w = CP_WEIGHT;
     const gear = (s.equip?.weapon?.power ?? 0) + (s.equip?.armor?.power ?? 0);
     const job = (jobById(s.jobId)?.combat ?? 0) * s.jobRank;
     const parts = [
-      ['체력', (vit * w.vit) / 2], ['마력', (mana * w.mana) / 2], [vit >= mana ? '주력(체력)' : '주력(마력)', (w.main * Math.max(vit, mana)) / 2],
-      ['지성', (int * w.int) / 2], ['행운', (luck * w.luck) / 2], ['장비', gear], ['직업', job],
+      ['공격력', (atk * w.atk) / 2.8], ['마력', (mana * w.mana) / 2.8], [atk >= mana ? '주력(공격력)' : '주력(마력)', (w.main * Math.max(atk, mana)) / 2.8],
+      ['방어력', (def * w.def) / 2.8], ['체력', (vit * w.vit) / 2.8], ['지능', (int * w.int) / 2.8], ['장비', gear], ['직업', job],
     ] as [string, number][];
     return `
       <div class="stat-info" data-act="stat" data-arg="cp">
         <b>${icon('sword')} 전투력 ${combatPower(s)}</b>
         <p>${parts.filter(([, v]) => v).map(([n, v]) => `${n} ${Math.round(v)}`).join(' + ')}</p>
-        <p class="muted small">사건 전투·던전의 승률을 정한다. 턴제 전투에서 체력은 공격, 마력은 마법(같은 수치면 30% 더 셈), 지성은 치명타·마법 배율, 행운은 회피·도주에 쓰인다.</p>
+        <p class="muted small">사건 전투·던전의 승률을 정한다. 턴제 전투에서 공격력은 공격, 마력은 마법(같은 수치면 30% 더 셈), 방어력은 받는 피해 감소, 지능은 치명타·피해 계수에 쓰인다.</p>
       </div>`;
   }
   return `
@@ -1418,7 +1423,7 @@ function viewCredits(app: App): string {
     section('능력치', STAT_KEYS.map((k) => line(STAT_NAMES[k], String(s.stats[k]))).join('')),
     section('함께한 힘', [line('여신의 권능', esc(cheatById(s.cheatId).name)), ...traitsOf(s).map((t) => line('타고난 특성', esc(t.name)))].join('')),
     `<p class="cr-epitaph">${esc(d.epitaph)}</p>`,
-    `<p class="cr-end">— 그리고, 다음 생으로 —</p>`,
+    `<p class="cr-end">${esc(d.endLine ?? '— 그리고, 다음 생으로 —')}</p>`,
   ].join('');
   // 줄 수에 맞춰 흐르는 시간을 정한다
   const secs = Math.max(20, Math.min(48, 14 + deeds.length * 1.2 + rels.length));

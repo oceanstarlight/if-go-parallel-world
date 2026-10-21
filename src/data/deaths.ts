@@ -53,6 +53,17 @@ export const DEATHS: DeathDef[] = [
     epitaph: '전설의 괴도가 될 뻔했다. 세 번째는 너무 많았다.' },
   { id: 'hero_sacrifice', name: '세계를 구한 희생', hint: '용사로서 마지막 전장에 선다.',
     epitaph: '마왕과 함께 빛 속으로. 세계는 그 이름을 영원히 노래했다.' },
+  // ───── 세계의 끝 (회차마다 하나) ─────
+  { id: 'doom_dragon', name: '흑룡의 날', hint: '잿빛 하늘 끝에서.', epitaph: '그렇게 나는, 이 세계와 함께 영원히 잠들었다.', endLine: '— 세계가 잠들었다 —' },
+  { id: 'doom_moon', name: '여섯째 달이 떨어진 날', hint: '황토빛 하늘 아래서.', epitaph: '그렇게 나는, 이 세계와 함께 영원히 잠들었다.', endLine: '— 세계가 잠들었다 —' },
+  { id: 'doom_war', name: '세계대전', hint: '붉은 하늘, 모든 나라의 깃발.', epitaph: '그렇게 나는, 이 세계와 함께 영원히 잠들었다.', endLine: '— 세계가 잠들었다 —' },
+  { id: 'doom_vanish', name: '사람들이 사라진 날', hint: '색이 빠진 하늘.', epitaph: '그렇게 나는, 이 세계와 함께 영원히 잠들었다.', endLine: '— 세계가 잠들었다 —' },
+  { id: 'doom_flood', name: '대홍수', hint: '그치지 않는 비.', epitaph: '그렇게 나는, 이 세계와 함께 영원히 잠들었다.', endLine: '— 세계가 잠들었다 —' },
+  // ───── 진실의 끝 ─────
+  { id: 'happy_end', name: '백룡을 쓰러뜨린 자', hint: '진실을 알고, 모든 것을 내려놓는다.',
+    epitaph: '세계는 아무것도 모른 채 내일을 맞이했다.', endLine: '— 모르는 것이 약이다 —' },
+  { id: 'bad_end', name: '진실을 아는 자', hint: '아직 아무도 이 끝에 닿지 못했다.',
+    epitaph: '나는 모든 것을 알게 되었다.', endLine: '— 아는 것이 힘이다 —' },
 ];
 
 export const deathById = (id: string) => DEATHS.find((d) => d.id === id) ?? DEATHS[1];

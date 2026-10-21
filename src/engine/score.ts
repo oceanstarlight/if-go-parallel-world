@@ -9,7 +9,7 @@ export interface StoneLine {
 export function computeStones(s: LifeState, meta: MetaSave): StoneLine[] {
   const lines: StoneLine[] = [
     { label: `세월 (${s.age}년)`, value: Math.floor(s.age / 4) },
-    { label: `명성 (${s.stats.fame})`, value: Math.floor(s.stats.fame / 8) },
+    { label: `명성 (${s.stats.fame})`, value: Math.floor(s.stats.fame / 11) },
   ];
   if (s.jobId) {
     lines.push({ label: `직위 (${s.jobRank}단계)`, value: s.jobRank * 6 + (s.jobRank >= 5 ? 10 : 0) });

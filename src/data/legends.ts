@@ -13,9 +13,9 @@ export function legendOf(s: LifeState): Legend | null {
   if (s.death?.causeId === 'sacrifice') return { ...base, kind: 'hero', deed: '소중한 이를 지키고 떠난' };
   if (s.karma <= -60) return { ...base, kind: 'villain', deed: '악명을 떨친' };
   if (s.jobId && s.jobRank >= 5) return { ...base, kind: 'hero', deed: `${jobTitle(s.jobId, s.jobRank)}에 오른` };
-  if (s.stats.int >= 160 || has('top_student')) return { ...base, kind: 'sage', deed: '대현자라 불린' };
+  if (s.stats.int >= 224 || has('top_student')) return { ...base, kind: 'sage', deed: '대현자라 불린' };
   if (s.karma >= 60) return { ...base, kind: 'sage', deed: '성자로 불린' };
-  if (s.stats.fame >= 120) return { ...base, kind: 'hero', deed: '이름을 떨친' };
+  if (s.stats.fame >= 168) return { ...base, kind: 'hero', deed: '이름을 떨친' };
   if (s.age <= 12) return { ...base, kind: 'ghost', deed: '어린 나이에 떠난' };
   return null;
 }

@@ -1,4 +1,5 @@
 import type {
+  Stats,
   Check, Choice, Effect, Focus, GameEvent, Legend, LifeState, MoodKey, Outcome, RelKey, Resolution, StatKey, Trait,
 } from '../types';
 import { rollTraits, traitById } from '../data/traits';
@@ -7,6 +8,7 @@ import { clampHp, maxHp, monthlyEconomy, starterKit, yearEndEconomy } from './ec
 import { bump, rec } from './record';
 import { statOf, trinketSlots } from './trinket';
 import { pickNote } from './notes';
+import { isWorldEnd, setupWorld, worldYear } from './world';
 import { makeTrinket, randomTrinket, trinketDef } from '../data/trinkets';
 import { gearByBase, makeItem } from '../data/items';
 import { deathById } from '../data/deaths';
@@ -15,9 +17,9 @@ import { inBranch } from '../data/branches';
 import { HOUSES, houseById } from '../data/houses';
 import { GOALS } from '../data/goals';
 import { CHEATS, cheatById } from '../data/cheats';
-import { jobById } from '../data/jobs';
+import { JOB_REQ, JOB_REQ_MIN } from '../data/jobs';
 import { type Gender, genderOfName, namesOf, opposite, pick } from '../data/names';
-import { STAT_KEYS, STAT_NAMES } from '../data/stats';
+import { GRADED, STAT_KEYS, STAT_NAMES } from '../data/stats';
 import { ALL_EVENTS, eventById } from '../data/events';
 import { BIRTH_TEXT, QUIET_YEAR } from '../data/flavor';
 import { matches } from './cond';
@@ -44,6 +46,11 @@ export interface NewLifeOptions {
   fated?: boolean;
   /** 전설이 된 전생들 */
   legends?: Legend[];
+  /** 지금까지 겪은 멸망 수 · 들은 힌트 수 */
+  loop?: number;
+  hints?: number;
+  /** 직전 생이 해피엔딩이었다: 여신이 아무 말도 하지 않는다 */
+  afterHappy?: boolean;
   /** 특성을 직접 지정 (테스트용). 없으면 무작위 */
   traits?: string[];
   /** 성별. 없으면 이름으로 짐작한다 */
@@ -102,7 +109,7 @@ export const MOOD_MUL: Record<MoodKey, Partial<Record<Focus, number>>> = {
 /** 스트레스가 이 이상이면 성장이 떨어진다 */
 export const STRESS_HIGH = 60;
 /** 능력치 상한 */
-export const STAT_MAX = 200;
+export const STAT_MAX = 280;
 /** 이 이상이면 과로로 쓰러질 수 있다 */
 export const STRESS_DANGER = 85;
 
@@ -112,7 +119,9 @@ const stochastic = (v: number, rng: Rng) => Math.floor(v) + (rng() < v - Math.fl
 export function createLife(opt: NewLifeOptions, rng: Rng = Math.random): LifeState {
   const house = houseById(opt.houseId);
   const cheat = cheatById(opt.cheatId);
-  const stats = { vit: 10, mana: 10, int: 10, cha: 10, fame: 0, luck: 10 };
+  const hv = house.stats.vit ?? 14;
+  // 출신에 공격력·방어력이 따로 없으면 체력에서 나눠 갖는다
+  const stats: Stats = { atk: Math.round(hv * 0.8), def: Math.round(hv * 0.6), mana: 14, vit: 14, int: 14, cha: 14, fame: 0, luck: 14 };
   for (const k of STAT_KEYS) {
     stats[k] = (house.stats[k] ?? stats[k]) + (cheat.stats?.[k] ?? 0);
     if (k !== 'fame') stats[k] += 4 * (opt.upgrades.echo ?? 0);
@@ -164,14 +173,19 @@ export function createLife(opt: NewLifeOptions, rng: Rng = Math.random): LifeSta
   };
   s.hp = maxHp(s);
   s.month = 0;
-  s.statScale = 2;
+  s.statScale = 3;
   rec(s);
   s.goals = pickGoals(s, rng);
-  if ((opt.lifeNo ?? 1) > 1) {
+  setupWorld(s, { loop: opt.loop, hints: opt.hints }, rng);
+  if (opt.afterHappy) {
+    // 해피엔딩 뒤의 여신은 아무 말도 하지 않는다 (베드엔딩의 복선)
+    log(s, '환생의 여신은 나를 바라보기만 했다. "……"', 'milestone');
+  } else if ((opt.lifeNo ?? 1) > 1) {
     // 매 생마다 다시 만나는 환생의 여신
     log(s, `환생의 여신이 하품을 하며 손을 흔들었다. "어머, 벌써 ${opt.lifeNo}번째 인생이네? 이번엔 「${cheat.name}」 권능으로 해줄게~"`, 'milestone');
   } else {
-    log(s, `환생의 여신이 반짝이는 손가락으로 당신을 콕 찔렀다. "축하해, 이세계 환생이야! 선물로 「${cheat.name}」 권능을 줄게♪"`, 'milestone');
+    log(s, pick(PROLOGUES, rng), 'milestone');
+    log(s, `환생의 여신이 반짝이는 손가락으로 나를 콕 찔렀다. "축하해, 이세계 환생이야! 선물로 「${cheat.name}」 권능을 줄게♪"`, 'milestone');
   }
   log(s, fill(BIRTH_TEXT[house.id] ?? BIRTH_TEXT.farm, s), 'milestone');
   if (traits.length) {
@@ -188,31 +202,55 @@ function log(s: LifeState, text: string, tone: LifeState['log'][number]['tone'] 
 // ───────────────────────── 성장 ─────────────────────────
 
 /**
- * 성장별 한 해 성장량 (능력치 200 기준). 매달 1/12 씩 나눠서 오른다.
- * 수련은 체력만, 학업은 지성·마력. 마력은 수련으로 오르지 않는다.
+ * 성장별 한 해 성장량 (능력치 280 기준). 매달 1/12 씩 나눠서 오른다.
+ * 수련 = 공격력·체력·방어력, 학업 = 지능·마력. 마력은 수련으로 오르지 않는다.
  */
 const FOCUS_GAINS: Record<Focus, Partial<Record<StatKey, [number, number]>>> = {
-  train: { vit: [6, 9] },
-  study: { int: [4, 7], mana: [3, 6] },
-  social: { cha: [4, 7], fame: [2, 4] },
-  explore: { luck: [5, 8] },
+  train: { atk: [7, 10], vit: [7, 10], def: [5, 8] },
+  study: { int: [8, 11], mana: [7, 10] },
+  social: { cha: [7, 11], fame: [3, 6] },
+  explore: { luck: [7, 11] },
   rest: {},
 };
 
+/** 나이별 성장 배율: 유년기는 조금, 소년기(13~18)에 폭발, 성인식 뒤로는 크게 느려진다 */
 function ageMul(age: number) {
   if (age < 6) return 0.5;
-  if (age < 13) return 0.75;
-  if (age <= 40) return 1;
-  if (age <= 60) return 0.5;
-  return 0.25;
+  if (age < 13) return 0.8;
+  if (age < 18) return 1.6;
+  if (age < 40) return 0.3;
+  return 0.15;
 }
+
+// ───── 등급 (S~F, 40점마다) ─────
+export const GRADES = ['F', 'E', 'D', 'C', 'B', 'A', 'S'] as const;
+export type Grade = (typeof GRADES)[number];
+/** 0~40 F · 41~80 E · 81~120 D · 121~160 C · 161~200 B · 201~240 A · 241~280 S */
+export const gradeIdx = (v: number) => Math.max(0, Math.min(6, Math.ceil(v / 40) - 1));
+export const gradeOf = (v: number): Grade => GRADES[gradeIdx(v)];
+/** 성인식 뒤 오를 수 있는 한계: 판정 등급 + 2등급 */
+export const statCap = (s: LifeState, k: StatKey) =>
+  s.grade18 && k in s.grade18 ? Math.min(STAT_MAX, 40 * (s.grade18[k]! + 3)) : STAT_MAX;
+/** 성인식을 치르는 나이 */
+export const CEREMONY_AGE = 18;
 
 export function gainStat(s: LifeState, k: StatKey, amount: number, rng: Rng) {
   // 높을수록 오르기 어렵다
-  const dim = amount > 0 ? Math.max(0.1, 1 - s.stats[k] / 225) : 1;
+  const dim = amount > 0 ? Math.max(0.1, 1 - s.stats[k] / 320) : 1;
   let mul = amount > 0 ? cheatById(s.cheatId).growthMul?.[k] ?? 1 : 1;
   if (amount > 0) for (const t of traitsOf(s)) mul *= t.growthMul?.[k] ?? 1;
-  s.stats[k] = clamp(s.stats[k] + stochastic(amount * dim * mul, rng), 0, STAT_MAX);
+  // 소년기에는 각성한 재능이 두 배로 자란다
+  if (amount > 0 && s.age >= 13 && s.talents?.includes(k)) mul *= 1.7;
+  const d = stochastic(amount * dim * mul, rng);
+  if (d > 0 && s.age < 13) addTalent(s, k, d);
+  const cap = d > 0 ? Math.max(s.stats[k], statCap(s, k)) : STAT_MAX;
+  s.stats[k] = clamp(s.stats[k] + d, 0, cap);
+}
+
+/** 유년기의 선택과 노력이 재능 점수로 쌓인다 (12세가 끝날 때 상위 1~2개가 각성) */
+function addTalent(s: LifeState, k: StatKey, v: number) {
+  if (!GRADED.includes(k)) return;
+  s.talentPts = { ...(s.talentPts ?? {}), [k]: (s.talentPts?.[k] ?? 0) + v };
 }
 
 /** 한 달 성장: 고른 성장의 한 해치를 12로 나눠 매달 조금씩 */
@@ -220,38 +258,45 @@ function growMonth(s: LifeState, rng: Rng) {
   // 요양 중에는 성장이 반으로 준다
   const m = ageMul(s.age) * ((s.recover ?? 0) > 0 ? 0.5 : 1) / MONTHS;
   if (s.age < 3) {
-    gainStat(s, 'vit', 3 * m, rng);
-    gainStat(s, pick(STAT_KEYS.filter((k) => k !== 'fame'), rng), 3 * m, rng);
-  } else if (s.focus === 'rest') {
-    // 휴식: 몸이 조금 회복된다
-    gainStat(s, 'vit', 1.5 * m, rng);
-  } else {
+    for (const k of GRADED) gainStat(s, k, 2 * m, rng);
+  } else if (s.focus !== 'rest') {
     const fm = focusMul(s, s.focus);
     for (const [k, [lo, hi]] of Object.entries(FOCUS_GAINS[s.focus])) {
       gainStat(s, k as StatKey, (lo + rng() * (hi - lo)) * m * fm, rng);
     }
-    if (s.focus === 'explore') {
-      gainStat(s, pick(['vit', 'mana', 'int', 'cha'] as StatKey[], rng), (2 + rng() * 4) * m * fm, rng);
-    }
+    if (s.focus === 'explore') gainStat(s, pick(GRADED, rng), (3 + rng() * 4) * m * fm, rng);
   }
+  // 어린 시절엔 무엇을 하든 몸과 머리가 조금씩 자란다
+  if (s.age < CEREMONY_AGE) for (const k of GRADED) gainStat(s, k, 4.5 * m, rng);
 }
 
-/** 한 해 성장: 출신·직업의 덤과 노화 */
+/** 한 해 정리: 노화 (엘프·불로 체질은 느리다). 저절로 오르는 성장은 없다 */
 function grow(s: LifeState, rng: Rng) {
-  for (const [k, v] of Object.entries(houseById(s.houseId).growth ?? {})) {
-    if (rng() < 0.5) gainStat(s, k as StatKey, v, rng);
-  }
-  const job = jobById(s.jobId);
-  if (job) {
-    for (const [k, v] of Object.entries(job.passive)) {
-      if (rng() < 0.6) gainStat(s, k as StatKey, v * (1 + s.jobRank * 0.2), rng);
-    }
-  }
-  // 노화 (엘프·불로 체질은 느리다)
   const am = agingMul(s);
-  if (s.age >= 40 && rng() < 0.6 * am) s.stats.vit = Math.max(1, s.stats.vit - 2);
-  if (s.age >= 60 && rng() < am) s.stats.vit = Math.max(1, s.stats.vit - 2);
-  if (s.age >= 70 && rng() < 0.5 * am) s.stats.vit = Math.max(1, s.stats.vit - 2);
+  if (s.age >= 40 && rng() < 0.6 * am) s.stats.vit = Math.max(1, s.stats.vit - 3);
+  if (s.age >= 60 && rng() < am) s.stats.vit = Math.max(1, s.stats.vit - 3);
+  if (s.age >= 70 && rng() < 0.5 * am) s.stats.vit = Math.max(1, s.stats.vit - 3);
+  if (s.age === 13) awakenTalent(s);
+  if (s.age === CEREMONY_AGE) ceremony(s);
+}
+
+/** 12세가 끝나면 가장 많이 쌓인 재능 1~2개가 깨어난다 */
+function awakenTalent(s: LifeState) {
+  const pts = GRADED.map((k) => [k, s.talentPts?.[k] ?? 0] as const).sort((a, b) => b[1] - a[1]);
+  const top = pts[0];
+  s.talents = [top[0]];
+  if (pts[1][1] >= top[1] * 0.75) s.talents.push(pts[1][0]);
+  log(s, `어린 시절 내가 고른 길이 몸에 새겨졌다. 재능이 깨어났다 — ${s.talents.map((k) => `「${STAT_NAMES[k]}」`).join(' ')}! 이제부터 이 재능은 훨씬 빨리 자란다.`, 'milestone');
+}
+
+/** 성인식: 대마검사협회(엘프·슬라임은 숲의 정령)에서 등급 판정을 받는다 */
+export const judgeName = (s: LifeState) =>
+  s.houseId === 'elf' || s.houseId === 'slime' ? '숲의 정령' : '에르시아 대마검사협회';
+
+function ceremony(s: LifeState) {
+  s.grade18 = Object.fromEntries(GRADED.map((k) => [k, gradeIdx(s.stats[k])]));
+  const line = GRADED.map((k) => `${STAT_NAMES[k]} ${gradeOf(s.stats[k])}`).join(' · ');
+  log(s, `성인식 날, ${judgeName(s)}에서 등급 판정을 받았다. ${line}. 이제부터는 이 등급에서 두 단계까지만 더 오를 수 있다.`, 'milestone');
 }
 
 /** 성장 배율: 특성 × 기분 × 스트레스 */
@@ -289,7 +334,7 @@ function updateMind(s: LifeState, rng: Rng) {
 /** 과로: 스트레스가 위험 수준이면 쓰러질 수 있다 */
 function overwork(s: LifeState, rng: Rng): boolean {
   if ((s.stress ?? 0) < STRESS_DANGER || rng() > 0.3) return false;
-  s.stats.vit = Math.max(0, s.stats.vit - 24);
+  s.stats.vit = Math.max(0, s.stats.vit - 34);
   s.stress = Math.max(0, (s.stress ?? 0) - 25);
   s.mood = 'gloom';
   if (s.stats.vit <= 0) {
@@ -297,7 +342,7 @@ function overwork(s: LifeState, rng: Rng): boolean {
     if (kill(s, 'overwork')) log(s, '다시는 일어나지 못했다.', 'death');
     flushInjury(s);
   } else {
-    log(s, '과로로 쓰러졌다! 한 달 내내 앓아누웠다. 가끔은 쉬어야 한다. (체력 -24)', 'bad');
+    log(s, '과로로 쓰러졌다! 한 달 내내 앓아누웠다. 가끔은 쉬어야 한다. (체력 -34)', 'bad');
   }
   return true;
 }
@@ -318,7 +363,7 @@ export function naturalDeathChance(s: LifeState): number {
   if (age < 55) return 0;
   const t = (age - 55) / 40;
   const grim = s.flags.includes('grim_win') ? 0.5 : 1;
-  return clamp((0.004 + t * t * 0.35) * (1.3 - s.stats.vit / 200) * grim, 0, 1);
+  return clamp((0.004 + t * t * 0.35) * (1.3 - s.stats.vit / 280) * grim, 0, 1);
 }
 
 // ───────────────────────── 죽음 ─────────────────────────
@@ -326,7 +371,16 @@ export function naturalDeathChance(s: LifeState): number {
 /** 늘 진짜 죽음인 사인: 노환, 교수대(세 번째 체포), 던전에서 쓰러짐 */
 const REAL_DEATH = new Set(['old_age', 'gallows', 'dungeon', 'abyss']);
 /** 중상이 이 횟수에 이르면 죽는다 */
+/** 내 직업의 사건이 뽑힐 가중치 배율 */
+export const JOB_EVENT_MUL = 4;
 export const MAX_INJURY = 3;
+/** 첫 생의 시작: 어쩌다 환생하게 되었나 (1인칭) */
+const PROLOGUES = [
+  '야근을 마치고 돌아오던 겨울밤, 횡단보도에서 눈부신 헤드라이트를 본 것이 마지막 기억이다. 눈을 떴을 때, 나는 하얀 공간에 서 있었다.',
+  '열이 펄펄 끓던 밤이었다. 이번 감기는 좀 길다고 생각하며 눈을 감았는데, 다시 눈을 떴을 때 나는 하얀 공간에 서 있었다.',
+  '물에 빠진 아이를 건져 올린 것까지는 기억난다. 그다음은 차갑고 어두웠다. 그리고 나는 하얀 공간에 서 있었다.',
+  '계단에서 발을 헛디딘 순간, 세상이 천천히 돌았다. 정신을 차렸을 때, 나는 하얀 공간에 서 있었다.',
+];
 const HAZARDS = ['illness', 'plague', 'carriage', 'bandits', 'duel', 'famine', 'war'];
 /** 중상 뒤 요양 기간 (달) */
 const RECOVER_MONTHS = 12;
@@ -341,13 +395,13 @@ let sureDeath = false;
  */
 export function kill(s: LifeState, causeId: string): boolean {
   if (s.death) return true;
-  if (causeId !== 'old_age' && s.extraLives > 0) {
+  if (causeId !== 'old_age' && !isWorldEnd(causeId) && s.extraLives > 0) {
     s.extraLives--;
-    s.stats.vit = Math.max(s.stats.vit, 50);
+    s.stats.vit = Math.max(s.stats.vit, 70);
     log(s, '눈앞이 하얘졌다… 그런데 불굴의 육체가 발동! "아직 안 끝났어!" 당신은 벌떡 일어났다.', 'good');
     return false;
   }
-  if (!sureDeath && !REAL_DEATH.has(causeId) && (s.injuries ?? 0) < (s.injuryCap ?? MAX_INJURY) - 1) {
+  if (!sureDeath && !REAL_DEATH.has(causeId) && !isWorldEnd(causeId) && (s.injuries ?? 0) < (s.injuryCap ?? MAX_INJURY) - 1) {
     injure(s, causeId);
     return false;
   }
@@ -359,7 +413,7 @@ export function kill(s: LifeState, causeId: string): boolean {
 /** 중상: 체력·돈을 잃고 1년간 요양한다 */
 function injure(s: LifeState, causeId: string) {
   s.injuries = (s.injuries ?? 0) + 1;
-  s.stats.vit = s.stats.vit <= 0 ? 20 : Math.max(10, s.stats.vit - 20);
+  s.stats.vit = s.stats.vit <= 0 ? 28 : Math.max(14, s.stats.vit - 28);
   const lost = (s.gold ?? 0) > 0 ? Math.round((s.gold ?? 0) * 0.2) : 0;
   s.gold = (s.gold ?? 0) - lost;
   s.stress = clamp((s.stress ?? 0) + 25, 0, 100);
@@ -381,7 +435,7 @@ function flushInjury(s: LifeState) {
   s.pendingInjury = null;
   const n = s.injuries ?? 1;
   const last = n >= MAX_INJURY - 1;
-  log(s, `…눈을 떠 보니 침대 위였다. 「${deathById(causeId).name}」 직전에서 살아났다! 중상 ${n}/${MAX_INJURY} — 1년간 요양해야 한다. (체력 -20${Number(lost) ? `, 치료비 ${Number(lost).toLocaleString('ko-KR')}G` : ''})${last ? ' 다음에 또 이런 일이 생기면 정말 끝이다…' : ''}`, 'bad');
+  log(s, `…눈을 떠 보니 침대 위였다. 「${deathById(causeId).name}」 직전에서 살아났다! 중상 ${n}/${MAX_INJURY} — 1년간 요양해야 한다. (체력 -28${Number(lost) ? `, 치료비 ${Number(lost).toLocaleString('ko-KR')}G` : ''})${last ? ' 다음에 또 이런 일이 생기면 정말 끝이다…' : ''}`, 'bad');
 }
 
 // ───────────────────────── 판정 / 효과 ─────────────────────────
@@ -389,7 +443,7 @@ function flushInjury(s: LifeState) {
 export function successChance(s: LifeState, check: Check): number {
   const bonus = (cheatById(s.cheatId).checkBonus?.[check.stat] ?? 0)
     + traitsOf(s).reduce((a, t) => a + (t.checkBonus?.[check.stat] ?? 0), 0);
-  const raw = 50 + (statOf(s, check.stat) - check.dc) * 1.5 + (statOf(s, 'luck') - 40) * 0.15 + bonus;
+  const raw = 50 + (statOf(s, check.stat) - check.dc) * 1.07 + (statOf(s, 'luck') - 56) * 0.11 + bonus;
   return clamp(Math.round(raw), 5, 95);
 }
 
@@ -403,8 +457,13 @@ function applyEffectRaw(s: LifeState, e: Effect | undefined, rng: Rng) {
   if (e.stats) {
     for (const [k, v] of Object.entries(e.stats)) {
       // 사건의 직접 보상은 체감 없이 반영 (배율만 적용)
-      const mul = v > 0 ? cheatById(s.cheatId).growthMul?.[k as StatKey] ?? 1 : 1;
-      s.stats[k as StatKey] = clamp(s.stats[k as StatKey] + Math.round(v * Math.min(mul, 1.3)), 0, STAT_MAX);
+      const key = k as StatKey;
+      const mul = v > 0 ? cheatById(s.cheatId).growthMul?.[key] ?? 1 : 1;
+      const d = Math.round(v * Math.min(mul, 1.3));
+      // 유년기의 선택은 재능으로 쌓이고, 성인식 뒤로는 등급 한계를 넘지 못한다
+      if (d > 0 && s.age < 13) addTalent(s, key, d);
+      const cap = d > 0 ? Math.max(s.stats[key], statCap(s, key)) : STAT_MAX;
+      s.stats[key] = clamp(s.stats[key] + d, 0, cap);
     }
   }
   if (e.karma) s.karma = clamp(s.karma + e.karma, -100, 100);
@@ -553,7 +612,9 @@ function pickEvent(s: LifeState, rng: Rng): GameEvent | null {
   const times: Record<string, number> = {};
   for (const id of s.seen) times[id] = (times[id] ?? 0) + 1;
   const pool = ALL_EVENTS.filter((e) => !e.milestone && eligible(s, e) && !(s.age - (seenAt[e.id] ?? -99) < REPEAT_GAP));
-  const weights = pool.map((e) => ((e.weight ?? 1) * (e.focus && e.focus === s.focus ? 3 : 1)) / (1 + 1.5 * (times[e.id] ?? 0)));
+  // 직업이 생기면 그 직업의 사건(상인=돈, 모험가=전투, 궁정 마법사=왕실…)이 삶의 중심이 된다
+  const jobMul = (e: GameEvent) => (s.jobId && e.cond.jobs?.includes(s.jobId) ? JOB_EVENT_MUL : 1);
+  const weights = pool.map((e) => ((e.weight ?? 1) * (e.focus && e.focus === s.focus ? 3 : 1) * jobMul(e)) / (1 + 1.5 * (times[e.id] ?? 0)));
   const total = weights.reduce((a, b) => a + b, 0);
   if (total <= 0) return null;
   let r = rng() * total;
@@ -618,6 +679,9 @@ function startYear(s: LifeState, rng: Rng) {
     flushInjury(s);
   }
   s.yearMark = Math.floor(rng() * 4);
+  // 세계의 시계: 가면 쓴 사람 · 하늘의 전조 · 멸망의 날
+  const omen = worldYear(s);
+  if (omen) log(s, omen, 'bad');
 }
 
 /** 던전에 다시 들어갈 수 있게 되면 한 번만 알린다 (12세 · 2년 쿨다운 · 출입 금지가 풀릴 때) */
@@ -724,7 +788,15 @@ export function applyOracle(s: LifeState, answers: { label: string; effect: Effe
 }
 
 /** 의지력이 모자라 고를 수 없는 선택지인가 */
-export const choiceLocked = (s: LifeState, c: Choice) => (c.will ?? 0) > (s.will ?? 50);
+/** 이 직업에 필요한 등급이 모자라면 그 이유 (예: 「마력 D 이상 필요」) */
+export function jobReqMissing(s: LifeState, jobId: string | undefined): string | null {
+  const req = jobId ? JOB_REQ[jobId] : undefined;
+  if (!req || req.some((k) => s.stats[k] >= JOB_REQ_MIN)) return null;
+  return `${req.map((k) => STAT_NAMES[k]).join(' 또는 ')} D 이상 필요`;
+}
+
+export const choiceLocked = (s: LifeState, c: Choice) =>
+  (c.will ?? 0) > (s.will ?? 50) || !!jobReqMissing(s, c.success.effect?.job);
 
 /**
  * 선택지를 고른다. forced 를 주면 판정 대신 그 결과를 쓴다 (턴제 전투에서 이미 승패가 났을 때).
@@ -733,7 +805,8 @@ export function choose(s: LifeState, index: number, rng: Rng = Math.random, forc
   const ev = currentEvent(s);
   if (!ev || s.death) return null;
   const choice = visibleChoices(s, ev)[index];
-  if (!choice || choiceLocked(s, choice)) return null;
+  // 모든 선택지가 잠겼으면 (드물게) 잠금을 풀어 준다: 멈춰 버리지 않게
+  if (!choice || (choiceLocked(s, choice) && visibleChoices(s, ev).some((c) => !choiceLocked(s, c)))) return null;
   s.pendingEventId = null;
   if (choice.will) s.will = clamp((s.will ?? 50) - choice.will, 0, 100);
   log(s, `▸ ${fill(choice.label, s)}`);

@@ -49,7 +49,9 @@ export function simulateLife(seed: number, opt: { name?: string; houseId?: strin
 export function autoStep(s: LifeState, rng: Rng) {
   const ev = currentEvent(s);
   if (ev) {
-    const open = visibleChoices(s, ev).map((c, i) => [c, i] as const).filter(([c]) => !choiceLocked(s, c));
+    const all = visibleChoices(s, ev).map((c, i) => [c, i] as const);
+    const unlocked = all.filter(([c]) => !choiceLocked(s, c));
+    const open = unlocked.length ? unlocked : all;
     // 확정 사망 선택지(대신 죽기 등)는 사람도 잘 고르지 않는다
     const safe = open.filter(([c]) => !c.success.effect?.death);
     const pool = safe.length && rng() < 0.9 ? safe : open;

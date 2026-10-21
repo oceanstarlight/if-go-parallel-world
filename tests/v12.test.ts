@@ -43,19 +43,19 @@ describe('v1.2 장신구', () => {
 
   it('찬 장신구만큼 판정·전투력이 오르고, 풀면 원래대로', () => {
     const s = createLife(base, seededRng(4));
-    s.stats.luck = 20;
+    s.stats.atk = 20;
     const cp = combatPower(s);
-    const chance = successChance(s, { stat: 'luck', dc: 30 });
-    const t = makeTrinket(TRINKETS.find((x) => x.stat === 'luck')!, 'common', seededRng(5));
+    const chance = successChance(s, { stat: 'atk', dc: 30 });
+    const t = makeTrinket(TRINKETS.find((x) => x.stat === 'atk')!, 'common', seededRng(5));
     s.bag = [t];
     equip(s, t.uid);
-    const add = t.stats!.luck!;
-    expect(statOf(s, 'luck')).toBe(20 + add);
-    expect(s.stats.luck).toBe(20); // 원래 능력치는 그대로
+    const add = t.stats!.atk!;
+    expect(statOf(s, 'atk')).toBe(20 + add);
+    expect(s.stats.atk).toBe(20); // 원래 능력치는 그대로
     expect(combatPower(s)).toBeGreaterThan(cp);
-    expect(successChance(s, { stat: 'luck', dc: 30 })).toBeGreaterThan(chance);
+    expect(successChance(s, { stat: 'atk', dc: 30 })).toBeGreaterThan(chance);
     unequipTrinket(s, t.uid);
-    expect(statOf(s, 'luck')).toBe(20);
+    expect(statOf(s, 'atk')).toBe(20);
     expect(combatPower(s)).toBe(cp);
   });
 
@@ -79,7 +79,8 @@ describe('v1.2 장신구', () => {
   });
 
   it('능력치마다 키우는 사건이 있다', () => {
-    for (const k of STAT_KEYS) {
+    // 공격력·방어력 사건은 3단계(직업별 사건 묶음)에서 채운다
+    for (const k of STAT_KEYS.filter((x) => x !== 'atk' && x !== 'def')) {
       const n = ALL_EVENTS.filter((e) => e.id.startsWith('s_') && JSON.stringify(e.choices ?? []).includes(`"${k}":`)).length;
       expect(n, k).toBeGreaterThanOrEqual(3);
     }
