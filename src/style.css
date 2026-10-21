@@ -994,3 +994,20 @@ button.t-slot { cursor: pointer; }
   .center-panel .choices.duo .choice { padding: 10px 8px; min-height: 56px; font-size: 14px; word-break: keep-all; }
   .center-panel .choice:hover:not(:disabled) { transform: none; box-shadow: none; }
 }
+
+/* ───── 모바일: 시간 막대를 언더바 위에 고정, 사건이 뜨면 카드를 화면 가득 ───── */
+@media (max-width: 760px) {
+  :root { --tb-h: 40px; }
+  .view-life { height: calc(100dvh - 45px - var(--ub-h) - var(--tb-h) - env(safe-area-inset-bottom)); }
+  .view-life .timebar {
+    position: fixed; left: 0; right: 0; z-index: 45; box-sizing: border-box; height: var(--tb-h);
+    bottom: calc(var(--ub-h) + env(safe-area-inset-bottom)); padding: 0 12px 0 14px; align-items: center;
+    background: rgba(255, 255, 255, 0.96); border-top: 1px solid var(--line); border-bottom: 0;
+  }
+  .view-life .action, .view-life .m-panel { bottom: calc(var(--ub-h) + var(--tb-h) + env(safe-area-inset-bottom)); }
+  .view-life.dueling .timebar { display: none; }
+  /* 사건 중: 인물 정보·연대기를 접고 카드가 남는 자리를 모두 쓴다 */
+  .view-life.evt > .sheet, .view-life .center.has-panel .chronicle { display: none; }
+  .view-life.evt .scene-host { height: calc(var(--ch, 190px) * 0.5); }
+  .view-life .center.has-panel .center-panel { flex: 1 1 auto; max-height: none; overflow-y: auto; }
+}

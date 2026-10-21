@@ -786,7 +786,7 @@ function view(app: App): string {
         <div class="stones" title="환생석">${icon('diamond-gem')} ${app.meta.soulStones}</div>
       </div>
     </header>
-    <main class="screen view-${app.screen} ${app.duel ? 'dueling' : ''}">${body}</main>
+    <main class="screen view-${app.screen} ${app.duel ? 'dueling' : ''} ${app.screen === 'life' && app.life && !app.duel && currentEvent(app.life) ? 'evt' : ''}">${body}</main>
     ${underbar(app)}
     ${app.notice ? `<div class="toast">${esc(app.notice)}</div>` : ''}
     ${app.dgConfirm ? dungeonConfirm() : ''}
@@ -1221,7 +1221,7 @@ function viewLife(app: App): string {
         <button class="link" data-act="abandon">이 삶을 포기한다</button>
       </div>
     </aside>
-    <section class="center">
+    <section class="center ${centerPanel ? 'has-panel' : ''}">
       <div class="scene-host ${s.omen ? `omen omen-${s.omen}` : ''}" data-gfx="scene" data-maxh="${Math.floor(window.innerHeight * 0.45)}"></div>
       ${s.death ? '' : timeBar(app, s, !!ev)}
       ${centerPanel ? `<div class="center-panel">${centerPanel}</div>` : ''}
