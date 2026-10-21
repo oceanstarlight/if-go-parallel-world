@@ -1006,8 +1006,8 @@ button.t-slot { cursor: pointer; }
   }
   .view-life .action, .view-life .m-panel { bottom: calc(var(--ub-h) + var(--tb-h) + env(safe-area-inset-bottom)); }
   .view-life.dueling .timebar { display: none; }
-  /* 사건 중: 인물 정보·연대기를 접고 카드가 남는 자리를 모두 쓴다 */
-  .view-life.evt > .sheet, .view-life .center.has-panel .chronicle { display: none; }
-  .view-life.evt .scene-host { height: calc(var(--ch, 190px) * 0.5); }
-  .view-life .center.has-panel .center-panel { flex: 1 1 auto; max-height: none; overflow-y: auto; }
+  /* 사건 중: 장면 대신 내 정보·능력치를 위에 두고, 카드는 한 단계 작게 */
+  .view-life.evt .scene-host { display: none; }
+  .view-life .center.has-panel .chronicle { display: block; }
+  .view-life .center.has-panel .center-panel { flex: none; max-height: 42dvh; overflow-y: auto; }
 }
